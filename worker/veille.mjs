@@ -8,6 +8,7 @@
 // opérateur MSSanté). Tant qu'elle n'est pas obtenue, le mode « simulation » répond localement, avec des
 // références préfixées SIM-, et rien ne quitte le serveur. Les adaptateurs « ans » sont les points de
 // branchement prévus : ils refusent explicitement de fonctionner sans configuration complète.
+import {interopStatus} from '../server/interop/index.mjs';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 async function body(request){const bytes=await request.arrayBuffer();if(bytes.byteLength>20000)throw Error('size');return JSON.parse(new TextDecoder().decode(bytes))}
 const mask=v=>{v=String(v||'');return v.length>4?v.slice(0,3)+'*'.repeat(v.length-5)+v.slice(-2):'***'};
@@ -21,19 +22,32 @@ export function suiviMessages(establishment){
  };
 }
 
-const CONNECTEURS=[
- {id:'insi',label:'Téléservice INSi',need:['INSI_CERT_PATH','INSI_ENDPOINT'],doc:'Raccordement CNAM + certificat logiciel ; DPI référencé Ségur.'},
- {id:'psc',label:'Pro Santé Connect',need:['PSC_CLIENT_ID','PSC_CLIENT_SECRET','PSC_ISSUER'],doc:'Déclaration du service auprès de l’ANS (OIDC, e-CPS / CPS).'},
- {id:'dmp',label:'DMP (Mon espace santé)',need:['DMP_LPS_ID','DMP_CERT_PATH'],doc:'Homologation LPS DMP par le CNDA ; identité INS qualifiée obligatoire.'},
- {id:'mssante',label:'MSSanté',need:['MSSANTE_OPERATEUR','MSSANTE_BAL'],doc:'Boîte organisationnelle de l’établissement chez un opérateur référencé.'}
-];
-export function interopStatus(env={}){
- return CONNECTEURS.map(c=>{const missing=c.need.filter(k=>!env[k]);return {id:c.id,label:c.label,mode:missing.length?'simulation':'configuré · homologation à vérifier',missing,doc:c.doc}});
+// État des connecteurs : voir server/interop/ (modes simulation | test | production).
+export {interopStatus};
+async function docData(env,key){const row=await env.DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(key).first();return row?JSON.parse(row.data):null}
+// Identité du séjour telle que qualifiée dans l'identitovigilance (seule source d'INS acceptée pour un envoi réel).
+async function identityRecord(env,stay){
+ const data=await docData(env,'identities/records'),rows=Array.isArray(data?.records)?data.records:Object.entries(data||{});
+ const rec=(rows.find(([id])=>id===stay)||[])[1]||null;if(!rec)return null;
+ const qualified=rec.remote?.outcome==='matched'&&!!rec.proof&&rec.remote?.mode&&rec.remote.mode!=='simulation';
+ return {status:qualified?'Qualifiée':'Non qualifiée',ins:qualified?rec.ins:null};
 }
+async function authorOf(env,user){const p=await env.DB.prepare('SELECT display_name,rpps FROM professional_profiles WHERE user_id=?').bind(user).first();const [firstName,...rest]=String(p?.display_name||'').replace(/^Dr\.?\s+/,'').split(' ');return {rpps:p?.rpps||'',firstName,lastName:rest.join(' ')}}
 
 export async function veilleApi(request,env,acl){
  const url=new URL(request.url),path=url.pathname;
  if(path==='/api/workspace/interop/status'&&request.method==='GET')return json({connecteurs:interopStatus(env.INTEROP_ENV||{})});
+ if(path==='/api/workspace/interop/insi'){
+  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
+  const d=await body(request),stay=String(d.stay||''),key='stay/'+stay+'/core';
+  if(!acl.canRead(key))return json({error:'Séjour hors habilitation.'},403);
+  const insi=env.INTEROP?.insi;if(!insi||insi.cfg.mode==='simulation')return json({mode:'simulation',error:'Téléservice INSi non raccordé : utilisez le test local de l’écran Identitovigilance.'},409);
+  const core=await docData(env,key);if(!core?.identity)return json({error:'Identité du séjour absente.'},409);
+  try{const r=await insi.search(core.identity);
+   await acl.log('insi-recherche',key,'allowed','Appel INSi ('+r.mode+')',r.outcome+(r.ins?' · '+r.ins.type+' ****'+String(r.ins.matricule).slice(-4):''));
+   return json(r);
+  }catch(e){const error=String(e.message||'INSi indisponible.').slice(0,300);await acl.log('insi-recherche',key,'denied','Appel INSi en échec',error);return json({error},502)}
+ }
  if(path==='/api/workspace/suivi/send'){
   if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
   const d=await body(request),stay=String(d.stay||''),kind=String(d.kind||'');
@@ -56,8 +70,27 @@ export async function veilleApi(request,env,acl){
   if(!acl.canRead(key)||!acl.keyWrite(key,[],[{}]))return json({error:'Envoi hors habilitation.'},403);
   const discharge=await env.DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind('stay/'+stay+'/discharge').first();
   if(!discharge||!JSON.parse(discharge.data)?.liaison?.document)return json({error:'Lettre de liaison non relue : enregistrez-la avant l’envoi.'},409);
-  const status=interopStatus(env.INTEROP_ENV||{});
-  if(targets.some(t=>status.find(c=>c.id===t.split('-')[0]).mode!=='simulation'))return json({error:'Connecteur réel configuré mais non activé dans cette version : homologation à finaliser.'},501);
+  const status=interopStatus(env.INTEROP_ENV||{}),modeOf=t=>status.find(c=>c.id===t.split('-')[0]).mode;
+  const real=targets.filter(t=>modeOf(t)!=='simulation');
+  if(real.length){
+   const connectors=env.INTEROP;if(!connectors)return json({error:'Connecteurs nationaux non chargés sur ce serveur.'},503);
+   const liaison=JSON.parse(discharge.data).liaison,pdfBase64=String(d.pdfBase64||'');
+   if(!/^[A-Za-z0-9+/=]{100,}$/.test(pdfBase64))return json({error:'Envoi réel : le PDF de la lettre relue doit accompagner la demande.'},409);
+   const identity=await identityRecord(env,stay),author=await authorOf(env,request.headers.get('oai-authenticated-user-id')),core=await docData(env,'stay/'+stay+'/core');
+   const results=[];
+   for(const t of targets){
+    if(modeOf(t)==='simulation'){results.push({target:t,ref:'SIM-'+t.toUpperCase()+'-'+crypto.randomUUID().slice(0,8),simulated:true});continue}
+    try{
+     if(t==='dmp'){const r=await connectors.dmp.send({identity,consent:liaison.consentementDmp,author,patient:core?.identity||{},ins:identity?.ins,pdfBase64});results.push({target:t,ref:r.documentId,mode:r.mode})}
+     else{const {patientAddress}=await import('../server/interop/mssante.mjs');
+      const to=t==='mssante-patient'?[patientAddress(identity?.ins)]:[String(liaison.medecinTraitantMssante||'')];
+      const r=await connectors.mssante.send({to,subject:'Lettre de liaison de sortie',text:'Lettre de liaison de sortie en pièce jointe.',attachments:[{filename:'lettre-de-liaison.pdf',contentType:'application/pdf',base64:pdfBase64}]});results.push({target:t,ref:'MSS-'+crypto.randomUUID().slice(0,8),mode:r.mode})}
+    }catch(e){results.push({target:t,error:String(e.message).slice(0,300)})}
+   }
+   const ok=results.filter(r=>!r.error);
+   await acl.log('interop-liaison',key,ok.length===results.length?'allowed':'denied','Envoi réel ('+real.join(', ')+')',results.map(r=>r.target+':'+(r.ref||'échec')).join(' '));
+   return json({mode:'reel',at:new Date().toISOString(),results},ok.length?200:502);
+  }
   const at=new Date().toISOString(),results=targets.map(t=>({target:t,ref:'SIM-'+t.toUpperCase()+'-'+crypto.randomUUID().slice(0,8),simulated:true}));
   await acl.log('interop-liaison',key,'allowed','Simulation : aucun envoi réel',results.map(r=>r.ref).join(' '));
   return json({mode:'simulation',at,results});

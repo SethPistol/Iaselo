@@ -18,7 +18,7 @@ export async function bootstrap(pool,env=process.env){if((await pool.query('SELE
 // de formulaire, même vers la même origine. Sec-Fetch-Site, fixé par le navigateur et non modifiable par une page,
 // confirme alors que la requête vient bien de cette origine. Toute autre origine reste refusée.
 export function sameOrigin(request,cfg){const origin=request.headers.get('Origin');if(origin===cfg.baseUrl)return true;return origin==='null'&&request.headers.get('Sec-Fetch-Site')==='same-origin'}
-export async function createAuth(pool,cfg){
+export async function createAuth(pool,cfg,{psc=null}={}){
  const fingerprint=v=>createHmac('sha256',cfg.sessionSecret).update(v).digest('hex'),cookieName=cfg.secure?'__Host-parcours_session':'parcours_session',dummy=await hashPassword(randomBytes(32).toString('hex'));
  const sessionCookie=(token,age)=>cookieName+'='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+age+(cfg.secure?'; Secure':'');
  function getToken(request){const value=(request.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);return /^[a-f0-9]{64}$/.test(value||'')?value:null}
@@ -32,13 +32,30 @@ export async function createAuth(pool,cfg){
   const passwordOK=await verifyPassword(d.password,account?.password_hash||dummy),ok=passwordOK&&account?.enabled===1&&account?.active===1;
   await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,ok?1:0]);
   if(!ok)return new Response(loginPage('Identifiants invalides ou compte désactivé.'),{status:401,headers:{'Content-Type':'text/html; charset=utf-8'}});
-  const token=randomBytes(32).toString('hex');await pool.query('INSERT INTO auth_sessions(token_hash,user_id,expires_at,created_at) VALUES($1,$2,$3,$4)',[fingerprint(token),account.id,new Date(Date.now()+cfg.sessionHours*3600000).toISOString(),at]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,account.id,'login']);
+  return openSession(account.id,'password');
+ }
+ async function openSession(userId,method,idToken=null){
+  const token=randomBytes(32).toString('hex'),at=new Date().toISOString();await pool.query('INSERT INTO auth_sessions(token_hash,user_id,expires_at,created_at,method,id_token) VALUES($1,$2,$3,$4,$5,$6)',[fingerprint(token),userId,new Date(Date.now()+cfg.sessionHours*3600000).toISOString(),at,method,idToken]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,userId,method==='psc'?'login-psc':'login']);
   return new Response(null,{status:303,headers:{Location:'/', 'Set-Cookie':sessionCookie(token,Math.floor(cfg.sessionHours*3600))}});
  }
- async function logout(request){if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});const token=getToken(request);if(token)await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[fingerprint(token)]);return new Response(null,{status:303,headers:{Location:'/login','Set-Cookie':sessionCookie('',0)}})}
- return {user,login,logout};
+ // Pro Santé Connect : le professionnel est reconnu par son RPPS, renseigné au préalable sur son compte
+ // par un administrateur (écran Accès professionnels). Aucun compte n'est créé automatiquement.
+ const stateCookie=(v,age)=>'iaselo_psc='+v+'; Path=/auth/psc; HttpOnly; SameSite=Lax; Max-Age='+age+(cfg.secure?'; Secure':'');
+ async function pscStart(){if(!psc?.enabled())return new Response('Pro Santé Connect non configuré.',{status:404});try{const {location,cookie}=await psc.start();return new Response(null,{status:303,headers:{Location:location,'Set-Cookie':stateCookie(cookie,600)}})}catch(e){return new Response(loginPage('Pro Santé Connect indisponible. Réessayez ou utilisez votre mot de passe.',undefined,true),{status:502,headers:{'Content-Type':'text/html; charset=utf-8'}})}}
+ async function pscCallback(request){
+  if(!psc?.enabled())return new Response('Pro Santé Connect non configuré.',{status:404});
+  const raw=(request.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('iaselo_psc='))?.slice(11);
+  const page=(m,status)=>new Response(loginPage(m,undefined,true),{status,headers:{'Content-Type':'text/html; charset=utf-8','Set-Cookie':stateCookie('',0)}});
+  let r;try{r=await psc.callback(new URL(request.url).searchParams,raw)}catch(e){return page(String(e.message).slice(0,200),401)}
+  if(!r.rpps)return page('Pro Santé Connect n’a pas transmis de RPPS pour ce professionnel.',403);
+  const account=(await pool.query('SELECT u.id FROM auth_users u JOIN professional_profiles p ON p.user_id=u.id WHERE p.rpps=$1 AND u.enabled=1 AND p.active=1',[r.rpps])).rows[0];
+  if(!account){await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,0)',[fingerprint('psc:'+r.rpps),new Date().toISOString()]);return page('Aucun compte actif n’est associé à ce RPPS. Demandez à l’administrateur de le renseigner sur votre compte.',403)}
+  const res=await openSession(account.id,'psc',r.idToken),headers=new Headers(res.headers);headers.append('Set-Cookie',stateCookie('',0));return new Response(null,{status:303,headers});
+ }
+ async function logout(request){if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});const token=getToken(request);let location='/login';if(token){const row=(await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1 RETURNING id_token',[fingerprint(token)])).rows?.[0];if(row?.id_token&&psc)try{location=await psc.logoutUrl(row.id_token)||location}catch{}}return new Response(null,{status:303,headers:{Location:location,'Set-Cookie':sessionCookie('',0)}})}
+ return {user,login,logout,pscStart,pscCallback,pscEnabled:()=>!!psc?.enabled()};
 }
-export function loginPage(message='',test=recette()){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
+export function loginPage(message='',test=recette(),psc=false){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
 @font-face{font-family:Geist;font-weight:100 900;font-display:swap;src:url(/assets/fonts/geist-latin-wght-normal.woff2) format('woff2-variations')}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%}
 body{font:16px/1.55 Geist,system-ui,-apple-system,'Segoe UI',sans-serif;color:#0C1A25;background:#F3F5F8;-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(380px,1fr);min-height:100vh}
@@ -63,6 +80,7 @@ input:hover{border-color:#4C5D6C}input:focus{outline:none;border-color:#0F4D5C;b
 button{font:600 16px Geist,system-ui,sans-serif;min-height:52px;margin-top:6px;border:0;border-radius:13px;background:#0F4D5C;color:#fff;cursor:pointer;box-shadow:0 1px 2px rgba(12,26,37,.15),0 8px 20px rgba(15,77,92,.18);transition:background .15s}
 button:hover{background:#0B3D49}button:focus-visible{outline:3px solid #0F4D5C;outline-offset:3px}
 .error{margin:0;padding:12px 14px;border-radius:12px;background:#FDEBEC;color:#B21F2A;font-weight:550}.error:empty{display:none}
+.psc{display:flex;align-items:center;justify-content:center;min-height:52px;border:1px solid #0F4D5C;border-radius:13px;color:#0F4D5C;font-weight:600;text-decoration:none}.psc:hover{background:#E1EFF1}
 .note{margin:0;font-size:13.5px;color:#4C5D6C;border-top:1px solid #DAE1E8;padding-top:18px}
 @media (max-width:860px){body{grid-template-columns:1fr}.marque{padding:28px 24px;gap:24px}.marque svg.halo{width:480px;height:480px;right:-180px;top:-200px}.marque h1{font-size:32px}.etapes,.pied{display:none}.acces{padding:28px 20px 40px}}
 </style></head><body>
@@ -71,4 +89,4 @@ button:hover{background:#0B3D49}button:focus-visible{outline:3px solid #0F4D5C;o
 <div><h1>Le parcours de chaque patient, d’un seul regard.</h1><p>De l’annonce chirurgicale au suivi, toute l’équipe travaille dans le même dossier : consultation, bloc, réveil, hospitalisation et sortie.</p>
 <ul class="etapes"><li>Annonce</li><li>Consultation</li><li>Préparation</li><li>Bloc</li><li>SSPI</li><li>Hospitalisation</li><li>Sortie</li><li>Suivi</li></ul></div>
 <p class="pied">Données de santé hébergées en France chez un hébergeur certifié HDS.</p></section>
-<div class="acces"><main><img class="etab" src="/assets/marque/etablissement.webp" alt="Clinique du Trocadéro" width="369" height="200"><div><h2>Connexion</h2><p class="sous">Espace des professionnels de l’établissement.</p></div><p class="error" role="alert">${message}</p>${test?`<p class="recette"><strong>Serveur de recette · patients fictifs uniquement.</strong> Compte de test : <code>${RECETTE_EMAIL}</code> · mot de passe <code>${RECETTE_PASSWORD}</code></p>`:''}<form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required${test?` value="${RECETTE_EMAIL}"`:''}></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form><p class="note">Patients : utilisez le lien personnel qui vous a été remis. Prototype réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></div></body></html>`}
+<div class="acces"><main><img class="etab" src="/assets/marque/etablissement.webp" alt="Clinique du Trocadéro" width="369" height="200"><div><h2>Connexion</h2><p class="sous">Espace des professionnels de l’établissement.</p></div><p class="error" role="alert">${message}</p>${test?`<p class="recette"><strong>Serveur de recette · patients fictifs uniquement.</strong> Compte de test : <code>${RECETTE_EMAIL}</code> · mot de passe <code>${RECETTE_PASSWORD}</code></p>`:''}<form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required${test?` value="${RECETTE_EMAIL}"`:''}></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form>${psc?`<a class="psc" href="/auth/psc/start">Se connecter avec Pro Santé Connect</a><p class="note">Carte CPS ou application e-CPS. Votre RPPS doit être renseigné sur votre compte.</p>`:''}<p class="note">Patients : utilisez le lien personnel qui vous a été remis. Prototype réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></div></body></html>`}
