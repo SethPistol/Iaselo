@@ -157,7 +157,9 @@ function openPatientPage(index){
  $('#patient-page-title').scrollIntoView({block:'start'});
 }
 async function submitPatientQuestionnaire(form){
- const {medRows,confirmed,...answers}=patientDrafts[patientTarget];
+ const {confirmed,...answers}=patientDrafts[patientTarget];
+ // Traitements transmis aussi ligne par ligne pour préremplir les traitements structurés du médecin.
+ if(answers.medRows)answers.medRows=answers.medRows.filter(row=>row.some(Boolean));if(!answers.medRows?.length)delete answers.medRows;
  const button=form.querySelector('button.primary');
  button.disabled=true;
  try{

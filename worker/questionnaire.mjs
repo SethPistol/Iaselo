@@ -10,9 +10,10 @@ export async function patientQuestionnaireApi(request,env){
  if(!row)return invitationJson({error:'Invitation expirée, remplacée ou déjà utilisée.'},410);
  if(url.pathname.endsWith('/resolve'))return invitationJson({available:true,expiresAt:row.expires_at});
  if(d.confirmed!==true||!d.answers||typeof d.answers!=='object'||Array.isArray(d.answers)||Object.keys(d.answers).length>250)return invitationJson({error:'Réponses et confirmation requises.'},400);
- const keys=new Set('birthname firstname usename dob weight height operation date allergy allergyDetails operations anesthesia anesthesiaDetails nausea travel hospital hospitalDetails diseases other teeth stairs devices bleeding treatments tobacco cigarettes years alcohol drugs drugDetails questions signedDate signature'.split(' ')),answers=Object.create(null);
+ const keys=new Set('birthname firstname usename dob weight height operation date allergy allergyDetails operations anesthesia anesthesiaDetails nausea travel hospital hospitalDetails diseases other teeth stairs devices bleeding treatments tobacco cigarettes years alcohol drugs drugDetails questions signedDate signature medRows'.split(' ')),answers=Object.create(null);
  for(const [key,value] of Object.entries(d.answers)){
   if(!keys.has(key))return invitationJson({error:'Champ de questionnaire inconnu.'},400);
+  if(key==='medRows'){if(!Array.isArray(value)||value.length>10||value.some(r=>!Array.isArray(r)||r.length!==5||r.some(x=>typeof x!=='string'||x.length>240)))return invitationJson({error:'Réponse invalide.'},400);const rows=value.map(r=>r.map(x=>x.trim())).filter(r=>r.some(Boolean));if(rows.length)answers.medRows=rows;continue}
   if(['diseases','devices','bleeding'].includes(key)){if(!Array.isArray(value)||value.length>40||value.some(x=>typeof x!=='string'||x.length>240))return invitationJson({error:'Réponse invalide.'},400);answers[key]=value;}
   else {if(typeof value!=='string'||value.length>8000)return invitationJson({error:'Réponse invalide.'},400);answers[key]=value.trim();}
  }
