@@ -16,8 +16,8 @@ export async function professionalAccess(env,request,user,member,at){
   if(request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8')try{display=decodeURIComponent(display)}catch{}
   await DB.prepare('INSERT OR IGNORE INTO professional_profiles(user_id,display_name,email,profession,active,updated_at,updated_by) VALUES(?,?,?,?,1,?,?)').bind(user,display.slice(0,160),(request.headers.get('oai-authenticated-user-email')||'').slice(0,200),isAdmin?'anesthesiste':'unassigned',at,user).run();
   if(isAdmin){await DB.batch([
-   DB.prepare("INSERT OR IGNORE INTO care_teams(id,label) VALUES('demo-clinique','Équipe de démonstration de la clinique')"),
-   DB.prepare("INSERT OR IGNORE INTO professional_teams(user_id,team_id,valid_from) VALUES(?,'demo-clinique',?)").bind(user,at),
+   DB.prepare("INSERT OR IGNORE INTO care_teams(id,label) VALUES('endoscopie','Endoscopie'),('demo-clinique','Chirurgie'),('sejour-medical','Séjour médical')"),
+   ...['endoscopie','demo-clinique','sejour-medical'].map(team=>DB.prepare("INSERT OR IGNORE INTO professional_teams(user_id,team_id,valid_from) VALUES(?,?,?)").bind(user,team,at)),
    DB.prepare("INSERT OR IGNORE INTO stay_teams(stay_id,team_id,valid_from) SELECT substr(key,6,length(key)-10),'demo-clinique',? FROM workspace_documents WHERE key LIKE 'stay/%/core'").bind(at)
   ]);}
   profile=await DB.prepare('SELECT * FROM professional_profiles WHERE user_id=?').bind(user).first();await log('account-first-connection',user,'allowed','Compte individuel issu de la connexion du site');
@@ -27,7 +27,7 @@ export async function professionalAccess(env,request,user,member,at){
   for(const row of rows.results)for(const hash of fileReferences(JSON.parse(row.data)))statements.push(DB.prepare('INSERT OR IGNORE INTO file_scopes(hash,document_key) VALUES(?,?)').bind(hash,row.key));
   statements.push(DB.prepare("INSERT OR IGNORE INTO access_migrations(id) VALUES('file-scopes-v1')"));await DB.batch(statements);
  }
- const teams=(await DB.prepare('SELECT t.id,t.label,m.valid_from,m.valid_until FROM care_teams t JOIN professional_teams m ON m.team_id=t.id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?)').bind(user,at,at).all()).results;
+ const teams=(await DB.prepare('SELECT t.id,t.label,m.valid_from,m.valid_until FROM care_teams t JOIN professional_teams m ON m.team_id=t.id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?) ORDER BY t.label').bind(user,at,at).all()).results;
  const stays=(await DB.prepare('SELECT DISTINCT s.stay_id FROM stay_teams s JOIN professional_teams m ON s.team_id=m.team_id JOIN care_teams t ON t.id=s.team_id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?) AND s.valid_from<=? AND (s.valid_until IS NULL OR s.valid_until>?)').bind(user,at,at,at,at).all()).results;
  const allowed=new Set(stays.map(x=>x.stay_id)),job=profile.profession,active=!!profile.active,clinical=['anesthesiste','chirurgien','infirmier','pharmacien','dim'].includes(job);
  if(!active||['unassigned','administration'].includes(job))allowed.clear();

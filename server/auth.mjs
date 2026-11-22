@@ -9,7 +9,7 @@ export async function createAccount(pool,{email,name,passwordHash,admin=false}){
  await client.query('INSERT INTO auth_users(id,email,display_name,password_hash,created_at) VALUES($1,$2,$3,$4,$5)',[id,email.toLowerCase(),name.trim(),passwordHash,at]);
  await client.query('INSERT INTO workspace_members VALUES($1,$2,$3)',[id,admin?'owner':'reader',at]);
  await client.query('INSERT INTO professional_profiles(user_id,display_name,email,profession,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$1)',[id,name.trim(),email.toLowerCase(),admin?'anesthesiste':'unassigned',at]);
- if(admin){await client.query("INSERT INTO care_teams(id,label) VALUES('demo-clinique','Équipe clinique') ON CONFLICT DO NOTHING");await client.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);}
+ if(admin){await client.query("INSERT INTO care_teams(id,label) VALUES('endoscopie','Endoscopie'),('demo-clinique','Chirurgie'),('sejour-medical','Séjour médical') ON CONFLICT DO NOTHING");for(const team of ['endoscopie','demo-clinique','sejour-medical'])await client.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,$2,$3)",[id,team,at]);}
  await client.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,id,admin?'bootstrap-admin':'account-created']);await client.query('COMMIT');return id;
  }catch(e){await client.query('ROLLBACK');throw e}finally{client.release()}
 }
