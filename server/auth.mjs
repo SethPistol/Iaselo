@@ -14,13 +14,17 @@ export async function createAccount(pool,{email,name,passwordHash,admin=false}){
  }catch(e){await client.query('ROLLBACK');throw e}finally{client.release()}
 }
 export async function bootstrap(pool,env=process.env){if((await pool.query('SELECT id FROM auth_users LIMIT 1')).rows.length)return;await createAccount(pool,{email:env.BOOTSTRAP_ADMIN_EMAIL,name:env.BOOTSTRAP_ADMIN_NAME||'Administrateur',passwordHash:env.BOOTSTRAP_ADMIN_PASSWORD_HASH,admin:true})}
+// Formulaires HTML : avec Referrer-Policy: no-referrer, les navigateurs envoient « Origin: null » pour un POST
+// de formulaire, même vers la même origine. Sec-Fetch-Site, fixé par le navigateur et non modifiable par une page,
+// confirme alors que la requête vient bien de cette origine. Toute autre origine reste refusée.
+export function sameOrigin(request,cfg){const origin=request.headers.get('Origin');if(origin===cfg.baseUrl)return true;return origin==='null'&&request.headers.get('Sec-Fetch-Site')==='same-origin'}
 export async function createAuth(pool,cfg){
  const fingerprint=v=>createHmac('sha256',cfg.sessionSecret).update(v).digest('hex'),cookieName=cfg.secure?'__Host-parcours_session':'parcours_session',dummy=await hashPassword(randomBytes(32).toString('hex'));
  const sessionCookie=(token,age)=>cookieName+'='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+age+(cfg.secure?'; Secure':'');
  function getToken(request){const value=(request.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);return /^[a-f0-9]{64}$/.test(value||'')?value:null}
  async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
  async function login(request){
-  if(request.headers.get('Origin')!==cfg.baseUrl)return new Response('Origine refusée',{status:403});
+  if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});
   const bytes=await request.arrayBuffer();if(bytes.byteLength>8192)return new Response('Requête trop volumineuse',{status:413});let d;try{const raw=new TextDecoder().decode(bytes);d=request.headers.get('Content-Type')?.includes('application/json')?JSON.parse(raw):Object.fromEntries(new URLSearchParams(raw))}catch{return new Response('Requête invalide',{status:400})}
   const email=String(d.email||'').trim().toLowerCase().slice(0,240),identity=fingerprint(email),at=new Date().toISOString(),since=new Date(Date.now()-15*60000).toISOString();
   if(Number((await pool.query('SELECT COUNT(*) AS n FROM auth_attempts WHERE identity_hash=$1 AND at>$2 AND success=0',[identity,since])).rows[0].n)>=10)return new Response('Trop de tentatives. Réessayez dans 15 minutes.',{status:429});
@@ -31,7 +35,7 @@ export async function createAuth(pool,cfg){
   const token=randomBytes(32).toString('hex');await pool.query('INSERT INTO auth_sessions(token_hash,user_id,expires_at,created_at) VALUES($1,$2,$3,$4)',[fingerprint(token),account.id,new Date(Date.now()+cfg.sessionHours*3600000).toISOString(),at]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,account.id,'login']);
   return new Response(null,{status:303,headers:{Location:'/', 'Set-Cookie':sessionCookie(token,Math.floor(cfg.sessionHours*3600))}});
  }
- async function logout(request){if(request.headers.get('Origin')!==cfg.baseUrl)return new Response('Origine refusée',{status:403});const token=getToken(request);if(token)await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[fingerprint(token)]);return new Response(null,{status:303,headers:{Location:'/login','Set-Cookie':sessionCookie('',0)}})}
+ async function logout(request){if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});const token=getToken(request);if(token)await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[fingerprint(token)]);return new Response(null,{status:303,headers:{Location:'/login','Set-Cookie':sessionCookie('',0)}})}
  return {user,login,logout};
 }
 export function loginPage(message=''){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion professionnelle · Parcours Anesthésie</title><style>body{font:17px system-ui;background:#edf3f6;color:#203747;margin:0;padding:8vh 20px}main{max-width:430px;margin:auto;background:white;padding:32px;border-radius:16px}label{display:block;margin:20px 0}input,button{box-sizing:border-box;font:inherit;width:100%;padding:12px;margin-top:8px;border:1px solid #abbfc9;border-radius:6px}button{background:#244e61;color:white}p{line-height:1.5}.error{color:#9b302a}</style></head><body><main><h1>Parcours Anesthésie</h1><p>Connexion individuelle des professionnels.</p><p class="error">${message}</p><form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form><p>Accès patient : utilisez le lien d’invitation qui vous a été remis. Le prototype reste réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></body></html>`}
