@@ -172,10 +172,12 @@ Si des données doivent être reprises du site antérieur, réaliser un export a
 | `.env.example` | Paramètres à compléter, sans secrets |
 | `clevercloud/environment.example` | Paramètres runtime à saisir dans la console ; fichier informatif |
 | `tests/` | Tests métier, droits et intégration PostgreSQL/S3 |
-| `docs/`, `drizzle/`, `demo-server/` | Documentation et sources historiques conservées pour référence ; pas le runtime Clever Cloud |
+| `docs/` | Documentation de conception du prototype, conservée pour référence |
+| `drizzle/`, `worker/sqlite-adapter.mjs`, `scripts/restore-backup.mjs` | Schéma SQLite historique, utilisé uniquement par les tests métier ; pas le runtime Clever Cloud |
+| `.github/workflows/ci.yml` | Intégration continue : build et tests à chaque modification |
 | `VALIDATION.md` | Résultats et limites des vérifications réalisées pour l’archive |
 
-L’interface comporte des fichiers JavaScript maintenus directement dans `dist` ; ils sont fournis intégralement. `npm run build` vérifie les sources et ressources, sans dépendre d’un compilateur privé. Les anciens scripts `build-durable.mjs`, `build-static.mjs` et `dev-durable.mjs` restent historiques ; utiliser exclusivement les commandes principales de ce README pour cette distribution. Le bundle généré spécifique Cloudflare et ses métadonnées de publication ne sont pas nécessaires et ne sont pas inclus.
+L’interface est maintenue directement dans `dist`, sans compilateur. Le dossier clinique principal est `dist/parcours-v8.js` (et `parcours-v8.css`) : c’est le fichier source à modifier. Les anciennes couches `parcours-v5` à `v7`, leurs sources `app.js`, `patient.js`, `consultation.js`, `workflow.js` et le script `build-static.mjs`, qui aurait écrasé `parcours-v8.js` avec ces sources périmées, ont été retirés. `npm run build` vérifie les sources, les ressources et l’absence de ces fichiers retirés. Les anciens scripts Cloudflare (`build-durable.mjs`, `dev-durable.mjs`) et le serveur de démonstration `demo-server/` ont également été retirés ; ils restent consultables dans l’historique Git.
 
 Cette version conserve le statut de **prototype à données fictives** et ses limites fonctionnelles. Elle n’est pas présentée comme un DPI certifié ou un dispositif médical validé. Avant des données réelles : vérifier le périmètre HDS des services et du contrat souscrit, la conformité et les procédures de la clinique, la sécurité des accès et la validation clinique du logiciel. Le choix de Clever Cloud seul ne réalise pas ces validations.
 
