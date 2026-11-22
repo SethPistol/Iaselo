@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {workspaceApi} from '../worker/workspace.mjs';import {sqliteBinding} from '../worker/sqlite-adapter.mjs';import {brevoMessaging} from '../server/brevo.mjs';import {invitationMessages} from '../worker/questionnaire.mjs';
+import {workspaceApi} from '../worker/workspace.mjs';import {sqliteBinding} from '../worker/sqlite-adapter.mjs';import {brevoMessaging,normalizeRecipient} from '../server/brevo.mjs';import {invitationMessages} from '../worker/questionnaire.mjs';
 const origin='https://prototype.test',now='2020-01-01T00:00:00.000Z';
 function fake(){const calls=[];return {calls,fetch:async(url,init)=>{calls.push({url,headers:init.headers,body:JSON.parse(init.body)});return new Response(JSON.stringify({messageId:'m-'+calls.length}),{status:201})}}}
 test('Brevo : clé lue dans l’environnement, bons points d’accès, SMS transactionnel sans +',async()=>{
@@ -48,3 +48,9 @@ test('envoi du lien : destinataire vérifié côté serveur, lien actif requis, 
  }finally{f.close()}
 });
 test('envoi refusé proprement si Brevo n’est pas configuré',async()=>{const f=fixture(undefined);try{assert.equal((await f.call('owner','/questionnaire/send',{stay:'A',token:'0'.repeat(64),channels:['sms']})).status,503)}finally{f.close()}});
+test('liste de test : e-mails avec points, 06/0033/+33, espaces, guillemets et points-virgules',async()=>{
+ const f=fake(),m=brevoMessaging({BREVO_API_KEY:'k',BREVO_SENDER_EMAIL:'a@b.test',BREVO_SMS_SENDER:'IASELO',IASELO_RECETTE:'true',MESSAGING_ALLOWED_RECIPIENTS:' "06 00 00 00 42" ; Prenom.Nom@Example.COM '},f.fetch);
+ await m.sms({to:'+33600000042',content:'x'});await m.email({to:'prenom.nom@example.com',subject:'s',text:'t',html:'h'});assert.equal(f.calls.length,2);
+ for(const v of ['0600000042','0033 6 00 00 00 42','+33 (0)6 00 00 00 42','33600000042','+33.6.00.00.00.42'])assert.equal(normalizeRecipient(v),'+33600000042',v);
+ await assert.rejects(m.email({to:'autre@example.com',subject:'s',text:'t',html:'h'}),/2 destinataires/);
+});

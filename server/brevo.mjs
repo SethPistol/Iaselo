@@ -13,14 +13,20 @@
 //                             qui pourrait appartenir à une vraie personne.
 const API='https://api.brevo.com/v3';
 const clean=s=>String(s||'').trim();
+// Comparaison tolérante : guillemets, espaces, casse, 06… / 0033… / +33…
+export function normalizeRecipient(value){
+ const v=clean(value).replace(/^["'«\s]+|["'»\s]+$/g,'').toLowerCase();if(!v)return '';
+ if(v.includes('@'))return v.replace(/\s/g,'');
+ let n=v.replace(/[^\d+]/g,'');if(n.startsWith('00'))n='+'+n.slice(2);if(/^0\d{9}$/.test(n))n='+33'+n.slice(1);if(n.startsWith('+330'))n='+33'+n.slice(4);if(/^33\d{9}$/.test(n))n='+'+n;return n;
+}
 export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
  const key=clean(env.BREVO_API_KEY),senderEmail=clean(env.BREVO_SENDER_EMAIL),establishment=clean(env.ETABLISSEMENT_NOM)||'Clinique du Trocadéro';
  const senderName=clean(env.BREVO_SENDER_NAME)||establishment,smsSender=clean(env.BREVO_SMS_SENDER).replace(/[^A-Za-z0-9]/g,'').slice(0,11);
- const recette=env.IASELO_RECETTE==='true',allowList=clean(env.MESSAGING_ALLOWED_RECIPIENTS).split(',').map(x=>x.trim().toLowerCase().replace(/[\s.]/g,'')).filter(Boolean);
+ const recette=env.IASELO_RECETTE==='true',allowList=clean(env.MESSAGING_ALLOWED_RECIPIENTS).split(/[,;\n]+/).map(normalizeRecipient).filter(Boolean);
  const channels={email:!!(key&&senderEmail),sms:!!(key&&smsSender.length>=3)};
  function refusal(to){
   if(recette&&!allowList.length)return 'Serveur de recette : aucun destinataire de test autorisé (MESSAGING_ALLOWED_RECIPIENTS).';
-  if(allowList.length&&!allowList.includes(String(to).toLowerCase()))return 'Destinataire hors de la liste de test autorisée.';
+  if(allowList.length&&!allowList.includes(normalizeRecipient(to)))return 'Destinataire hors de la liste de test autorisée ('+allowList.length+' destinataire'+(allowList.length>1?'s':'')+' dans MESSAGING_ALLOWED_RECIPIENTS).';
   return '';
  }
  async function call(path,payload){
