@@ -140,3 +140,4 @@ body.am-locked{overflow:hidden}
 }
 @media (hover:none){.am-search-btn kbd{display:none}}
 @media (max-width:700px){.am-r-card header{flex-wrap:wrap}.am-r-where{text-align:left}}
+.am-bio{margin-top:18px}.am-refus{max-width:620px;margin:24px auto;display:flex;flex-direction:column;align-items:flex-start;gap:12px}.am-refus h3{margin:0}.am-refus p{margin:0;color:var(--i-mut)}
