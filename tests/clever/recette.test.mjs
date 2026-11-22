@@ -25,3 +25,11 @@ test('PGSSL=require : accepté seulement en recette, jamais en production',async
  const pool=createPool({...base,PGSSL:'require',IASELO_RECETTE:'true'});assert.deepEqual(pool.options.ssl,{rejectUnauthorized:false});await pool.end();
  const strict=createPool(base);assert.equal(strict.options.ssl.rejectUnauthorized,true);await strict.end();
 });
+import http from 'node:http';
+test('recette : création du bucket sans LocationConstraint (refusé par Cellar)',async()=>{
+ const seen=[];const server=http.createServer((req,res)=>{let body='';req.on('data',c=>body+=c);req.on('end',()=>{seen.push({method:req.method,url:req.url,body});if(req.method==='HEAD'){res.writeHead(404);res.end()}else{res.writeHead(200);res.end()}})});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ try{const bucket=cellarBinding({NODE_ENV:'test',IASELO_RECETTE:'true',S3_ENDPOINT:'http://127.0.0.1:'+server.address().port,CELLAR_ADDON_KEY_ID:'KEY1',CELLAR_ADDON_KEY_SECRET:'x'});await bucket.check();
+  const create=seen.find(r=>r.method==='PUT');assert.ok(create,'bucket créé');assert.match(create.url,/^\/iaselo-recette-key1\/?$/);assert.doesNotMatch(create.body,/LocationConstraint/);}
+ finally{server.close()}
+});
