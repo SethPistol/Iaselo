@@ -1,0 +1,85 @@
+/* « Ma journée » : page d'accueil (maquette Scialytique). Jetons --i-* définis dans iaselo.css. */
+body.j-home main > header { display: none; }
+body.j-home #workspace { display: flex; flex-direction: column; gap: 28px; }
+.j-hero { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.j-date { margin: 0; font-size: 14px; color: var(--i-mut); }
+html body .j-hello { margin: 0; font-size: clamp(34px, 4.2vw, 48px); line-height: 1.05; font-weight: 680; letter-spacing: -.035em; color: var(--i-ink); }
+.j-summary { margin: 6px 0 0; font-size: 18px; line-height: 1.45; color: var(--i-mut); max-width: 62ch; }
+.j-summary strong { color: var(--i-ink); font-weight: 600; }
+.j-summary .j-urgent { color: var(--i-crit); }
+
+.j-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.j-kpi { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 20px 22px; border-radius: var(--i-r-l); background: var(--i-s1); border: 1px solid var(--i-line); box-shadow: var(--i-shadow); transition: border-color .15s, transform .15s; }
+.j-kpi:hover { border-color: var(--i-acc); transform: translateY(-1px); }
+.j-kpi:focus-visible { outline: 3px solid var(--i-acc); outline-offset: 2px; }
+.j-kpi span { font-size: 14px; color: var(--i-mut); }
+.j-kpi strong { font-size: 34px; line-height: 1; font-weight: 650; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--i-ink); }
+.j-kpi small { font-size: 13px; color: var(--i-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.j-kpi.is-crit strong { color: var(--i-crit); }
+
+.j-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.j-card { background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); padding: 22px 24px; }
+.j-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+html body .j-card-head h3 { margin: 0; font-size: 19px; font-weight: 620; letter-spacing: -.015em; }
+.j-hint { font-size: 13px; color: var(--i-mut); }
+.j-link { all: unset; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--i-acc); }
+.j-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.j-link:focus-visible { outline: 3px solid var(--i-acc); outline-offset: 2px; border-radius: 4px; }
+.j-empty { color: var(--i-mut); margin: 8px 0 12px; }
+
+.j-todo-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.j-todo-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--i-line); }
+.j-todo-row:first-child { border-top: 0; }
+.j-todo-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.j-todo-main strong { font-size: 15.5px; font-weight: 600; color: var(--i-ink); }
+.j-todo-main span { font-size: 13.5px; color: var(--i-mut); }
+.j-when { font: 500 13px/1.3 var(--i-mono); color: var(--i-mut); white-space: nowrap; }
+.j-todo-actions { display: flex; gap: 8px; }
+.j-todo-actions .secondary { min-height: 40px; }
+.j-done { min-width: 40px; min-height: 40px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--i-line); background: var(--i-s1); color: var(--i-ok); cursor: pointer; padding: 0; }
+.j-done:hover { background: var(--i-ok-soft); border-color: var(--i-ok); }
+.j-done svg { width: 18px; height: 18px; }
+
+.j-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; font-style: normal; padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+.j-chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.j-crit { background: var(--i-crit-soft); color: var(--i-crit); }
+.j-warn { background: var(--i-warn-soft); color: var(--i-warn); }
+.j-info { background: var(--i-acc-soft); color: var(--i-acc-ink); }
+.j-ok { background: var(--i-ok-soft); color: var(--i-ok); }
+
+.j-live { display: flex; flex-direction: column; gap: 6px; }
+.j-room { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 0 -12px; border-radius: 12px; }
+.j-room:hover { background: var(--i-s2); }
+.j-room:focus-visible { outline: 3px solid var(--i-acc); }
+.j-room-top { display: flex; align-items: baseline; gap: 10px; }
+.j-room-top strong { font-size: 15px; }
+.j-room-top span { font-size: 13.5px; color: var(--i-mut); flex: 1; }
+.j-room small { font-size: 13px; color: var(--i-mut); }
+.j-sspi { display: flex; align-items: center; gap: 14px; margin-top: 8px; padding: 14px 16px; border-radius: 14px; background: var(--i-s2); }
+.j-sspi strong { font: 650 24px/1 var(--i-mono); color: var(--i-ink); }
+.j-sspi span { font-size: 14px; color: var(--i-mut); }
+
+.j-steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; min-width: 0; }
+.j-steps span { height: 7px; border-radius: 4px; background: var(--i-line); }
+.j-steps span.done { background: var(--i-acc); }
+.j-steps span.now { background: var(--i-acc); opacity: .45; }
+
+.j-journey-list { display: flex; flex-direction: column; }
+.j-journey-row { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(130px, 1fr) minmax(180px, 1.7fr) minmax(150px, 1fr); gap: 20px; align-items: center; padding: 14px 10px; margin: 0 -10px; border-top: 1px solid var(--i-line); border-radius: 0; }
+.j-journey-row:first-child { border-top: 0; }
+.j-journey-row:hover { background: var(--i-s2); border-radius: 12px; }
+.j-journey-row:focus-visible { outline: 3px solid var(--i-acc); border-radius: 12px; }
+.j-who, .j-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.j-who strong { font-size: 15px; font-weight: 600; color: var(--i-ink); }
+.j-who small, .j-what small { font-size: 13px; color: var(--i-mut); }
+.j-what > span { font-size: 14.5px; color: var(--i-ink); }
+.j-status { font-size: 14px; font-weight: 600; }
+.j-t-warn { color: var(--i-warn); } .j-t-ok { color: var(--i-ok); } .j-t-acc { color: var(--i-acc); } .j-t-mut { color: var(--i-mut); }
+.j-back { margin-bottom: 12px; }
+
+@media (max-width: 1180px) { .j-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .j-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .j-todo-row { grid-template-columns: 1fr; gap: 8px; }
+  .j-journey-row { grid-template-columns: 1fr; gap: 8px; }
+  .j-kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+}

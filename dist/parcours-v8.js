@@ -1430,6 +1430,91 @@ const priorRender=render;render=function(){
 const priorStats=stats;stats=function(){priorStats();updatePriorityBadge()};
 if($('#doctor')){$('#doctor').onchange=e=>{if(tab==='consult')captureConsult();activeDoctor=e.target.value;role=activeDoctor==='med-c'?'Chirurgien':'Anesthésiste';$('#role').value=role;if(role==='Chirurgien')tab='surgeryAnnouncement';view=role==='Chirurgien'?'patients':'priorities';render()};view='priorities'}
 setInterval(()=>{updatePriorityBadge();if(view==='priorities'&&!document.activeElement?.matches('select'))renderPriorities()},60000);
+// « Ma journée » : page d'accueil du médecin (maquette Scialytique validée).
+// Remplace l'ancienne vue « Mes priorités » ; l'ancienne liste reste accessible par « Toutes mes actions ».
+(function () {
+  'use strict';
+  if (typeof renderPriorities !== 'function' || typeof patients === 'undefined') return;
+  const legacyPriorities = renderPriorities;
+  let showAll = false;
+  const steps = ['Consultation', 'Préopératoire', 'Intervention', 'SSPI', 'Hospitalisation', 'Sortie'];
+  const stepLabels = ['Consultation', 'Préparation', 'Bloc', 'SSPI', 'Hospitalisation', 'Sortie'];
+  const ico = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const who = x => [x.identity?.lastName && x.identity?.firstName ? `${x.identity.lastName} ${x.identity.firstName}` : '', x.specialty, x.mode].filter(Boolean).join(' · ');
+  const fullName = x => x.identity?.lastName ? `${x.identity.firstName || ''} ${x.identity.lastName}`.trim() : x.id;
+  const age = x => { const b = x.identity?.birthDate; if (!b) return ''; const d = new Date(b + 'T12:00:00'), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--; return Number.isFinite(a) ? a + ' ans' : ''; };
+  const tone = info => info.rank <= 1 ? 'crit' : info.rank <= 3 ? 'warn' : 'info';
+  const toneLabel = { crit: 'Urgent', warn: 'Aujourd’hui', info: 'À venir' };
+  const when = a => { if (!a.due) return 'sans échéance'; const d = new Date(a.due + 'T12:00:00'); const t = dateKey(); return a.due === t ? 'aujourd’hui' : a.due < t ? 'en retard · ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }); };
+  const statusTone = x => /sortie/i.test(x.stage) ? 'ok' : /compléter|valider|attendu|vérifier/i.test(x.task || '') ? 'warn' : /cours|disponible/i.test(x.task || '') ? 'acc' : 'mut';
+  const displayName = () => { try { const n = professionalWorkspace?.getAccess?.()?.profile?.display_name; if (n) return n; } catch (e) {} return doctorName(activeDoctor).split(' · ')[0]; };
+
+  function bar(x) {
+    const i = steps.indexOf(x.stage);
+    return `<div class="j-steps" role="img" aria-label="Étape : ${esc(x.stage)} (${i + 1} sur ${steps.length})">${steps.map((s, k) => `<span class="${k < i ? 'done' : k === i ? 'now' : ''}" title="${esc(stepLabels[k])}"></span>`).join('')}</div>`;
+  }
+
+  function renderJournee() {
+    if (showAll) { legacyPriorities(); const head = document.querySelector('.priority-dashboard .panelhead'); if (head && !document.getElementById('j-back')) head.insertAdjacentHTML('afterbegin', '<button type="button" class="secondary j-back" id="j-back">← Ma journée</button>'); const back = document.getElementById('j-back'); if (back) back.onclick = () => { showAll = false; render(); }; return; }
+    const now = new Date(), all = priorityEntries(), open = all.filter(({ a }) => isOpen(a));
+    const mine = open.filter(({ a }) => a.doctorId === activeDoctor), list = (mine.length ? mine : open).slice(0, 6);
+    const urgent = mine.filter(({ info }) => info.rank <= 1).length;
+    const bloc = patients.filter(x => x.stage === 'Intervention'), sspi = patients.filter(x => x.stage === 'SSPI');
+    const toValidate = patients.filter(x => ['Consultation', 'Préopératoire'].includes(x.stage) && !x.consult?.validated);
+    const late = open.filter(({ info }) => info.rank === 1).length;
+    $('#title').textContent = 'Ma journée'; $('#new').hidden = false; $('#stats').hidden = true;
+    document.body.classList.add('j-home');
+    document.querySelectorAll('.nav[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'priorities'));
+    const date = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('#workspace').innerHTML = `<section class="j-hero">
+      <p class="j-date">${esc(date.charAt(0).toUpperCase() + date.slice(1))} · ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+      <h2 class="j-hello">Bonjour, ${esc(displayName())}.</h2>
+      <p class="j-summary">${patients.length} séjour${patients.length > 1 ? 's' : ''} suivi${patients.length > 1 ? 's' : ''}. ${urgent ? `<strong class="j-urgent">${urgent} action${urgent > 1 ? 's' : ''} urgente${urgent > 1 ? 's' : ''}</strong> à traiter` : 'Aucune action urgente'}${mine.length ? `, ${mine.length} action${mine.length > 1 ? 's' : ''} ouverte${mine.length > 1 ? 's' : ''} à votre nom` : ''}.</p>
+    </section>
+    <section class="j-kpis" aria-label="Indicateurs du jour">
+      <button type="button" class="j-kpi" data-j-view="service"><span>Au bloc maintenant</span><strong>${bloc.length}</strong><small>${bloc.length ? esc(bloc.map(x => x.id).join(' · ')) : 'aucune intervention en cours'}</small></button>
+      <button type="button" class="j-kpi" data-j-view="service"><span>En SSPI</span><strong>${sspi.length}</strong><small>${sspi.length ? esc(sspi.map(x => x.id).join(' · ')) : 'aucun patient'}</small></button>
+      <button type="button" class="j-kpi" data-j-view="patients"><span>Consultations à valider</span><strong>${toValidate.length}</strong><small>avant l’intervention</small></button>
+      <button type="button" class="j-kpi ${late ? 'is-crit' : ''}" data-j-view="tasks"><span>Actions en retard</span><strong>${late}</strong><small>${open.length} action${open.length > 1 ? 's' : ''} ouverte${open.length > 1 ? 's' : ''} dans l’équipe</small></button>
+    </section>
+    <div class="j-grid">
+      <section class="j-card j-todo" aria-labelledby="j-todo-h">
+        <div class="j-card-head"><h3 id="j-todo-h">À faire maintenant</h3><span class="j-hint">Trié par urgence, puis par échéance</span></div>
+        ${list.length ? `<ol class="j-todo-list">${list.map(({ x, a, info }) => { const t = tone(info); return `<li class="j-todo-row">
+          <span class="j-chip j-${t}"><i aria-hidden="true"></i>${toneLabel[t]}</span>
+          <div class="j-todo-main"><strong>${esc(a.label)}</strong><span>${esc(x.id)} · ${esc(who(x))}</span></div>
+          <span class="j-when">${esc(when(a))}</span>
+          <div class="j-todo-actions"><button type="button" class="secondary" data-j-open="${esc(x.id)}" data-j-action="${esc(a.id)}">Ouvrir</button><button type="button" class="j-done" data-j-done="${esc(a.id)}" data-j-stay="${esc(x.id)}" aria-label="Marquer « ${esc(a.label)} » comme réalisée">${ico('<path d="m5 12.5 4.2 4.2L19 7"/>')}</button></div>
+        </li>`; }).join('')}</ol>` : '<p class="j-empty">Rien d’urgent pour le moment.</p>'}
+        <button type="button" class="j-link" id="j-all">Toutes mes actions et rappels</button>
+      </section>
+      <section class="j-card j-live" aria-labelledby="j-live-h">
+        <div class="j-card-head"><h3 id="j-live-h">Bloc en direct</h3><button type="button" class="j-link" data-j-view="regulation">Planning complet</button></div>
+        ${[...bloc, ...sspi].length ? [...bloc, ...sspi].map(x => `<button type="button" class="j-room" data-j-stay="${esc(x.id)}"><span class="j-room-top"><strong>${esc(x.id)}</strong><span>${esc(x.specialty)}</span><em class="j-chip ${x.stage === 'SSPI' ? 'j-info' : 'j-ok'}">${x.stage === 'SSPI' ? 'SSPI' : 'Au bloc'}</em></span>${bar(x)}<small>${esc(fullName(x))} · ${esc(x.task || '')}</small></button>`).join('') : '<p class="j-empty">Aucun patient au bloc ni en SSPI.</p>'}
+        <div class="j-sspi"><strong>${sspi.length}</strong><span>patient${sspi.length > 1 ? 's' : ''} en SSPI · ${bloc.length} au bloc</span></div>
+      </section>
+    </div>
+    <section class="j-card j-journey" aria-labelledby="j-journey-h">
+      <div class="j-card-head"><h3 id="j-journey-h">Le parcours de mes patients</h3><span class="j-hint">${stepLabels.join(' · ')}</span></div>
+      <div class="j-journey-list">${patients.map(x => `<button type="button" class="j-journey-row" data-j-stay="${esc(x.id)}">
+        <span class="j-who"><strong>${esc(fullName(x))}</strong><small>${esc([x.id, age(x), x.consult?.asa && x.consult.asa !== 'Non renseigné' ? 'ASA ' + x.consult.asa : ''].filter(Boolean).join(' · '))}</small></span>
+        <span class="j-what"><span>${esc(x.specialty)}</span><small>${esc(x.mode)}</small></span>
+        ${bar(x)}
+        <span class="j-status j-t-${statusTone(x)}">${esc(x.task || x.stage)}</span>
+      </button>`).join('')}</div>
+    </section>`;
+    document.querySelectorAll('[data-j-open]').forEach(b => b.onclick = () => { selected = b.dataset.jOpen; prepEditing = b.dataset.jAction; view = 'patients'; tab = 'preparation'; render(); });
+    document.querySelectorAll('[data-j-done]').forEach(b => b.onclick = () => { const x = patients.find(x => x.id === b.dataset.jStay), a = prepFor(x).find(a => a.id === b.dataset.jDone); a.state = 'Réalisée'; traceFor(x, 'Action « ' + a.label + ' » : Réalisée par ' + doctorName(activeDoctor), 'Rappel'); updatePriorityBadge(); render(); toast('Action réalisée'); });
+    document.querySelectorAll('button[data-j-stay]').forEach(b => b.onclick = () => { selected = b.dataset.jStay; view = 'patients'; render(); });
+    document.querySelectorAll('[data-j-view]').forEach(b => b.onclick = () => { view = b.dataset.jView; render(); });
+    $('#j-all').onclick = () => { showAll = true; render(); };
+  }
+
+  renderPriorities = renderJournee;
+  const before = render;
+  render = function () { document.body.classList.remove('j-home'); if (view !== 'priorities') showAll = false; before(); };
+})();
+
 
 // Feuille peropératoire : données de simulation propres à chaque séjour.
 const periVitals=[['sbp','PAS','mmHg'],['dbp','PAD','mmHg'],['map','PAM mesurée','mmHg'],['hr','FC','/min'],['spo2','SpO₂','%'],['etco2','EtCO₂','mmHg'],['temp','Température','°C'],['fio2','FiO₂','%'],['rr','FR','/min'],['vt','Volume courant','mL'],['peep','PEEP','cmH₂O'],['pip','Pression de crête','cmH₂O'],['halogenEnd','Fraction expirée de l’halogéné','%']];
@@ -1939,6 +2024,50 @@ detail=function(){detailBeforeIdentity();const stay=p();const nursingActive=view
   if(print)print.disabled=true;
  }
 };
+ // Feuille d'anesthésie : tableau de bord « bloc » en tête (maquette Scialytique, format tablette).
+ const detailBeforeCockpit=detail;
+ detail=function(){
+  detailBeforeCockpit();
+  if(tab!=='perop')return;const content=$('#content'),x=p();if(!content||!x||content.querySelector('.ck'))return;
+  const records=periSorted((x.perop?.records||[]).filter(r=>!r.voided)),vit=records.filter(r=>r.kind==='Surveillance'),meds=records.filter(r=>r.kind==='Médicament');
+  const last=key=>{for(let i=vit.length-1;i>=0;i--){const v=vit[i].values?.[key];if(v!==''&&v!==undefined&&v!==null)return {v:Number(String(v).replace(',','.')),at:vit[i].at}}return null};
+  const fmt=n=>n==null||!Number.isFinite(n.v)?null:String(n.v).replace('.',',');
+  const card=(label,key,unit,range,lo,hi,extra='')=>{const m=last(key),val=fmt(m),out=m&&Number.isFinite(m.v)&&((lo!=null&&m.v<lo)||(hi!=null&&m.v>hi));return `<div class="ck-card${out?' is-out':''}"><div class="ck-card-top"><span>${label}</span><small>${range}</small></div><strong>${val??'—'}${val?`<small>${unit}</small>`:''}</strong>${extra}${m?`<em>${esc(periTime(m.at).slice(-5))}</em>`:'<em>aucune mesure</em>'}</div>`};
+  const sbp=last('sbp'),dbp=last('dbp'),map=last('map');
+  const pa=`<div class="ck-card ck-pa${sbp&&(sbp.v<90||sbp.v>160)?' is-out':''}"><div class="ck-card-top"><span>PA</span><small>90–160</small></div><strong>${sbp?fmt(sbp):'—'}${dbp?'/'+fmt(dbp):''}${map?`<small>PAM ${fmt(map)}</small>`:''}</strong>${sbp?`<em>${esc(periTime(sbp.at).slice(-5))}</em>`:'<em>aucune mesure</em>'}</div>`;
+  const allergy=String(x.consult?.allergies||'').trim(),known=allergy&&!/^(aucune?|néant|non|à vérifier)/i.test(allergy);
+  const start=records[0]?.at?new Date(records[0].at):null,mins=start?Math.max(0,Math.round((Date.now()-start)/60000)):null,dur=mins==null?'—':String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+  const name=x.identity?.lastName?`${String(x.identity.lastName).toUpperCase()} ${x.identity.firstName||''}`:x.id;
+  content.insertAdjacentHTML('afterbegin',`<section class="ck" aria-label="Tableau de bord de la feuille d’anesthésie">
+   <div class="ck-strip"><div class="ck-who"><strong>${esc(name)}</strong><span>${esc(x.id)} · ${esc(x.specialty)}${x.consult?.asa&&x.consult.asa!=='Non renseigné'?' · ASA '+esc(x.consult.asa):''}</span></div>${known?`<span class="ck-allergy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20Z"/><path d="M12 10v4m0 3h.01"/></svg>${esc(allergy.slice(0,30).toUpperCase())}</span>`:''}
+    <dl class="ck-clocks"><div><dt>Début</dt><dd>${start?esc(periTime(records[0].at).slice(-5)):'—'}</dd></div><div><dt>Durée</dt><dd>${dur}</dd></div><div><dt>Heure</dt><dd class="ck-now">${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</dd></div></dl></div>
+   <div class="ck-grid"><div class="ck-vitals">${pa}${card('FC','hr','/min','45–110',45,110)}${card('SpO₂','spo2','%','≥ 94',94,null)}${card('EtCO₂','etco2','mmHg','30–45',30,45)}${card('Température','temp','°C','≥ 36',36,null)}${card('Halogéné expiré','halogenEnd','%','',null,null)}</div>
+   <div class="ck-meds"><h4>Dernières administrations</h4>${meds.length?`<ol>${meds.slice(-5).reverse().map(r=>`<li><span class="ck-t">${esc(periTime(r.at).slice(-5))}</span><span>${esc(r.values?.drug||'Médicament')}</span><b>${esc([r.values?.amount,r.values?.unit].filter(v=>v!==''&&v!=null).join(' '))}</b></li>`).join('')}</ol>`:'<p>Aucune administration tracée.</p>'}</div></div>
+  </section>`);
+ };
+ // Bandeau patient et parcours en étapes (maquette Scialytique « Dossier patient »).
+ const detailBeforeBanner=detail;
+ detail=function(){
+  detailBeforeBanner();
+  const x=p(),head=document.querySelector('#detail .detailhead');if(!x||!head||head.querySelector('.pb-banner'))return;
+  const c=x.consult||{},ext=c.ext||{},id=x.identity||{};
+  const num=v=>{const n=parseFloat(String(v??'').replace(',','.'));return Number.isFinite(n)&&n>0?n:null};
+  const w=num(ext.weight),h=num(ext.height),bmi=w&&h?(w/((h/100)**2)).toFixed(1).replace('.',','):null;
+  const birth=id.birthDate?new Date(id.birthDate+'T12:00:00'):null;
+  const age=birth?Math.floor((Date.now()-birth)/31557600000):null;
+  const initials=((id.lastName||'')[0]||'')+((id.firstName||'')[0]||'');
+  const name=id.lastName?`<strong>${esc(String(id.lastName).toUpperCase())}</strong> ${esc(id.firstName||'')}`:`<strong>${esc(x.id)}</strong>`;
+  const allergy=String(c.allergies||'').trim(),noAllergy=/^(aucune?|néant|non|ras|pas d.allergie)/i.test(allergy),unknown=!allergy||/à vérifier|non renseign/i.test(allergy);
+  const anticoag=String(c.treatments||'').match(/apixaban|rivaroxaban|dabigatran|edoxaban|warfarine|fluindione|acénocoumarol|héparine|enoxaparine|tinzaparine|AVK|AOD/i);
+  const vital=(label,value,unit='')=>`<div class="pb-vital"><dt>${label}</dt><dd>${value==null||value===''?'<span class="pb-na">—</span>':esc(value)+(unit?`<small> ${unit}</small>`:'')}</dd></div>`;
+  const asa=c.asa&&c.asa!=='Non renseigné'?c.asa:null,group=String(ext.bloodGroup||'').match(/\b(AB|A|B|O)\s*[+-]/i)?.[0]?.replace(/\s/g,'');
+  const chips=[unknown?'<span class="pb-chip pb-warn">Allergies à vérifier</span>':noAllergy?'<span class="pb-chip pb-ok">Pas d’allergie connue</span>':`<span class="pb-chip pb-crit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20Z"/><path d="M12 10v4m0 3h.01"/></svg>Allergie : ${esc(allergy.slice(0,48))}${allergy.length>48?'…':''}</span>`,anticoag?`<span class="pb-chip pb-warn">${esc(anticoag[0][0].toUpperCase()+anticoag[0].slice(1))} · anticoagulant</span>`:''].join('');
+  const i=stages.indexOf(x.stage),labels={Consultation:'Consultation',Préopératoire:'Préparation',Intervention:'Bloc',SSPI:'SSPI',Hospitalisation:'Hospitalisation',Sortie:'Sortie'};
+  head.insertAdjacentHTML('afterbegin',`<div class="pb-banner"><span class="pb-avatar" aria-hidden="true">${esc(initials.toUpperCase()||'?')}</span><div class="pb-id"><h2 class="pb-name">${name}</h2><p>${birth?`Né(e) le <span class="pb-mono">${esc(birth.toLocaleDateString('fr-FR'))}</span> (${age} ans) · `:''}Séjour <span class="pb-mono">${esc(x.id)}</span></p></div><dl class="pb-vitals">${vital('Poids',w,'kg')}${vital('Taille',h,'cm')}${vital('IMC',bmi)}${vital('ASA',asa)}${vital('Groupe',group)}</dl><div class="pb-chips">${chips}</div></div>
+  <section class="pb-journey" aria-label="Parcours du séjour"><div class="pb-journey-head"><strong>${esc(x.specialty)} · ${esc(x.mode)}</strong><span>${esc(x.task||'')}</span></div><ol class="pb-steps">${stages.map((s,k)=>`<li class="${k<i?'done':k===i?'now':''}"${k===i?' aria-current="step"':''}><span class="pb-bar"></span><b>${esc(labels[s]||s)}</b><small>${k<i?'terminé':k===i?'en cours':'à venir'}</small></li>`).join('')}</ol></section>`);
+  const actions=head.querySelector(':scope > .row .actions');if(actions)head.querySelector('.pb-banner').append(actions);
+  head.classList.add('pb-on');
+ };
 const newBeforeIdentity=$('#new').onclick;$('#new').onclick=()=>{$('#new-identity-warning')?.remove();newBeforeIdentity()};
 const createBeforeIdentity=$('#newform').onsubmit;
 $('#newform').onsubmit=e=>{
