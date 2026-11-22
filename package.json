@@ -1,0 +1,27 @@
+{
+  "name": "parcours-anesthesie",
+  "version": "1.0.0-clever.1",
+  "private": true,
+  "description": "Dossier périopératoire multiprofessionnel — export autonome Clever Cloud",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "build": "node scripts/build-clever.mjs",
+    "test": "node --test tests/*.test.cjs tests/*.test.mjs tests/clever/*.test.mjs",
+    "test:clever": "node --test tests/clever/*.test.mjs",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate-postgres.mjs",
+    "password:hash": "node scripts/password-hash.mjs",
+    "user:create": "node --env-file-if-exists=.env scripts/create-user.mjs",
+    "user:password": "node --env-file-if-exists=.env scripts/reset-password.mjs",
+    "postinstall": "npm run build"
+  },
+  "dependencies": {
+    "pg": "8.23.1",
+    "@aws-sdk/client-s3": "3.1173.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.17"
+  }
+}

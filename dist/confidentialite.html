@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Confidentialité · Parcours Anesthésie</title>
+<link rel="icon" type="image/webp" href="assets/sceau-trocadero.webp">
+<style>
+:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f4f1eb;color:#24343b;font:16px/1.65 system-ui,sans-serif}main{max-width:900px;margin:auto;padding:32px 22px 60px}h1,h2{font-family:Georgia,serif;font-weight:400;line-height:1.2}h1{font-size:clamp(32px,5vw,47px)}h2{font-size:26px;margin-top:32px}a{color:#285967;text-underline-offset:3px}a:focus-visible{outline:2px solid #956b3f;outline-offset:3px}.notice{padding:16px 20px;border-left:3px solid #a78556;background:#eee5d6}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;background:#fffdf8}th,td{border:1px solid #ded8cb;padding:12px;text-align:left;vertical-align:top}th{background:#eee5d6}
+</style>
+</head>
+<body><main>
+<a href="./">Parcours Anesthésie</a>
+<h1>Confidentialité et données de santé</h1>
+<p>État du 19 novembre 2026.</p>
+<p class="notice"><strong>Version de démonstration destinée aux données fictives.</strong> La préparation à l’utilisation clinique est en cours. La conformité RGPD de l’exploitation clinique et le périmètre d’hébergement HDS restent à établir.</p>
+
+<h2>Les données de la démonstration</h2>
+<p>Les formulaires permettent de tester un dossier, un questionnaire, des constantes et des documents avec des informations fictives. Le dossier professionnel conserve désormais les formulaires enregistrés dans une base serveur, avec versions et contrôle des modifications concurrentes. Les pièces jointes des CRO sont conservées dans un stockage de fichiers. L’accès passe par la connexion du site. Les états de test et les profils métier restent fictifs ; le portail patient autonome reste une démonstration distincte, sans collecte clinique réelle. Les impressions et fichiers enregistrés par l’utilisateur restent sous sa responsabilité.</p>
+<p>Le serveur local de démonstration constitue un fonctionnement distinct. Il conserve les questionnaires reçus et les dossiers partagés dans une base SQLite. Les écritures et les lectures API sont horodatées avec le compte de démonstration et le dossier concerné. Il ne comporte pas encore de purge automatique des données et des journaux.</p>
+
+<h2>Services externes</h2>
+<p>Le widget de recherche VIDAL se charge après activation de son bouton et établit alors une connexion avec VIDAL. Les liens de référence ouvrent les sites de leurs éditeurs. Le navigateur et l’hébergement peuvent traiter des métadonnées techniques lors des accès. Le périmètre contractuel de ces fournisseurs reste à documenter pour le service clinique.</p>
+<p>La dictée du compte rendu utilise le mode local de reconnaissance vocale lorsque le navigateur le permet. Les fichiers enregistrés dans le dossier professionnel sont stockés côté serveur et inclus dans l’export de sauvegarde. Un fichier sélectionné reste non confirmé tant que l’enregistrement serveur n’a pas réussi.</p>
+
+<h2>Préparation à l’utilisation clinique</h2>
+<div class="table-wrap"><table>
+<thead><tr><th scope="col">Domaine</th><th scope="col">État constaté</th></tr></thead>
+<tbody>
+<tr><td>Hébergement</td><td>Certification HDS du périmètre clinique, localisation et sous-traitance à vérifier et contractualiser.</td></tr>
+<tr><td>Accès professionnels</td><td>Connexion individuelle du site, métier attribué côté serveur et rattachements datés à une équipe de soins. L’accès au dossier exige également l’affectation de cette équipe au séjour. Désactivation, expiration et refus d’accès sont contrôlés et tracés. Pro Santé Connect et vérification professionnelle restent à intégrer pour le service clinique. Authentification professionnelle forte et validation de la politique clinique d’habilitation à finaliser.</td></tr>
+<tr><td>Traçabilité</td><td>Versions serveur des écritures et journal des lectures API ; export et restauration isolée testés. Journal applicatif des consultations, écritures, refus et changements de droits protégé contre modification et suppression via les requêtes normales ; durée, surveillance et protection d’infrastructure à finaliser.</td></tr>
+<tr><td>RGPD</td><td>Responsable du traitement et DPO, registre, AIPD, information patient, droits et durées de conservation à formaliser pour la clinique.</td></tr>
+<tr><td>Exigences françaises</td><td>Identitovigilance et INS, identification électronique, échanges et qualification des modules cliniques à instruire selon le périmètre retenu.</td></tr>
+<tr><td>Continuité</td><td>Chiffrement, sauvegardes, restauration, supervision et procédure d’incident à déployer et tester sur l’infrastructure clinique.</td></tr>
+</tbody></table></div>
+
+<h2>Information du futur service clinique</h2>
+<p>Avant la collecte de données de vrais patients, la clinique devra publier la notice précisant le responsable du traitement et ses coordonnées, les finalités, les bases juridiques, les destinataires, les sous-traitants, les transferts éventuels, les durées et les modalités d’exercice des droits. Les coordonnées du responsable et du DPO de ce futur service restent à confirmer.</p>
+<p>Les bases juridiques du traitement des données de soins doivent être documentées. Le consentement à l’anesthésie et la confirmation des réponses du questionnaire ont leur propre finalité.</p>
+
+<h2>Références officielles</h2>
+<ul>
+<li><a href="https://www.cnil.fr/fr/donnees-de-sante-la-cnil-rappelle-les-mesures-de-securite-et-de-confidentialite-pour-lacces-au" target="_blank" rel="noopener noreferrer">CNIL — sécurité et habilitations du dossier patient</a></li>
+<li><a href="https://www.cnil.fr/fr/traitement-de-donnees-de-sante-comment-informer-les-personnes-concernees" target="_blank" rel="noopener noreferrer">CNIL — information des personnes</a></li>
+<li><a href="https://esante.gouv.fr/produits-services/hds/procedure-de-certification-hebergeur-de-donnees-de-sante" target="_blank" rel="noopener noreferrer">ANS — certification HDS</a></li>
+<li><a href="https://esante.gouv.fr/ens/offre/referentiel-ins" target="_blank" rel="noopener noreferrer">ANS — identité nationale de santé</a></li>
+</ul>
+</main></body></html>

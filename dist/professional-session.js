@@ -1,0 +1,1 @@
+(() => {if(document.body?.dataset?.patientPage==='true')return;document.addEventListener('DOMContentLoaded',()=>{const host=document.querySelector('aside .asidebottom');if(!host)return;const form=document.createElement('form');form.method='post';form.action='/auth/logout';form.innerHTML='<button type="submit" class="secondary">Se déconnecter</button>';host.append(form)})})();

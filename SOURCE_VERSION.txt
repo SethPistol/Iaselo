@@ -1,0 +1,6 @@
+Parcours Anesthésie — export autonome Clever Cloud
+Date : 20 novembre 2026
+Source initiale : dfc1b113367136069f51143aabd407fe100e8900
+Cette distribution ajoute un serveur Node.js, PostgreSQL, S3/Cellar et une authentification locale.
+Elle ne contient ni export de base de données, ni secrets, ni historique Git.
+Les ressources dist sont les sources front-end maintenues du prototype ; aucun composant privé ChatGPT n’est nécessaire au démarrage.

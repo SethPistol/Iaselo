@@ -1,0 +1,189 @@
+.pq-portal {
+  --pq-line: #ded8cb;
+  --pq-paper: #fffdf9;
+  --pq-ink: #24343b;
+  width: min(100%, 930px);
+  margin-inline: auto;
+  overflow: visible;
+  background: var(--pq-paper);
+  color: var(--pq-ink);
+}
+.pq-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding: 15px clamp(16px, 4vw, 40px);
+  border-bottom: 1px solid var(--pq-line);
+  border-radius: 11px 11px 0 0;
+  background: #f3eee4;
+}
+.pq-demo { font-size: 12px; font-weight: 650; color: #634d31; }
+.pq-meta label { margin: 0; }
+.pq-meta select { min-width: min(195px, 100%); margin-top: 4px; }
+.pq-meta p { width: 100%; margin: 0; font-size: 13px; }
+.pq-form { padding: clamp(18px, 4vw, 42px); }
+.pq-heading { text-align: center; }
+.pq-heading h2 {
+  margin: 0 0 7px;
+  font: 400 clamp(30px, 4vw, 44px)/1.08 var(--serif);
+  letter-spacing: -.035em;
+  scroll-margin-top: 90px;
+}
+.pq-heading span { font-size: 12px; color: #635b50; }
+.pq-page-label {
+  margin: 28px 0 16px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--pq-line);
+  font: 400 clamp(22px, 3vw, 28px)/1.18 var(--serif);
+}
+.pq-form p, .pq-form ul { margin-block: 0 13px; }
+.pq-bring {
+  margin-block: 16px;
+  padding: 14px 18px;
+  border: 1px solid #bd766a;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #fbefeb;
+}
+.pq-bring h4 { margin: 0 0 6px; color: #713c35; }
+.pq-bring ul { margin: 0; padding-left: 21px; }
+.pq-instruction { font-weight: 600; }
+.pq-box, .pq-question, .pq-category { min-width: 0; margin-inline: 0; }
+.pq-box {
+  margin-block: 22px;
+  padding: 12px 16px 16px;
+  border: 1px solid;
+  border-radius: 9px;
+}
+.pq-box > legend, .pq-question > legend { padding-inline: 6px; font-weight: 650; }
+.pq-identity { border-color: #668baa; background: #f5f9fc; }
+.pq-allergy { border-color: #6f947c; background: #f3f8f3; }
+.pq-signature { border-color: #8d877c; }
+.pq-form label { margin: 0; }
+.pq-form :is(input:not([type=checkbox], [type=radio]), textarea) {
+  min-width: 0;
+  min-height: 42px;
+  margin-top: 5px;
+  padding: 8px 10px;
+  font-size: 16px;
+}
+.pq-form textarea { min-height: 72px; }
+.pq-form :is(input[type=checkbox], input[type=radio]) {
+  appearance: auto;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: #28464c;
+}
+.pq-grid, .pq-diseases {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 16px;
+}
+.pq-question {
+  margin-block: 17px;
+  padding: 10px 0 13px;
+  border: 0;
+  border-bottom: 1px solid var(--pq-line);
+}
+.pq-question > legend { padding-inline: 0; max-width: 100%; }
+.pq-number {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #284049;
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.pq-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 10px;
+}
+.pq-choices label, .pq-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.pq-choices label {
+  border: 1px solid #ded8cc;
+  border-radius: 5px;
+  background: #fffdf9;
+}
+.pq-choices label:has(:checked) { border-color: #6b8381; background: #e7efeb; }
+.pq-check { display: flex; width: fit-content; padding-inline: 2px; }
+.pq-diseases {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 13px;
+}
+.pq-category {
+  padding: 6px 10px 9px;
+  border: 1px solid var(--pq-line);
+  border-radius: 7px;
+  background: #fff;
+}
+.pq-category legend {
+  width: 100%;
+  padding: 5px 7px;
+  border-radius: 5px;
+  background: var(--pq-category, #efebe2);
+  color: #2b3637;
+  font-size: 13px;
+  font-weight: 650;
+}
+.pq-cardiac { --pq-category: #f4d8d4; }
+.pq-vascular { --pq-category: #f3ded3; }
+.pq-digestive { --pq-category: #f4e9c8; }
+.pq-respiratory { --pq-category: #d8ebf3; }
+.pq-neurological { --pq-category: #dceddf; }
+.pq-endocrine { --pq-category: #e8e0ef; }
+.pq-rare { --pq-category: #eeeacd; }
+.pq-habits { display: grid; gap: 10px; }
+.pq-habits > div { padding: 10px; background: #f6f4ee; border-radius: 6px; }
+.pq-medications { border-color: #c5b493; }
+.pq-medications table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.pq-medications th, .pq-medications td { padding: 5px; border: 1px solid var(--pq-line); }
+.pq-medications th { background: #eee8db; font-size: 13px; text-align: left; }
+.pq-medications th:first-child { width: 36%; }
+.pq-medications tr:nth-child(even) { background: #f9f6ef; }
+.pq-medications td label { display: block; }
+.pq-medications td span { display: none; }
+.pq-form .pq-medications td input { width: 100%; margin: 0; }
+.pq-medications button { margin-top: 10px; }
+.pq-signature .pq-check { margin-top: 10px; }
+.pq-actions { padding-top: 13px; border-top: 1px solid var(--pq-line); }
+.pq-actions .primary { margin-inline-start: auto; }
+
+@media (max-width: 700px) {
+  .pq-diseases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .pq-grid, .pq-diseases { grid-template-columns: minmax(0, 1fr); }
+  .pq-box { padding-inline: 10px; }
+  .pq-medications table, .pq-medications tbody { display: block; }
+  .pq-medications thead { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
+  .pq-medications tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: 1px solid var(--pq-line);
+    margin-bottom: 8px;
+  }
+  .pq-medications td { border: 0; }
+  .pq-medications td:nth-child(-n+2) { grid-column: 1 / -1; }
+  .pq-medications td span { display: block; padding-bottom: 4px; font-size: 12px; }
+  .pq-actions button { width: 100%; }
+  .pq-actions .primary { margin: 0; }
+}

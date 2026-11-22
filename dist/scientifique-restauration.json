@@ -1,0 +1,19 @@
+{
+  "original_library_file_id": "libfile_170aa9629d6c8191acdbe275b6f0c5f8",
+  "original_version": "4",
+  "source_name": "Parcours_Anesthesie_V0.22_Collegues.html",
+  "sha256": "08815c317e421fc48d9dc6f1d4f4c9d0cdb7ff8f59b8fdd783a93b3316bd2ecd",
+  "modules": [
+    "board",
+    "general",
+    "abx",
+    "pbm",
+    "vte",
+    "anticoag",
+    "has",
+    "hem",
+    "perop",
+    "iv"
+  ],
+  "restoration": "Original preserved byte-for-byte; embedded edition adds session bridge, context banner and layout overrides. Clinical source code unchanged. No clinical revalidation claimed."
+}

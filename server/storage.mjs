@@ -1,0 +1,8 @@
+import {S3Client,PutObjectCommand,GetObjectCommand,HeadBucketCommand} from '@aws-sdk/client-s3';
+export function cellarBinding(env=process.env){
+ const raw=env.S3_ENDPOINT||env.CELLAR_ADDON_HOST,bucket=env.S3_BUCKET,key=env.S3_ACCESS_KEY_ID||env.CELLAR_ADDON_KEY_ID,secret=env.S3_SECRET_ACCESS_KEY||env.CELLAR_ADDON_KEY_SECRET;
+ if(!raw||!bucket||!key||!secret)throw Error('Configurer Cellar/S3 : endpoint, bucket privé et identifiants.');
+ const endpoint=new URL(raw.startsWith('http')?raw:'https://'+raw);if(endpoint.protocol!=='https:'&&env.NODE_ENV!=='test')throw Error('Le stockage objet exige HTTPS.');
+ const client=new S3Client({endpoint:endpoint.href,region:env.S3_REGION||'default',forcePathStyle:true,credentials:{accessKeyId:key,secretAccessKey:secret},requestChecksumCalculation:'WHEN_REQUIRED',responseChecksumValidation:'WHEN_REQUIRED'});
+ return {async check(){await client.send(new HeadBucketCommand({Bucket:bucket}))},async put(hash,bytes,meta){if(!/^[a-f0-9]{64}$/.test(hash))throw Error('Empreinte invalide');await client.send(new PutObjectCommand({Bucket:bucket,Key:hash,Body:new Uint8Array(bytes),ContentType:meta.httpMetadata?.contentType||'application/octet-stream',Metadata:{name:encodeURIComponent(meta.customMetadata?.name||'document')}}))},async get(hash){if(!/^[a-f0-9]{64}$/.test(hash))return null;try{const r=await client.send(new GetObjectCommand({Bucket:bucket,Key:hash}));return {body:await r.Body.transformToByteArray(),httpMetadata:{contentType:r.ContentType},customMetadata:{name:decodeURIComponent(r.Metadata?.name||'document')}}}catch(e){if(e.$metadata?.httpStatusCode===404)return null;throw e}},close(){client.destroy()}};
+}
