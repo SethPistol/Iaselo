@@ -1,4 +1,8 @@
-# Parcours Anesthésie — déploiement autonome Clever Cloud
+# IASELO — parcours patient périopératoire (Clever Cloud)
+
+Version 1.0.0 : voir [`docs/notes-de-version.md`](docs/notes-de-version.md) pour le contenu, ce qui reste en simulation et les prérequis avant toute donnée réelle.
+
+## Origine : Parcours Anesthésie — déploiement autonome Clever Cloud
 
 Export du 20 novembre 2026. Source initiale et adaptations : `SOURCE_VERSION.txt`.
 

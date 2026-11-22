@@ -11,7 +11,7 @@
 .v-card-head p { margin: 4px 0 0; color: var(--i-mut); font-size: 14px; }
 .v-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
 .v-mono { font-family: var(--i-mono); font-size: 12.5px; }
-.v-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.v-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .v-empty { margin: 0; color: var(--i-mut); }
 .v-foot { margin: 14px 0 0; font-size: 13px; color: var(--i-mut); }
 .v-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
@@ -131,7 +131,7 @@
 .v-log li { display: flex; gap: 8px; align-items: center; }
 .v-log .is-ok { color: var(--i-ok); } .v-log .is-ko { color: var(--i-crit); } .v-log .is-na { color: var(--i-mut); }
 .v-log li span { color: var(--i-ink); }
-.v-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.v-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px 16px; }
 .v-form label > span, .v-form legend { display: block; font-size: 13px; font-weight: 600; color: var(--i-mut); margin-bottom: 6px; }
 .v-form fieldset { border: 0; margin: 0; padding: 0; }
 .v-form input[type=number], .v-form textarea { width: 100%; box-sizing: border-box; min-height: 44px; font: inherit; padding: 8px 12px; border-radius: var(--i-r-s); border: 1px solid var(--i-line-strong); background: var(--i-s1); color: var(--i-ink); }
@@ -263,3 +263,12 @@
 .v-card .v-table { table-layout: auto; }
 .v-card { min-width: 0; overflow-x: auto; }
 .v-wrap svg.v-spark { width: 100%; height: 56px; }
+/* Finalisation : aucun champ ne déborde de sa carte (dates, heures, segments). */
+.v-form > *, .v-form label, .v-form fieldset { min-width: 0; }
+.v-form input, .v-form select, .v-form textarea { max-width: 100%; box-sizing: border-box; }
+.v-form input[type=date], .v-form input[type=datetime-local], .v-form input[type=time] { width: 100%; }
+.v-seg { flex-wrap: wrap; }
+/* Tableaux larges (tour de contrôle, pilotage) : défilement dans la carte sur petit écran, jamais de la page. */
+.v-board, .v-card:has(> .v-table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.v-wrap, .v-wrap > *, .v-board { min-width: 0; max-width: 100%; }
+.v-board { position: relative; }

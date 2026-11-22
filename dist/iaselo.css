@@ -267,3 +267,33 @@ html body .integrated-frame { border: 1px solid var(--i-line); border-radius: va
   html body { background: #fff !important; }
   html body aside, html body .demo, html body .shared-save, html body #theme-toggle { display: none !important; }
 }
+
+/* ---------- Impression : en-tête établissement + identité patient sur chaque document ---------- */
+.print-head { display: none; }
+@media print {
+  .print-head { display: flex !important; align-items: center; gap: 18px; padding: 0 0 10px; margin: 0 0 14px; border-bottom: 1.5px solid #0F4D5C; break-inside: avoid; }
+  .print-head img { width: 120px; height: auto; }
+  .print-head div { display: flex; flex-direction: column; gap: 2px; font-size: 10pt; color: #0C1A25; }
+  .print-head strong { font-size: 13pt; }
+  .i-sign { display: none !important; }
+  @page { margin: 12mm; }
+}
+/* Feuille d’anesthésie : la grille horaire entière tient sur la page (paysage). */
+@media print {
+  body.print-perop .peri-sheet-scroll, body.print-perop .peri-scroll { overflow: visible !important; }
+  body.print-perop .peri-sheet { width: 100% !important; min-width: 0 !important; font-size: 7pt; }
+}
+@media print {
+  body.print-perop .ck { display: none !important; }
+  .peri-sheet > h3 { break-after: avoid; }
+}
+@media print {
+  /* La grille de la feuille ne se fragmente pas : l’en-tête est posé en haut à droite, hors du flux, pour tenir sur une page paysage. */
+  body.print-perop .print-head { position: absolute !important; top: 0; right: 0; border: 0 !important; margin: 0 !important; padding: 0 !important; }
+  body.print-perop .print-head img { width: 70px !important; }
+  body.print-perop .print-head div { font-size: 8pt; }
+  body.print-perop .print-head strong { font-size: 10pt; }
+  body.print-perop .peri-sheet { zoom: .7; break-inside: auto; }
+  body.print-perop .peri-sheet > h3 { margin: 0 0 70px !important; padding-left: 6px; }
+  body.print-perop #dossier-panel { overflow: visible !important; }
+}

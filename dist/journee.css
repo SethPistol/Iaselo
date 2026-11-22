@@ -83,3 +83,6 @@ html body .j-card-head h3 { margin: 0; font-size: 19px; font-weight: 620; letter
   .j-journey-row { grid-template-columns: 1fr; gap: 8px; }
   .j-kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
 }
+/* Téléphone : les indicateurs restent dans la largeur de l’écran. */
+.j-kpi { min-width: 0; }
+.j-kpi span, .j-kpi small { overflow-wrap: anywhere; }

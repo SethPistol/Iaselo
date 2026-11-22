@@ -1,8 +1,8 @@
 {
-  "name": "parcours-anesthesie",
-  "version": "1.0.0-clever.1",
+  "name": "iaselo",
+  "version": "1.0.0",
   "private": true,
-  "description": "Dossier périopératoire multiprofessionnel — export autonome Clever Cloud",
+  "description": "IASELO — parcours patient périopératoire multiprofessionnel (Clever Cloud)",
   "engines": {
     "node": "24.x"
   },

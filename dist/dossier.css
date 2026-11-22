@@ -31,7 +31,8 @@ html body .pb-name strong { font-weight: 680; }
 .pb-bar { height: 6px; border-radius: 3px; background: var(--i-line); margin-bottom: 8px; }
 .pb-steps li.done .pb-bar { background: var(--i-acc); }
 .pb-steps li.now .pb-bar { background: var(--i-acc); opacity: .5; }
-.pb-steps b { font-size: 14px; font-weight: 600; color: var(--i-mut); }
+.pb-steps b { font-size: 14px; font-weight: 600; color: var(--i-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1280px) { .pb-steps b { font-size: 12.5px; } .pb-steps { gap: 6px; } }
 .pb-steps li.done b, .pb-steps li.now b { color: var(--i-ink); }
 .pb-steps small { font: 500 12px var(--i-mono); color: var(--i-mut); }
 .pb-steps li.now small { color: var(--i-acc); }
@@ -50,7 +51,8 @@ html body #detail .dossier-tabs .dossier-tab-text { display: flex; flex-directio
 html body #detail .dossier-tabs .dossier-tab-text > :first-child { font-size: 15px; font-weight: 600; color: inherit; }
 html body #detail .dossier-tabs .dossier-tab-text > :not(:first-child) { display: none; }
 
-@media (max-width: 900px) { .pb-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; } .pb-chips { margin-left: 0; } }
+@media (max-width: 1100px) { .pb-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; } }
+@media (max-width: 900px) { .pb-chips { margin-left: 0; } }
 /* Le dossier n'est plus une carte dans une carte : le bandeau et le parcours portent leurs propres cartes. */
 html body #detail.panel:has(.pb-on) { background: transparent; border: 0; box-shadow: none; padding: 0; overflow: visible; }
 html body #detail:has(.pb-on) #dossier-panel { background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); overflow: hidden; }
