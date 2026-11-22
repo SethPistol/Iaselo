@@ -1,0 +1,182 @@
+/* Écrans de travail (recherche, identité, service, gestion, accès…) alignés sur la maquette Scialytique.
+   Jetons --i-* définis dans iaselo.css. Chargé après iaselo.css, journee.css, dossier.css et bloc.css. */
+
+/* ---------- En-tête de page : date, grand titre, action ---------- */
+html body main > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 6px 16px; border: 0; padding: 4px 0 0; margin: 0 0 24px; }
+html body main > header .eyebrow { display: none; }
+html body main > header .art-header-meta { grid-column: 1 / -1; grid-row: 1; order: -1; margin: 0; }
+html body main > header .art-header-meta span { font-size: 14px; color: var(--i-mut); }
+html body main > header .art-header-meta span::first-letter { text-transform: uppercase; }
+html body main > header h1 { margin: 0; font-size: clamp(34px, 4.2vw, 48px); line-height: 1.05; font-weight: 680; letter-spacing: -.035em; color: var(--i-ink); }
+html body main > header .primary { min-height: 48px; padding: 0 20px; border-radius: 12px; font-size: 15px; }
+
+/* ---------- Indicateurs ---------- */
+html body .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin: 0 0 28px; }
+html body .stats .stat { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 6px; padding: 20px 22px; min-height: 0; border-radius: var(--i-r-l); }
+html body .stats .stat span { font-size: 14px; color: var(--i-mut); }
+html body .stats .stat strong { font-size: 34px; line-height: 1; font-weight: 650; letter-spacing: -.03em; color: var(--i-ink); }
+html body .stats .stat.accent strong { color: var(--i-acc-ink); }
+html body .management-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin: 18px 0 24px; }
+html body .management-metric { display: flex; flex-direction: column; gap: 6px; padding: 20px 22px; background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); }
+html body .management-metric strong { margin: 0; font-size: 30px; line-height: 1.05; font-weight: 650; letter-spacing: -.03em; color: var(--i-ink); font-family: var(--i-font); }
+html body .management-metric span { font-size: 14px; color: var(--i-mut); }
+
+/* ---------- Cartes et titres de section ---------- */
+html body #workspace .panel { background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); overflow: visible; }
+html body #workspace .panel > .content { padding: 26px 28px; }
+html body #workspace .panel h2 { font-size: 21px; line-height: 1.2; font-weight: 640; letter-spacing: -.02em; margin: 0 0 8px; color: var(--i-ink); }
+html body #workspace .panel h3 { font-size: 17px; font-weight: 620; letter-spacing: -.01em; margin: 26px 0 10px; color: var(--i-ink); }
+html body #workspace .panel .eyebrow { font-size: 11.5px; letter-spacing: .1em; color: var(--i-acc); margin: 0 0 6px; }
+html body #workspace .panel p { line-height: 1.5; }
+html body #workspace .panelhead { padding: 22px 28px 14px; border-bottom: 1px solid var(--i-line); background: transparent; }
+html body #workspace .panelhead .row { align-items: flex-end; }
+
+/* Les écrans de gestion reprennent le titre de la page : pas de doublon dans la carte. */
+html body .management.panel { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+html body .management.panel > .content { padding: 0 !important; }
+html body .management.panel > .content > .eyebrow:first-child,
+html body .management.panel > .content > .eyebrow:first-child + h2,
+html body[data-view=professionalAccess] #workspace > .panel:first-child > .content > .eyebrow:first-child,
+html body[data-view=professionalAccess] #workspace > .panel:first-child > .content > .eyebrow:first-child + h2 { display: none; }
+html body .management.panel h3 { font-size: 19px; margin-top: 30px; }
+
+/* ---------- Bandeaux d'information ---------- */
+html body #workspace .notice { display: flex; gap: 10px; align-items: flex-start; padding: 13px 16px; border: 0; border-radius: var(--i-r-m); background: var(--i-s2); color: var(--i-mut); font-size: 14px; line-height: 1.45; }
+html body #workspace .notice::before { content: ''; flex: none; width: 18px; height: 18px; margin-top: 1px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6M12 7.5h.01'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6M12 7.5h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
+html body #workspace .notice.warn { background: var(--i-warn-soft); color: var(--i-warn); }
+
+/* ---------- Bandeau « séjour sélectionné » des écrans de gestion ---------- */
+html body .management-toolbar { display: flex; gap: 12px 16px; flex-wrap: wrap; align-items: flex-end; margin: 18px 0; padding: 16px 18px; background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); }
+html body .management-toolbar label { flex: 1; min-width: 220px; margin: 0; font-size: 13px; font-weight: 600; color: var(--i-mut); }
+html body .management-toolbar .secondary { min-height: 46px; }
+html body #management-body > .management-toolbar, html body #planning-content .management-toolbar { box-shadow: none; background: var(--i-s2); border-color: transparent; }
+
+/* ---------- Formulaires ---------- */
+html body #workspace :is(.management-form, .planning-choice) { background: var(--i-s2); border: 0; border-radius: var(--i-r-l); padding: 22px 24px; margin: 16px 0; }
+html body #workspace .management-form .formgrid { gap: 14px 18px; }
+html body #workspace label { font-size: 13.5px; font-weight: 600; color: var(--i-mut); }
+html body #workspace :is(input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea) { min-height: 46px; border: 1px solid var(--i-line-strong); border-radius: 11px; background: var(--i-s1); color: var(--i-ink); font-size: 15.5px; font-weight: 400; padding: 10px 13px; transition: border-color .15s, box-shadow .15s; }
+html body #workspace textarea { min-height: 96px; }
+html body #workspace :is(input, select, textarea):focus-visible { outline: none; border-color: var(--i-acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--i-acc) 25%, transparent); }
+html body #workspace .management-form .primary, html body #workspace form .actions .primary { min-height: 46px; padding: 0 20px; border-radius: 12px; }
+html body #workspace .secondary { min-height: 42px; border-radius: 11px; border: 1px solid var(--i-line-strong); background: var(--i-s1); color: var(--i-ink); font-weight: 600; }
+html body #workspace .secondary:hover { border-color: var(--i-acc); color: var(--i-acc); }
+html body #workspace .management-error:empty { display: none; }
+
+/* ---------- Onglets (pilules) ---------- */
+html body #workspace .tabs:not(.dossier-tabs) { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; margin: 18px 0; background: var(--i-s2); border: 0; border-radius: 14px; width: fit-content; max-width: 100%; }
+html body #workspace .tabs:not(.dossier-tabs) button { min-height: 42px; padding: 0 16px; border: 0; border-radius: 10px; background: transparent; color: var(--i-mut); font-size: 14.5px; font-weight: 600; box-shadow: none; }
+html body #workspace .tabs:not(.dossier-tabs) button:hover { color: var(--i-ink); background: color-mix(in srgb, var(--i-s1) 60%, transparent); }
+html body #workspace .tabs:not(.dossier-tabs) button:is(.active, [aria-pressed=true], [aria-selected=true]) { background: var(--i-s1); color: var(--i-acc-ink); box-shadow: var(--i-shadow); }
+
+/* ---------- Pastilles de statut ---------- */
+html body #workspace .pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border: 0; border-radius: 999px; background: var(--i-acc-soft); color: var(--i-acc-ink); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+html body #workspace .pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+html body #workspace .pill:is(.warn, .late) { background: var(--i-warn-soft); color: var(--i-warn); }
+html body #workspace .pill:is(.good, .ok) { background: var(--i-ok-soft); color: var(--i-ok); }
+html body #workspace .pill:is(.bad, .crit, .danger) { background: var(--i-crit-soft); color: var(--i-crit); }
+
+/* ---------- Tableaux ---------- */
+html body #workspace .management-scroll { background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); overflow: auto; }
+html body #workspace .management-table { font-size: 14.5px; }
+html body #workspace .management-table th { background: transparent; color: var(--i-mut); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 14px 16px 10px; border-bottom: 1px solid var(--i-line); }
+html body #workspace .management-table td { padding: 14px 16px; border-bottom: 1px solid var(--i-line); color: var(--i-ink); }
+html body #workspace .management-table tr:last-child td { border-bottom: 0; }
+html body #workspace .management-table tbody tr:hover td { background: var(--i-s2); }
+
+/* ---------- États vides ---------- */
+html body #workspace .empty { display: grid; place-items: center; gap: 8px; margin: 12px 0; padding: 30px 20px; border: 1.5px dashed var(--i-line-strong); border-radius: var(--i-r-l); color: var(--i-mut); text-align: center; font-size: 15px; background: transparent; }
+html body #workspace .empty::before { content: ''; width: 36px; height: 36px; border-radius: 12px; background: var(--i-s2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d8c99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='4' width='16' height='16' rx='3'/%3E%3Cpath d='M8 12h8'/%3E%3C/svg%3E") center / 20px no-repeat; }
+
+/* ---------- Avatar, nom et mini-parcours (listes de patients) ---------- */
+.ui-avatar { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--i-acc-soft); color: var(--i-acc-ink); font-weight: 680; font-size: 15px; letter-spacing: .02em; }
+.ui-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; text-align: left; }
+.ui-who > strong { font-size: 15.5px; font-weight: 640; color: var(--i-ink); }
+.ui-who > span { font-size: 13.5px; color: var(--i-mut); font-weight: 400; }
+.ui-steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 6px; max-width: 220px; }
+.ui-steps i { height: 6px; border-radius: 3px; background: var(--i-line); }
+.ui-steps i.done { background: var(--i-acc); }
+.ui-steps i.now { background: var(--i-acc); opacity: .45; }
+
+/* ---------- Recherche patient ---------- */
+html body[data-view=search] #patient-search-form > p { font-size: 15px; color: var(--i-mut); margin: 0 0 16px; }
+html body[data-view=search] .patient-search-fields { gap: 16px 20px; }
+html body[data-view=search] #patient-search-form .actions { margin-top: 18px; gap: 10px; }
+html body[data-view=search] #patient-search-status { margin: 22px 0 8px; font-size: 14px; color: var(--i-mut); font-weight: 600; }
+html body .patient-search-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+html body .patient-search-result { display: flex; align-items: center; gap: 16px; padding: 14px 4px; border: 0; border-top: 1px solid var(--i-line); border-radius: 0; background: transparent; }
+html body .patient-search-result:first-child { border-top: 0; }
+html body .patient-search-result > div { flex: 1; min-width: 0; }
+html body .patient-search-result strong { font-size: 16px; color: var(--i-ink); }
+html body .patient-search-result p { margin: 2px 0 0; font-size: 13.5px; color: var(--i-mut); }
+
+/* ---------- Vue du service ---------- */
+html body .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; align-items: start; }
+html body #workspace .service-sector { padding: 20px 20px 14px; }
+html body #workspace .service-sector-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+html body #workspace .service-sector-head h2 { font-size: 17px; margin: 0; }
+html body #workspace .service-sector ul { list-style: none; margin: 0 -8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+html body #workspace .service-sector > .muted { margin: 6px 0 8px; font-size: 14px; color: var(--i-mut); }
+html body .service-stay { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 8px; border-radius: 12px; cursor: pointer; }
+html body button.service-stay:hover { background: var(--i-s2); }
+html body button.service-stay:focus-visible { outline: 3px solid var(--i-acc); outline-offset: 1px; }
+html body .service-stay .ui-avatar { width: 40px; height: 40px; border-radius: 12px; font-size: 14px; }
+html body .service-unassigned { border-style: dashed !important; box-shadow: none !important; background: transparent !important; }
+
+/* ---------- Actions à suivre ---------- */
+html body[data-view=tasks] #workspace .panel > .content { padding: 6px 28px 20px; }
+html body #workspace .prep-row { padding: 18px 0; border: 0; border-top: 1px solid var(--i-line); border-radius: 0; background: transparent; box-shadow: none; margin: 0; }
+html body #workspace .prep-row:first-child { border-top: 0; }
+html body #workspace .prep-row > .row strong { font-size: 16px; font-weight: 620; color: var(--i-ink); }
+html body #workspace .prep-row .muted { font-size: 13.5px; margin-top: 3px; }
+html body #workspace .prep-row .preserve { margin: 10px 0; color: var(--i-ink); font-size: 14.5px; }
+html body #workspace .prep-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; margin: 12px 0; }
+html body #workspace .legacy-tasks { margin-top: 18px; border-top: 1px solid var(--i-line); padding-top: 14px; }
+html body #workspace .legacy-tasks summary { cursor: pointer; font-weight: 620; color: var(--i-ink); }
+
+/* ---------- Identité & INS ---------- */
+html body .identity-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin: 18px 0; }
+html body #workspace .identity-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 0; padding: 14px 16px; text-align: left; border: 1px solid var(--i-line); border-radius: 14px; background: var(--i-s1); box-shadow: var(--i-shadow); }
+html body #workspace .identity-row strong { font-size: 14.5px; color: var(--i-ink); }
+html body #workspace .identity-row span { font-size: 12.5px; font-weight: 400; color: var(--i-mut); }
+html body #workspace .identity-row:is([aria-pressed=true], .active, [aria-current]) { border-color: var(--i-acc); box-shadow: 0 0 0 2px var(--i-acc); }
+html body #workspace .identity-selected { margin: 20px 0; padding: 24px 26px; background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); }
+html body #workspace .identity-selected h3 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+html body #workspace .identity-traits { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 24px; margin: 14px 0 0; }
+html body #workspace .identity-traits > div { padding: 12px 0; border-top: 1px solid var(--i-line); }
+html body #workspace .identity-traits dt { font-size: 12.5px; color: var(--i-mut); font-weight: 600; }
+html body #workspace .identity-traits dd { margin: 3px 0 0; font-size: 15.5px; color: var(--i-ink); }
+html body #workspace .identity-columns { gap: 20px; }
+html body #workspace .identity-candidate { padding: 18px 20px; margin: 12px 0; border: 1px solid var(--i-line); border-radius: var(--i-r-l); background: var(--i-s1); }
+
+/* ---------- Questionnaire depuis une photo, accès professionnels ---------- */
+html body .invitation-grid, html body .professional-grid { gap: 22px; }
+html body #workspace .invitation-grid > * { background: var(--i-s2); border: 0; border-radius: var(--i-r-l); padding: 20px 22px; }
+html body #workspace input[type=file] { padding: 8px; border: 1.5px dashed var(--i-line-strong); border-radius: 12px; background: var(--i-s1); width: 100%; }
+html body[data-view=professionalAccess] #workspace > .notice { margin: 20px 0; }
+html body[data-view=professionalAccess] .professional-grid .panel h2 { font-size: 18px; }
+
+@media (max-width: 760px) {
+  html body main > header { grid-template-columns: 1fr; }
+  html body #workspace .panel > .content { padding: 20px; }
+  html body #workspace .prep-meta { grid-template-columns: 1fr; }
+  html body .stats { grid-template-columns: 1fr 1fr; }
+}
+html body.j-home main > header { display: none; }
+html body .ui-stay-bar { align-items: center; }
+html body .ui-stay-id { display: flex; align-items: center; gap: 14px; flex: 1.2; min-width: 240px; }
+html body .ui-stay-bar label { flex: 1; }
+
+/* ---------- Liste des séjours (colonne gauche) ---------- */
+html body #patientlist .patient { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px; border: 0; border-top: 1px solid var(--i-line); border-radius: 0; background: transparent; text-align: left; }
+html body #patientlist .patient:first-child { border-top: 0; }
+html body #patientlist .patient:hover { background: var(--i-s2); }
+html body #patientlist .patient.selected { background: var(--i-acc-soft); border-radius: 14px; border-top-color: transparent; box-shadow: inset 3px 0 0 var(--i-acc); }
+html body #patientlist .patient.selected + .patient { border-top-color: transparent; }
+html body #patientlist .ui-patient { display: flex; align-items: center; gap: 12px; min-width: 0; }
+html body #patientlist .ui-avatar { width: 38px; height: 38px; border-radius: 12px; font-size: 13px; }
+html body #patientlist .ui-who > strong { font-size: 14.5px; }
+html body #patientlist .ui-who > span { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body #patientlist .patient > .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+html body #patientlist .patient > .row small { font-size: 12.5px; color: var(--i-mut); text-align: right; }
+html body #patientlist .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: var(--i-s2); color: var(--i-acc-ink); font-size: 12px; font-weight: 600; border: 0; }

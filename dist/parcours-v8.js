@@ -10,7 +10,7 @@ function toast(s){$('#toast').textContent=s;$('#toast').style.display='block';cl
 function event(text,kind='Modification'){p().events.unshift({at:new Date().toLocaleString('fr-FR'),role,text,kind})}
 function stats(){const pending=patients.filter(x=>!x.done).length;$('#stats').innerHTML=[[patients.length,'Séjours fictifs'],[patients.filter(x=>['Intervention','SSPI','Hospitalisation'].includes(x.stage)).length,'Prises en charge en cours'],[pending,'Actions en attente'],[patients.filter(x=>x.stage==='Sortie').length,'Séjours en sortie']].map((x,i)=>`<div class="stat ${i===2?'accent':''}"><span>${x[1]}</span><strong>${x[0]}</strong></div>`).join('')}
 function render(){stats();$('#title').textContent={patients:'Patients & séjours',service:'Vue du service',search:'Recherche patient',tasks:'Actions à suivre',portal:'Préparer ma consultation'}[view];document.querySelectorAll('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));if(view==='portal'){renderPortal();return}if(view==='service'){renderService();return}if(view==='search'){renderPatientSearch();return}if(view==='tasks'){renderTasks();return}$('#workspace').innerHTML=`<div class="layout"><section class="panel"><div class="panelhead"><h3>Liste des séjours</h3><div class="filters"><input id="search" aria-label="Rechercher un séjour fictif" placeholder="Identifiant ou spécialité" value="${esc(query)}"><select id="filter" aria-label="Filtrer le parcours">${['Tous',...stages].map(s=>`<option ${filter===s?'selected':''}>${s}</option>`).join('')}</select></div></div><div id="patientlist"></div></section><section class="panel" id="detail"></section></div>`;$('#search').oninput=e=>{query=e.target.value;list()};$('#filter').onchange=e=>{filter=e.target.value;list()};list();detail()}
-function list(){const matches=patients.filter(x=>(filter==='Tous'||filter===x.stage)&&`${x.id} ${x.specialty}`.toLowerCase().includes(query.toLowerCase()));$('#patientlist').innerHTML=matches.length?matches.map(x=>`<button class="patient ${x.id===selected?'selected':''}" data-patient="${x.id}"><div class="row"><strong>${x.id}</strong><span class="pill">${x.stage}</span></div><small>${x.specialty} · ${x.mode}</small><small>${x.done?'Action réalisée':x.task}</small></button>`).join(''):'<div class="empty">Aucun séjour ne correspond à ce filtre.</div>';document.querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(tab==='consult')captureConsult();selected=b.dataset.patient;tab=role==='Chirurgien'?'surgeryAnnouncement':nurseProfile()?'follow':'consult';list();detail()})}
+function list(){const matches=patients.filter(x=>(filter==='Tous'||filter===x.stage)&&`${x.id} ${x.specialty} ${x.identity?.lastName||''} ${x.identity?.firstName||''}`.toLowerCase().includes(query.toLowerCase()));$('#patientlist').innerHTML=matches.length?matches.map(x=>`<button class="patient ${x.id===selected?'selected':''}" data-patient="${x.id}"><div class="ui-patient">${stayAvatar(x)}<span class="ui-who"><strong>${esc(stayName(x))}</strong><span>${esc(x.id)} · ${esc(x.specialty)} · ${esc(x.mode)}</span></span></div><div class="row"><span class="pill">${esc(x.stage)}</span><small>${esc(x.done?'Action réalisée':x.task)}</small></div></button>`).join(''):'<div class="empty">Aucun séjour ne correspond à ce filtre.</div>';document.querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(tab==='consult')captureConsult();selected=b.dataset.patient;tab=role==='Chirurgien'?'surgeryAnnouncement':nurseProfile()?'follow':'consult';list();detail()})}
 function patientIdentityFields(){
  return `<div class="patient-identity-fields">
   <label>Nom fictif<input name="lastName" maxlength="80" autocomplete="off"></label>
@@ -71,7 +71,7 @@ function bindPatientSearch(open){
    const name=[lastName,firstName].filter(Boolean).join(' ');
    const birth=birthDate?birthDate.split('-').reverse().join('/'):'Date de naissance non renseignée';
    return `<li class="patient-search-result">
-    <div><strong>${esc(name||'Identité non renseignée')}</strong><p>${esc(birth)} · Dossier ${esc(stay.id)}</p><p>${esc(stay.specialty)} · ${esc(stay.stage)}</p></div>
+    ${stayAvatar(stay)}<div><strong>${esc(name||'Identité non renseignée')}</strong><p>${esc(birth)} · Dossier ${esc(stay.id)}</p><p>${esc(stay.specialty)} · ${esc(stay.stage)}</p></div>
     ${open?`<button type="button" class="secondary" data-patient-result="${esc(stay.id)}" aria-label="Ouvrir le dossier ${esc(stay.id)}">Ouvrir le dossier</button>`:''}
    </li>`;
   }).join('');
@@ -113,8 +113,11 @@ function sectorOptions(current){
   `<option value="${id}" ${current===id?'selected':''}>${esc(label)}</option>`).join('');
 }
 
+function stayAvatar(stay){const n=stay.identity||{};return `<span class="ui-avatar" aria-hidden="true">${esc((((n.lastName||'')[0]||'')+((n.firstName||'')[0]||'')).toUpperCase()||'?')}</span>`}
+function stayName(stay){const n=stay.identity||{};return n.lastName?`${String(n.lastName).toUpperCase()} ${n.firstName||''}`.trim():stay.id}
+function staySteps(stay){const list=['Consultation','Préopératoire','Intervention','SSPI','Hospitalisation','Sortie'],i=list.indexOf(stay.stage);return `<span class="ui-steps" role="img" aria-label="Étape ${i+1} sur 6 : ${esc(stay.stage)}">${list.map((_,k)=>`<i class="${k<i?'done':k===i?'now':''}"></i>`).join('')}</span>`}
 function serviceStayCard(stay,canOpen){
- const description=`<strong>${esc(stay.id)}</strong><span>${esc(stay.specialty)} · ${esc(stay.stage)}</span>`;
+ const description=`${stayAvatar(stay)}<span class="ui-who"><strong>${esc(stayName(stay))}</strong><span>${esc(stay.id)} · ${esc(stay.specialty)} · ${esc(stay.stage)}</span>${staySteps(stay)}</span>`;
  return canOpen
   ? `<button type="button" class="service-stay" data-service-stay="${esc(stay.id)}">${description}</button>`
   : `<div class="service-stay">${description}</div>`;
@@ -1429,6 +1432,7 @@ const priorRender=render;render=function(){
  updatePriorityBadge();if(view==='priorities'){renderPriorities();return}priorRender()};
 const priorStats=stats;stats=function(){priorStats();updatePriorityBadge()};
 if($('#doctor')){$('#doctor').onchange=e=>{if(tab==='consult')captureConsult();activeDoctor=e.target.value;role=activeDoctor==='med-c'?'Chirurgien':'Anesthésiste';$('#role').value=role;if(role==='Chirurgien')tab='surgeryAnnouncement';view=role==='Chirurgien'?'patients':'priorities';render()};view='priorities'}
+(()=>{const tag=()=>{const a=document.querySelector('.nav.active[data-view]');if(a)document.body.dataset.view=a.dataset.view;else delete document.body.dataset.view;if(a&&a.dataset.view!=='priorities')document.body.classList.remove('j-home')};const w=document.querySelector('#workspace');if(w)new MutationObserver(tag).observe(w,{childList:true});tag();})();
 setInterval(()=>{updatePriorityBadge();if(view==='priorities'&&!document.activeElement?.matches('select'))renderPriorities()},60000);
 // « Ma journée » : page d'accueil du médecin (maquette Scialytique validée).
 // Remplace l'ancienne vue « Mes priorités » ; l'ancienne liste reste accessible par « Toutes mes actions ».
