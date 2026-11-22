@@ -18,6 +18,8 @@ export function suiviMessages(establishment){
  const etab=establishment||'Clinique du Trocadéro';
  return {
   'j-1':etab+' : rappel de votre venue prévue demain. Respectez les consignes de jeûne et l’heure d’arrivée qui vous ont été remises. En cas d’empêchement, appelez la clinique.',
+  'j-7':etab+' : pensez à compléter votre dossier d’admission (pièces demandées). En cas de question, appelez la clinique.',
+  'j-3':etab+' : rappel, votre dossier d’admission est incomplet. Merci de transmettre les pièces demandées ou d’appeler la clinique.',
   'j+1':etab+' : un membre de l’équipe va vous appeler aujourd’hui pour prendre de vos nouvelles. En cas d’urgence, appelez le 15.'
  };
 }
@@ -36,6 +38,36 @@ async function authorOf(env,user){const p=await env.DB.prepare('SELECT display_n
 
 export async function veilleApi(request,env,acl){
  const url=new URL(request.url),path=url.pathname;
+
+ // Journal d'accès d'un séjour : DPO (propriétaire) et équipe de soins habilitée. Remis au patient sur demande.
+ if(path==='/api/workspace/journal'&&request.method==='GET'){
+  const stay=String(url.searchParams.get('stay')||'');if(!stay||stay.length>80)return json({error:'Séjour invalide.'},400);
+  if(!acl.isAdmin&&!acl.canRead('stay/'+stay+'/core')){await acl.log('journal',stay,'denied');return json({error:'Journal hors habilitation.'},403)}
+  const like='%stay/'+stay.replace(/[%_]/g,'')+'/%';
+  const rows=(await env.DB.prepare("SELECT l.at,l.actor,l.action,l.target,l.result,COALESCE(p.display_name,l.actor) AS name FROM professional_access_log l LEFT JOIN professional_profiles p ON p.user_id=l.actor WHERE (l.target LIKE ? OR l.target=? OR (l.action='read' AND l.detail LIKE ?)) ORDER BY l.sequence DESC LIMIT 200").bind(like,stay,like).all()).results;
+  await acl.log('journal',stay,'allowed','Consultation du journal d’accès');
+  return json({rows:rows.map(r=>({...r,target:r.action==='read'?'lecture du dossier':r.target}))});
+ }
+ // Bris de glace : accès d'urgence de 4 h à un séjour hors équipe, motif obligatoire, journalisé pour revue.
+ if(path==='/api/workspace/bris-de-glace'){
+  if(request.method==='GET'){const rows=(await env.DB.prepare("SELECT l.at,l.target,l.reason,COALESCE(p.display_name,l.actor) AS name FROM professional_access_log l LEFT JOIN professional_profiles p ON p.user_id=l.actor WHERE l.action='bris-de-glace' AND l.result='allowed' AND (?=1 OR l.actor=?) ORDER BY l.sequence DESC LIMIT 50").bind(acl.isAdmin?1:0,acl.profile.user_id).all()).results;return json({rows})}
+  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
+  const d=await body(request),stay=String(d.stay||'').trim(),motif=String(d.motif||'').trim();
+  if(!['anesthesiste','chirurgien','infirmier'].includes(acl.job)||!acl.active)return json({error:'Accès d’urgence réservé aux soignants actifs.'},403);
+  if(motif.length<10||motif.length>500)return json({error:'Motif obligatoire (10 caractères minimum).'},400);
+  if(!/^[^/]{1,80}$/.test(stay)||!await env.DB.prepare('SELECT key FROM workspace_documents WHERE key=?').bind('stay/'+stay+'/core').first()){await acl.log('bris-de-glace',stay||'?','denied',motif);return json({error:'Séjour introuvable.'},404)}
+  if(acl.allowed.has(stay))return json({error:'Ce séjour est déjà dans votre périmètre.'},409);
+  const user=acl.profile.user_id,team='bdg-'+user.slice(0,60),from=new Date().toISOString(),until=new Date(Date.now()+4*3600000).toISOString();
+  await env.DB.batch([
+   env.DB.prepare('INSERT OR IGNORE INTO care_teams(id,label,active) VALUES(?,?,1)').bind(team,'Accès d’urgence · '+String(acl.profile.display_name||user).slice(0,60)),
+   env.DB.prepare('INSERT OR IGNORE INTO professional_teams(user_id,team_id,valid_from,valid_until) VALUES(?,?,?,?)').bind(user,team,from,until),
+   env.DB.prepare('UPDATE professional_teams SET valid_until=? WHERE user_id=? AND team_id=?').bind(until,user,team),
+   env.DB.prepare('INSERT OR IGNORE INTO stay_teams(stay_id,team_id,valid_from,valid_until) VALUES(?,?,?,?)').bind(stay,team,from,until),
+   env.DB.prepare('UPDATE stay_teams SET valid_until=? WHERE stay_id=? AND team_id=?').bind(until,stay,team)
+  ]);
+  await acl.log('bris-de-glace',stay,'allowed',motif.slice(0,500),'Jusqu’à '+until);
+  return json({opened:true,until},201);
+ }
  if(path==='/api/workspace/interop/status'&&request.method==='GET')return json({connecteurs:interopStatus(env.INTEROP_ENV||{})});
  if(path==='/api/workspace/interop/insi'){
   if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
@@ -51,8 +83,8 @@ export async function veilleApi(request,env,acl){
  if(path==='/api/workspace/suivi/send'){
   if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
   const d=await body(request),stay=String(d.stay||''),kind=String(d.kind||'');
-  if(!['j-1','j+1'].includes(kind))return json({error:'Type de message inconnu.'},400);
-  const key='stay/'+stay+'/suiviAmbu';
+  if(!['j-1','j+1','j-7','j-3'].includes(kind))return json({error:'Type de message inconnu.'},400);
+  const key='stay/'+stay+'/'+(kind==='j-7'||kind==='j-3'?'preadmission':'suiviAmbu');
   if(!acl.canRead(key)||!acl.keyWrite(key,null,{}))return json({error:'Envoi hors habilitation.'},403);
   const messaging=env.MESSAGING;if(!messaging?.channels?.sms)return json({error:'Envoi de SMS Brevo non configuré sur ce serveur.'},503);
   // Le numéro vient des coordonnées vérifiées du séjour, jamais de la requête.

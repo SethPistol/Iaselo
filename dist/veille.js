@@ -34,6 +34,9 @@ window.createVeille=function(ctx){
 
  // Onglets ajoutés au dossier, dans les étapes existantes.
  const TABS={aideCpa:['consultation','Scores, tri & consignes',1],checklistHas:['peroperatoire','Check-list HAS bloc',1],suiviJ1:['postoperatoire','Suivi ambulatoire J-1 / J+1',2]};
+ function viewHeader(title,id){$('#title').textContent=title;const nw=$('#new');if(nw)nw.hidden=true;const st=$('#stats');if(st)st.hidden=true;document.body.classList.remove('j-home');document.body.classList.add('v-controle-on');document.querySelectorAll('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id));}
+ const plus=window.createVeillePlus?.(ctx,{who,can,trace,job,identity,goTab:k=>ctx.goTab(k),viewHeader,name:s=>name(s)})||null;
+ if(plus)Object.assign(TABS,plus.TABS);
  for(const [key,[group,label,pos]] of Object.entries(TABS)){const g=dossierStages.find(x=>x.id===group);if(g&&!g.items.some(([k])=>k===key))g.items.splice(Math.min(pos,g.items.length),0,[key,label]);}
 
  /* ================= Aide à la consultation ================= */
@@ -180,6 +183,7 @@ window.createVeille=function(ctx){
   $('#workspace').innerHTML=`<div class="v-wrap v-tower">
    <header class="v-head"><div><p class="v-kicker">${ICON.tower} Temps réel · mise à jour en un clic</p><h3>Où en est chaque patient du jour</h3><p class="v-sub">Bloc, service et accueil voient le même tableau. Les dossiers incomplets sont signalés avant l’entrée au bloc ; les alertes du suivi J+1 remontent ici.</p></div></header>
    <div class="v-flow">${R.STATUTS.map(s=>`<div class="v-flow-step${count(s.id)?' has':''}"><strong>${count(s.id)}</strong><span>${s.label}</span></div>`).join('')}</div>
+   ${plus?plus.sallesHTML():''}
    ${blocked.length||alertRows.length?`<div class="v-two">${blocked.length?`<section class="v-card v-alertbox"><header class="v-card-head"><div><h4>${ICON.lock} Dossiers incomplets avant bloc</h4><p>${blocked.length} patient${blocked.length>1?'s':''}</p></div></header><ul>${blocked.map(r=>`<li><button type="button" class="v-link" data-open="${esc(r.stay.id)}" data-tab="aideCpa">${esc(name(r.stay))}</button><small>${r.comp.blocking.map(i=>esc(i.label)).join(' · ')}</small></li>`).join('')}</ul></section>`:''}${alertRows.length?`<section class="v-card v-alertbox is-crit"><header class="v-card-head"><div><h4>${ICON.phone} Alertes du suivi J+1</h4><p>${alertRows.length} patient${alertRows.length>1?'s':''} à rappeler</p></div></header><ul>${alertRows.map(r=>`<li><button type="button" class="v-link" data-open="${esc(r.stay.id)}" data-tab="suiviJ1">${esc(name(r.stay))}</button><small>${r.alerts.map(a=>esc(a.label)).join(' · ')}</small></li>`).join('')}</ul></section>`:''}</div>`:''}
    <section class="v-card v-board"><table class="v-table v-tower-table"><thead><tr><th>Patient</th><th>Intervention</th><th>Dossier</th><th>Check-list HAS</th><th>Statut</th><th><span class="v-sr">Action</span></th></tr></thead><tbody>
    ${rows.map(r=>{const next=R.statutSuivant(r.st),i=R.STATUTS.findIndex(s=>s.id===r.st);const surg=r.stay.surgicalAnnouncement?.published?.fields||{},op=surg.procedure||r.stay.consult?.ext?.operation||r.stay.specialty;
@@ -190,6 +194,7 @@ window.createVeille=function(ctx){
     <td>${canMove&&r.st!=='sorti'?`<button type="button" class="v-next" data-next="${esc(r.stay.id)}" data-to="${next.id}" ${!r.comp.ready&&r.st==='prepare'?'data-blocked="1"':''}>${esc(next.label)} ${ICON.arrow}</button>`:''}</td></tr>`}).join('')}
    </tbody></table></section></div>`;
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{document.body.classList.remove('v-controle-on');ctx.open(b.dataset.open,b.dataset.tab||'consult')});
+  document.querySelectorAll('[data-open-room]').forEach(b=>b.onclick=()=>{document.body.classList.remove('v-controle-on');ctx.open(b.dataset.openRoom,'perop')});
   document.querySelectorAll('[data-next]').forEach(b=>b.onclick=()=>{const stay=patients.find(x=>x.id===b.dataset.next);if(!stay)return;
    if(b.dataset.blocked){const comp=R.completude(stay,stay.aideCpa,identity(stay));const motif=prompt('Dossier incomplet : '+comp.blocking.map(i=>i.label).join(', ')+'.\nMotif pour passer outre (obligatoire) :','');if(!motif||motif.trim().length<5){toast('Entrée au bloc non enregistrée : motif requis.');return}aide(stay).overrides=[...(aide(stay).overrides||[]),{at:new Date().toISOString(),by:who(),motif:motif.trim().slice(0,300),missing:comp.blocking.map(i=>i.id)}];trace(stay,'Entrée au bloc malgré dossier incomplet · motif : '+motif.trim(),'Bloc')}
    advance(stay,b.dataset.to);renderControle();});
@@ -212,12 +217,12 @@ window.createVeille=function(ctx){
    if(!motif||motif.trim().length<5){e.stopImmediatePropagation();sel.value=stay.stage;toast('Étape non modifiée : dossier incomplet.');return}
    aide(stay).overrides=[...(aide(stay).overrides||[]),{at:new Date().toISOString(),by:who(),motif:motif.trim().slice(0,300),missing:c.blocking.map(i=>i.id)}];trace(stay,'Passage au bloc malgré dossier incomplet · motif : '+motif.trim(),'Bloc');},true);}
  }
- function panel(tab){({aideCpa:panelAide,checklistHas:panelChecklist,suiviJ1:panelSuivi})[tab]?.()}
+ function panel(tab){(({aideCpa:panelAide,checklistHas:panelChecklist,suiviJ1:panelSuivi})[tab]||plus?.panels[tab])?.()}
 
  // Bouton de navigation « Tour de contrôle », juste après « Ma journée ».
  const home=document.querySelector('.nav[data-view="priorities"]');
- if(home&&!document.querySelector('.nav[data-view="controle"]')){const b=document.createElement('button');b.type='button';b.className='nav';b.dataset.view='controle';b.innerHTML=ICON.tower+'Tour de contrôle';home.after(b);b.addEventListener('click',()=>ctx.setView('controle'));}
+ if(home&&!document.querySelector('.nav[data-view="controle"]')){let after=home;for(const [id,label,icon] of [['controle','Tour de contrôle',ICON.tower],...(plus?[['pilotage','Pilotage & qualité','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/></svg>'],['droits','Droits & traçabilité','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6Z"/></svg>']]:[])]){const b=document.createElement('button');b.type='button';b.className='nav';b.dataset.view=id;b.innerHTML=icon+label;after.after(b);after=b;b.addEventListener('click',()=>ctx.setView(id));}}
 
- return {panel,tabs:Object.keys(TABS),detail:detailHook,render:view=>{if(view!=='controle'){document.body.classList.remove('v-controle-on');return false}renderControle();return true}};
+ return {panel,tabs:Object.keys(TABS),detail:detailHook,render:view=>{if(view==='controle'){renderControle();return true}if(plus?.views[view]){plus.views[view]();return true}document.body.classList.remove('v-controle-on');return false}};
 };
 })();

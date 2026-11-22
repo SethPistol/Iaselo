@@ -33,7 +33,7 @@ export async function professionalAccess(env,request,user,member,at){
  if(!active||['unassigned','administration'].includes(job))allowed.clear();
  const epoch=(await DB.prepare('SELECT revision FROM professional_policy_revision WHERE id=1').first()).revision;
  const globalRead={planningResources:['anesthesiste','chirurgien','infirmier','secretariat'],vacations:['anesthesiste','chirurgien','infirmier','secretariat'],reservations:['anesthesiste','chirurgien','infirmier','secretariat'],acts:['anesthesiste','chirurgien','dim','facturation'],lots:['anesthesiste','chirurgien','infirmier','pharmacien'],movements:['anesthesiste','chirurgien','infirmier','pharmacien'],pmsi:['dim','anesthesiste','chirurgien'],invoices:['facturation'],patientDrafts:[]};
- function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact')return ['anesthesiste','chirurgien','secretariat'].includes(job);return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||allowed.size>0&&(globalRead[id]||[]).includes(job));return false;}
+ function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact'||module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job);return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||allowed.size>0&&(globalRead[id]||[]).includes(job));return false;}
  function filter(key,data){if(data===null||data===undefined)return data;const [group,name,module]=key.split('/');
   if(group==='stay'&&module==='core'&&!clinical)return Object.fromEntries(Object.entries(data).filter(([k])=>['id','specialty','mode','stage','sector','identity','careTeamId'].includes(k)));
   if(group==='management'){
@@ -54,6 +54,10 @@ export async function professionalAccess(env,request,user,member,at){
    if(module==='nursingRecord')return ['anesthesiste','chirurgien','infirmier'].includes(job)&&appendOnly(old||[],data);
    if(module==='medicationCircuit')return ['anesthesiste','chirurgien','pharmacien'].includes(job)&&appendOnly(old||[],data)&&data.slice((old||[]).length).every(e=>['analysis','reconciliation','validation'].includes(e.kind)&&(e.kind!=='validation'||job==='pharmacien')&&e.author?.trim()&&e.note?.trim()&&Number.isFinite(Date.parse(e.at)));
    if(module==='events')return clinical&&Array.isArray(data)&&additions(old||[],data);
+   if(['periopPlus','peropRapide','soinsPlus','sortiePlus','iaTrace'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object';
+   if(module==='codage')return ['anesthesiste','chirurgien','dim'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(module==='droitsRgpd')return (['anesthesiste','chirurgien'].includes(job)||isAdmin)&&Array.isArray(data);
    // Modules issus de la veille marché : statut bloc, check-list HAS, suivi J+1 (soignants) ; aide CPA (anesthésiste) ; envois DMP/MSSanté (médecins).
    if(['checklistBloc','blocStatut','suiviAmbu'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='aideCpa')return job==='anesthesiste'&&!!data&&typeof data==='object'&&!Array.isArray(data);
