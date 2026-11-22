@@ -1,0 +1,50 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+import {workspaceApi} from '../worker/workspace.mjs';import {sqliteBinding} from '../worker/sqlite-adapter.mjs';import {brevoMessaging} from '../server/brevo.mjs';import {invitationMessages} from '../worker/questionnaire.mjs';
+const origin='https://prototype.test',now='2020-01-01T00:00:00.000Z';
+function fake(){const calls=[];return {calls,fetch:async(url,init)=>{calls.push({url,headers:init.headers,body:JSON.parse(init.body)});return new Response(JSON.stringify({messageId:'m-'+calls.length}),{status:201})}}}
+test('Brevo : clé lue dans l’environnement, bons points d’accès, SMS transactionnel sans +',async()=>{
+ const f=fake(),m=brevoMessaging({BREVO_API_KEY:'cle-test',BREVO_SENDER_EMAIL:'no-reply@clinique.test',BREVO_SMS_SENDER:'Trocadéro!',ETABLISSEMENT_NOM:'Clinique X'},f.fetch);
+ assert.deepEqual(m.channels,{email:true,sms:true});
+ await m.sms({to:'+33612345678',content:'Bonjour'});await m.email({to:'a@b.test',subject:'S',text:'T',html:'<p>T</p>'});
+ assert.equal(f.calls[0].url,'https://api.brevo.com/v3/transactionalSMS/send');assert.equal(f.calls[0].headers['api-key'],'cle-test');
+ assert.deepEqual({...f.calls[0].body,tag:undefined},{sender:'Trocadro',recipient:'33612345678',content:'Bonjour',type:'transactional',tag:undefined});
+ assert.equal(f.calls[1].url,'https://api.brevo.com/v3/smtp/email');assert.equal(f.calls[1].body.sender.email,'no-reply@clinique.test');
+ assert.deepEqual(brevoMessaging({},f.fetch).channels,{email:false,sms:false});
+});
+test('Brevo : en recette, seuls les destinataires de test autorisés reçoivent un message',async()=>{
+ const f=fake(),env={BREVO_API_KEY:'k',BREVO_SMS_SENDER:'IASELO',IASELO_RECETTE:'true'};
+ await assert.rejects(brevoMessaging(env,f.fetch).sms({to:'+33612345678',content:'x'}),/recette/);
+ const m=brevoMessaging({...env,MESSAGING_ALLOWED_RECIPIENTS:'+33 6 00 00 00 01'},f.fetch);
+ await assert.rejects(m.sms({to:'+33612345678',content:'x'}),/liste de test/);await m.sms({to:'+33600000001',content:'x'});assert.equal(f.calls.length,1);
+});
+test('Brevo : erreur de clé traduite sans divulguer la clé',async()=>{
+ const m=brevoMessaging({BREVO_API_KEY:'secret-cle',BREVO_SMS_SENDER:'IASELO'},async()=>new Response(JSON.stringify({code:'unauthorized'}),{status:401}));
+ await assert.rejects(m.sms({to:'+33600000001',content:'x'}),e=>/BREVO_API_KEY/.test(e.message)&&!e.message.includes('secret-cle'));
+});
+test('message patient minimal : ni nom, ni motif, seulement le lien',()=>{
+ const t=invitationMessages('Clinique X','https://x.test/patient.html#invitation=abc');
+ for(const v of Object.values(t))assert.ok(!/anesth|opération|chirurg/i.test(v));assert.ok(t.sms.includes('https://x.test/patient.html#invitation=abc'));
+});
+function fixture(messaging){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'brevo-')),DB=sqliteBinding(path.join(dir,'db.sqlite'));for(const file of ['0000_workspace.sql','0001_atomic_commits.sql','0002_professional_access.sql','0003_questionnaire_invitations.sql'])DB.raw.exec(fs.readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
+ for(const [id,job,team]of [['owner','anesthesiste','A'],['other','anesthesiste','B']]){DB.raw.prepare('INSERT INTO workspace_members VALUES(?,?,?)').run(id,id==='owner'?'owner':'reader',now);DB.raw.prepare('INSERT INTO professional_profiles(user_id,display_name,profession,updated_at,updated_by) VALUES(?,?,?,?,?)').run(id,id,job,now,'owner');DB.raw.prepare('INSERT OR IGNORE INTO care_teams(id,label) VALUES(?,?)').run(team,'Équipe '+team);DB.raw.prepare('INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES(?,?,?)').run(id,team,now)}
+ for(const id of ['A','B']){DB.raw.prepare('INSERT INTO stay_teams(stay_id,team_id,valid_from) VALUES(?,?,?)').run(id,id,now);DB.raw.prepare('INSERT INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES(?,?,1,?,?,?,?)').run('stay/'+id+'/core',JSON.stringify({id}),'owner',now,crypto.randomUUID(),'test')}
+ async function call(user,route,data){const r=await workspaceApi(new Request(origin+'/api/workspace'+route,{method:'POST',headers:{'oai-authenticated-user-id':user,Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(data)}),{DB,ENABLE_DEMO_SEED:true,MESSAGING:messaging});return {status:r.status,data:await r.json()}}
+ return {DB,call,close(){DB.close();fs.rmSync(dir,{recursive:true,force:true})}};
+}
+test('envoi du lien : destinataire vérifié côté serveur, lien actif requis, périmètre et traçabilité',async()=>{
+ const f0=fake(),messaging=brevoMessaging({BREVO_API_KEY:'k',BREVO_SENDER_EMAIL:'no-reply@c.test',BREVO_SMS_SENDER:'IASELO'},f0.fetch),f=fixture(messaging);try{
+  const contact={firstName:'Camille',lastName:'MARTIN',birthDate:'1985-06-14',email:'camille@example.test',phone:'+33612345678'};
+  f.DB.raw.prepare('INSERT INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES(?,?,1,?,?,?,?)').run('stay/A/invitationContact',JSON.stringify({contact,confirmed:true}),'owner',now,crypto.randomUUID(),'test');
+  const invite=await f.call('owner','/questionnaire/invite',{stay:'A',contact,confirmed:true});assert.equal(invite.status,201);assert.deepEqual(invite.data.messaging,{email:true,sms:true});
+  const token=new URLSearchParams(new URL(invite.data.link).hash.slice(1)).get('invitation');
+  assert.equal((await f.call('other','/questionnaire/send',{stay:'A',token,channels:['sms']})).status,403);
+  assert.equal((await f.call('owner','/questionnaire/send',{stay:'A',token:'0'.repeat(64),channels:['sms']})).status,410);
+  assert.equal((await f.call('owner','/questionnaire/send',{stay:'A',token,channels:['fax']})).status,400);
+  const sent=await f.call('owner','/questionnaire/send',{stay:'A',token,channels:['sms','email'],to:'pirate@evil.test'});
+  assert.equal(sent.status,200);assert.ok(sent.data.results.every(r=>r.sent));
+  assert.equal(f0.calls[0].body.recipient,'33612345678');assert.equal(f0.calls[1].body.to[0].email,'camille@example.test');assert.ok(f0.calls[0].body.content.includes(token));
+  const logs=f.DB.raw.prepare("SELECT * FROM professional_access_log WHERE action='questionnaire-envoi'").all();assert.equal(logs.length,2);
+  assert.ok(!JSON.stringify(logs).includes('612345678')&&!JSON.stringify(logs).includes('camille@'),'coordonnées masquées dans le journal');assert.ok(!JSON.stringify(logs).includes(token));
+ }finally{f.close()}
+});
+test('envoi refusé proprement si Brevo n’est pas configuré',async()=>{const f=fixture(undefined);try{assert.equal((await f.call('owner','/questionnaire/send',{stay:'A',token:'0'.repeat(64),channels:['sms']})).status,503)}finally{f.close()}});

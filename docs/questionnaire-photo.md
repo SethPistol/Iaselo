@@ -8,6 +8,16 @@ OCR : Tesseract.js 6.0.1, moteur tesseract.js-core 6.0.0 LSTM sans SIMD pour la 
 
 Les invitations contiennent 256 bits aléatoires dans un fragment d’URL. Seule leur empreinte SHA-256 est stockée. Validité 48 heures, remplacement révocatoire et consommation atomique à usage unique. Le questionnaire ne peut écrire que dans le séjour associé ; ses réponses sont filtrées et son identité confrontée aux coordonnées relues.
 
-Le bouton de courriel ou SMS ouvre un brouillon sur l’appareil ; le site ne déclare aucun message envoyé. Aucun fournisseur de messagerie n’est configuré. L’accès owner-private existant est conservé : un patient extérieur ne peut pas accéder au prototype. L’utilisation réelle exige un environnement et un accès patient adaptés, puis la configuration de la messagerie.
+## Envoi par SMS et e-mail (Brevo)
+
+Quand Brevo est configuré (voir `clevercloud/environment.example`), l’écran affiche « Envoyer par SMS », « Envoyer par e-mail » et « Envoyer les deux » après la préparation du lien. Sinon, les anciens boutons de brouillon (mailto/sms) restent affichés.
+
+- Route serveur : `POST /api/workspace/questionnaire/send` `{stay, token, channels:["sms","email"]}`. Elle exige un lien actif (non expiré, non remplacé, non utilisé) du même séjour et les mêmes habilitations que la préparation.
+- Le destinataire est toujours lu dans les coordonnées vérifiées enregistrées (`stay/<id>/invitationContact`), jamais dans la requête.
+- Contenu minimal : nom de l’établissement et lien à usage unique, sans nom du patient, motif, date ni information médicale. SMS de type `transactional` (`/v3/transactionalSMS/send`), e-mail via `/v3/smtp/email`.
+- Traçabilité : chaque tentative (réussie ou non) est inscrite dans `professional_access_log` (action `questionnaire-envoi`) avec l’auteur, le séjour, le canal, le destinataire masqué et la référence Brevo. Ni le jeton ni les coordonnées complètes ne sont journalisés.
+- Clé d’API : uniquement dans la variable d’environnement `BREVO_API_KEY`.
+- Recette : aucun envoi tant que `MESSAGING_ALLOWED_RECIPIENTS` n’est pas renseigné, et seulement vers ces destinataires (les patients fictifs pourraient avoir le numéro d’une vraie personne).
+- À faire côté Brevo avant usage réel : signer le DPA (contrat de sous-traitance RGPD), désactiver le suivi des ouvertures et des clics pour les e-mails transactionnels, authentifier le domaine d’envoi (SPF/DKIM/DMARC). Brevo conserve le contenu des messages (donc le lien, valable 48 h) dans ses journaux.
 
 Validation : lecture OCR d’une image française fictive avec les cinq champs attendus ; tests de parsing, contrôles de périmètre, coordonnées confirmées, correspondance d’identité, jeton remplacé/expiré et soumission unique avec retour au bon séjour. La vérification visuelle dans un navigateur n’a pas été réalisée.

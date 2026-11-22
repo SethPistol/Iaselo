@@ -4,3 +4,12 @@ CC_RUN_COMMAND=npm start
 CC_HEALTH_CHECK_PATH=/healthz
 NODE_ENV=production
 ENABLE_DEMO_SEED=false
+# Envoi SMS / e-mail aux patients via Brevo (facultatif). Ne jamais mettre la vraie clé ici :
+# la saisir uniquement dans Clever Cloud > application > Variables d'environnement.
+# BREVO_API_KEY=
+# BREVO_SENDER_EMAIL=no-reply@votre-domaine.fr
+# BREVO_SENDER_NAME=Clinique du Trocadéro
+# BREVO_SMS_SENDER=TROCADERO
+# ETABLISSEMENT_NOM=Clinique du Trocadéro
+# En recette (IASELO_RECETTE=true), obligatoire : seuls ces destinataires reçoivent un message.
+# MESSAGING_ALLOWED_RECIPIENTS=+33600000000,prenom.nom@exemple.fr
