@@ -1,0 +1,31 @@
+/* Questionnaire patient (espace pro « Préparer ma consultation » et page patient) : style Scialytique. */
+html body .pq-portal { max-width: 860px; margin: 0 auto; background: transparent; border: 0; box-shadow: none; overflow: visible; }
+html body .pq-portal .pq-meta { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; padding: 16px 20px; margin-bottom: 18px; background: var(--i-s2); border: 0; border-radius: var(--i-r-l); }
+html body .pq-portal .pq-demo { font-size: 13px; font-weight: 600; color: var(--i-warn); background: var(--i-warn-soft); padding: 6px 12px; border-radius: 999px; }
+html body .pq-portal .pq-form { background: transparent; border: 0; padding: 0; box-shadow: none; }
+html body .pq-portal .pq-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 26px 28px; margin: 0 0 22px; border-radius: 24px; background-color: #0F4D5C; background-image: var(--i-halo); color: #fff; text-align: left; border: 0; }
+html body .pq-portal .pq-heading h2 { margin: 0; color: #fff; font-size: clamp(26px, 3.4vw, 34px); font-weight: 680; letter-spacing: -.03em; }
+html body .pq-portal .pq-heading span { color: #D3E8EC; font: 500 14px/1 var(--i-mono); white-space: nowrap; }
+html body .pq-portal .pq-page-label { margin: 6px 0 8px; font-size: 22px; font-weight: 650; letter-spacing: -.02em; color: var(--i-ink); border: 0; padding: 0; }
+html body .pq-portal .pq-form > p { font-size: 16px; line-height: 1.55; color: var(--i-mut); }
+html body .pq-portal .pq-bring { margin: 18px 0; padding: 18px 20px; border: 0; border-radius: var(--i-r-l); background: var(--i-warn-soft); color: var(--i-warn); }
+html body .pq-portal .pq-bring :is(strong, h3, h4, p, li) { color: var(--i-warn); }
+html body .pq-portal .pq-instruction { font-weight: 600; color: var(--i-ink) !important; }
+html body .pq-portal :is(.pq-box, .pq-question) { margin: 18px 0; padding: 22px 24px 20px; border: 1px solid var(--i-line); border-radius: var(--i-r-l); background: var(--i-s1); box-shadow: var(--i-shadow); }
+html body .pq-portal :is(.pq-box, .pq-question) > legend { float: left; width: 100%; margin: 0 0 14px; padding: 0; font-size: 18px; font-weight: 650; letter-spacing: -.015em; color: var(--i-ink); background: transparent; border: 0; }
+html body .pq-portal :is(.pq-box, .pq-question) > legend + * { clear: both; }
+html body .pq-portal label { font-size: 14px; font-weight: 600; color: var(--i-mut); }
+html body .pq-portal :is(input:not([type=checkbox]):not([type=radio]), select, textarea) { min-height: 50px; border: 1px solid var(--i-line-strong); border-radius: 12px; background: var(--i-s1); color: var(--i-ink); font-size: 16px; padding: 10px 14px; }
+html body .pq-portal :is(input, select, textarea):focus-visible { outline: none; border-color: var(--i-acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--i-acc) 25%, transparent); }
+html body .pq-portal .pq-choices { display: flex; flex-wrap: wrap; gap: 10px; }
+html body .pq-portal .pq-choices label { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 20px; border: 1.5px solid var(--i-line-strong); border-radius: 14px; background: var(--i-s1); color: var(--i-ink); font-size: 16px; cursor: pointer; }
+html body .pq-portal .pq-choices label:has(input:checked) { border-color: var(--i-acc); background: var(--i-acc-soft); color: var(--i-acc-ink); }
+html body .pq-portal .pq-choices input { accent-color: var(--i-acc); width: 20px; height: 20px; }
+html body .pq-portal .pq-check { accent-color: var(--i-acc); }
+html body .pq-portal .pq-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 24px; }
+html body .pq-portal .pq-actions :is(.primary, .secondary, button) { min-height: 54px; padding: 0 26px; border-radius: 14px; font-size: 16px; }
+@media (max-width: 600px) { html body .pq-portal :is(.pq-box, .pq-question) { padding: 18px 16px; } html body .pq-portal .pq-heading { padding: 22px 20px; } }
+html body #workspace .pq-portal.panel { background: transparent; border: 0; box-shadow: none; }
+html body #workspace .pq-portal .pq-heading h2, html body .pq-portal .pq-heading h2 { color: #fff; font-size: clamp(26px, 3.4vw, 34px); margin: 0; }
+html body #workspace .pq-portal .pq-heading { padding: 26px 28px; }
+html body #workspace .pq-portal .pq-form { padding: 0; }
