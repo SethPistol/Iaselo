@@ -2161,6 +2161,10 @@ if(veilleModule){const detailBeforeVeille=detail;detail=function(){detailBeforeV
 const ameliorations=window.createAmeliorations?.({$,esc,toast,patients,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,teams:()=>careTeams,management:()=>clinicManagement.exportState(),view:()=>view,tab:()=>tab,open:(id,nextTab)=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();selected=id;tab=nextTab||(nurseProfile()?'follow':'consult');view='patients';filter='Tous';query='';render()},setView:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}})||null;
 if(ameliorations){const renderBeforeAmeliorations=render;render=function(){if(ameliorations.render(view))return;renderBeforeAmeliorations()}}
 
+// Prescriptions préopératoires de la consultation (dist/prescriptions-preop.js) : bilans, prémédication, consignes, envoi au patient.
+const prescriptionsPreop=window.createPrescriptionsPreop?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,shared:()=>!!durableWorkspace,flush:()=>durableWorkspace?.flush()})||null;
+if(prescriptionsPreop&&veilleModule){const panelBeforePreop=veilleModule.panel;veilleModule.panel=t=>prescriptionsPreop.panel(t)||panelBeforePreop(t)}
+
 // Accès direct au plan de soins du séjour sélectionné.
 if($('#open-nursing-record'))$('#open-nursing-record').onclick=()=>{
  if(view==='patients'&&tab==='consult'&&p())captureConsult();

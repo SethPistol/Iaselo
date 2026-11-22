@@ -42,13 +42,13 @@ export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
  return {
   channels,establishment,
   refusal,
-  async email({to,name,subject,text,html}){
+  async email({to,name,subject,text,html,tag='iaselo-questionnaire'}){
    if(!channels.email)throw Error('Envoi d’e-mail non configuré (BREVO_API_KEY, BREVO_SENDER_EMAIL).');const no=refusal(to);if(no)throw Error(no);
-   return call('/smtp/email',{sender:{name:senderName,email:senderEmail},to:[{email:to,...(name?{name}:{})}],subject,textContent:text,htmlContent:html,tags:['iaselo-questionnaire']});
+   return call('/smtp/email',{sender:{name:senderName,email:senderEmail},to:[{email:to,...(name?{name}:{})}],subject,textContent:text,htmlContent:html,tags:[tag]});
   },
-  async sms({to,content}){
+  async sms({to,content,tag='iaselo-questionnaire'}){
    if(!channels.sms)throw Error('Envoi de SMS non configuré (BREVO_API_KEY, BREVO_SMS_SENDER).');const no=refusal(to);if(no)throw Error(no);
-   return call('/transactionalSMS/send',{sender:smsSender,recipient:String(to).replace(/^\+/,''),content,type:'transactional',tag:'iaselo-questionnaire'});
+   return call('/transactionalSMS/send',{sender:smsSender,recipient:String(to).replace(/^\+/,''),content,type:'transactional',tag});
   }
  };
 }
