@@ -36,5 +36,20 @@ test('veille : SMS J+1 via Brevo (numéro vérifié côté serveur), envoi DMP/M
   const other=await login('autre@example.test','Mot de passe test 2026');
   assert.equal((await api('POST','/suivi/send',{stay:'V1',kind:'j-1'},other)).status,403);
   assert.equal((await api('POST','/interop/liaison',{stay:'V1',targets:['dmp']},other)).status,403);
+  // Journal d'accès du séjour : lisible par l'équipe, refusé hors équipe.
+  r=await api('GET','/journal?stay=V1');assert.equal(r.status,200);assert.ok(r.data.rows.some(x=>x.action==='suivi-j+1'));
+  assert.equal((await api('GET','/journal?stay=V1',undefined,other)).status,403);
+  // Bris de glace : soignant hors équipe, motif obligatoire, accès ouvert puis journalisé.
+  const {rows:[o]}=await pool.query("SELECT id FROM auth_users WHERE email='autre@example.test'");await pool.query("UPDATE professional_profiles SET profession='infirmier' WHERE user_id=$1",[o.id]);
+  assert.equal((await api('POST','/bris-de-glace',{stay:'V1',motif:'court'},other)).status,400);
+  assert.equal((await api('POST','/bris-de-glace',{stay:'INCONNU',motif:'Urgence vitale en pleine nuit'},other)).status,404);
+  r=await api('POST','/bris-de-glace',{stay:'V1',motif:'Urgence vitale en pleine nuit'},other);assert.equal(r.status,201,JSON.stringify(r.data));
+  assert.equal((await api('GET','/journal?stay=V1',undefined,other)).status,200);
+  assert.equal((await api('POST','/bris-de-glace',{stay:'V1',motif:'Urgence vitale en pleine nuit'},other)).status,409);
+  r=await api('GET','/bris-de-glace');assert.equal(r.data.rows.length,1);assert.match(r.data.rows[0].reason,/Urgence vitale/);
+  // Relances de préadmission J-7 : autorisées (rubrique preadmission), sans donnée de santé.
+  r=await api('POST','/suivi/send',{stay:'V1',kind:'j-7'});assert.equal(r.status,200,JSON.stringify(r.data));assert.match(sent.at(-1).content,/dossier d’admission/);
+  // Nouvelles rubriques : droits d'écriture.
+  assert.equal((await api('POST','/commit',{documents:[edit('stay/V1/preadmission',{pieces:{}}),edit('stay/V1/periopPlus',{}),edit('stay/V1/peropRapide',{evenements:[]}),edit('stay/V1/soinsPlus',{}),edit('stay/V1/sortiePlus',{}),edit('stay/V1/codage',{}),edit('stay/V1/iaTrace',[]),edit('stay/V1/droitsRgpd',[])]})).status,200);
  }finally{await db.close()}
 });

@@ -43,3 +43,19 @@ et `dist/acces-professionnels.js`.
 
 Mode dégradé hors ligne de la feuille d'anesthésie, base médicamenteuse agréée (Vidal/BCB), codage CCAM à la source,
 bris de glace, journal d'accès consultable par le patient : prochaines étapes.
+
+## Phase 2 : tout le reste de la veille (P2 et P3)
+
+Règles dans `dist/veille-plus-regles.js` (testées par `tests/veille-plus.test.cjs`), écrans dans `dist/veille-plus.js`, API dans `worker/veille.mjs`.
+
+- **Préadmission** : pièces attendues (dont autorisation parentale pour un mineur), relances SMS J-7 et J-3 sans donnée de santé, choix de chambre, estimation du reste à charge, import de rendez-vous Doctolib (simulation).
+- **Bilans et VPA** : examens guidés (SFAR-HAS 2012, rien de systématique), téléconsultation, visite pré-anesthésique avec contrôle du jeûne.
+- **Synthèse** : synthèse de consultation par règles, acceptée ou rejetée par le médecin et tracée (`iaTrace`).
+- **Bloc** : saisie rapide des événements, doses au poids (poids idéal, poids maigre), passerelle moniteur (simulation), traçabilité DMI par code GS1 avec clé GTIN vérifiée, registre des stupéfiants, mode hors ligne avec sauvegarde locale.
+- **SSPI** : score d'Aldrete, EVA, NVPO, sortie signée.
+- **Soins** : conciliation médicamenteuse, protocoles RAAC (simulation, prescription dans l'outil certifié), échelles douleur et sédation avec courbe, Braden, Morse.
+- **Sortie** : score de Chung signé, sortie prévue, orientation ViaTrajectoire (simulation), PROMs à J30.
+- **Codage** : CCAM saisi par le praticien, CIM-10 proposés et décidés par le DIM, export RUM de contrôle (simulation).
+- **Pilotage et qualité** : passages, temps de salle, occupation, indicateurs IQSS, lits et bionettoyage.
+- **Droits et traçabilité** : journal d'accès par séjour (relevé imprimable pour le patient), bris de glace (soignant hors équipe, motif obligatoire, accès 4 h journalisé), durée de conservation (R1112-7), demandes RGPD avec échéance d'un mois.
+- **Tour de contrôle** : cartes de salle avec constantes.
