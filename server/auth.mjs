@@ -38,4 +38,36 @@ export async function createAuth(pool,cfg){
  async function logout(request){if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});const token=getToken(request);if(token)await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[fingerprint(token)]);return new Response(null,{status:303,headers:{Location:'/login','Set-Cookie':sessionCookie('',0)}})}
  return {user,login,logout};
 }
-export function loginPage(message=''){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion professionnelle · Parcours Anesthésie</title><style>body{font:17px system-ui;background:#edf3f6;color:#203747;margin:0;padding:8vh 20px}main{max-width:430px;margin:auto;background:white;padding:32px;border-radius:16px}label{display:block;margin:20px 0}input,button{box-sizing:border-box;font:inherit;width:100%;padding:12px;margin-top:8px;border:1px solid #abbfc9;border-radius:6px}button{background:#244e61;color:white}p{line-height:1.5}.error{color:#9b302a}</style></head><body><main><h1>Parcours Anesthésie</h1><p>Connexion individuelle des professionnels.</p><p class="error">${message}</p><form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form><p>Accès patient : utilisez le lien d’invitation qui vous a été remis. Le prototype reste réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></body></html>`}
+export function loginPage(message=''){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
+@font-face{font-family:Geist;font-weight:100 900;font-display:swap;src:url(/assets/fonts/geist-latin-wght-normal.woff2) format('woff2-variations')}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{font:16px/1.55 Geist,system-ui,-apple-system,'Segoe UI',sans-serif;color:#0C1A25;background:#F3F5F8;-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(380px,1fr);min-height:100vh}
+.marque{position:relative;overflow:hidden;color:#EAF5F7;background:radial-gradient(120% 140% at 100% 0%,#1C6B7D 0%,#0F4D5C 42%,#0A3843 100%);padding:48px clamp(28px,5vw,72px);display:flex;flex-direction:column;justify-content:space-between;gap:40px}
+.marque svg.halo{position:absolute;right:-220px;top:-220px;width:760px;height:760px;opacity:.5;pointer-events:none}
+.marque img{height:46px;width:auto;position:relative;align-self:flex-start}
+.marque h1{position:relative;margin:0;font-size:clamp(34px,4vw,56px);line-height:1.04;letter-spacing:-.035em;font-weight:640;max-width:14ch;color:#fff}
+.marque p{position:relative;margin:18px 0 0;font-size:18px;color:#BFE0E6;max-width:44ch}
+.etapes{position:relative;display:flex;flex-wrap:wrap;gap:8px;margin-top:28px;padding:0;list-style:none}
+.etapes li{font-size:13px;font-weight:550;padding:7px 12px;border-radius:99px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#E2F2F5}
+.pied{position:relative;font-size:13px;color:#A9D3DB}
+.acces{display:flex;align-items:center;justify-content:center;padding:40px 24px}
+main{width:100%;max-width:420px;display:flex;flex-direction:column;gap:22px}
+.etab{height:68px;width:auto;align-self:flex-start}
+h2{margin:6px 0 0;font-size:30px;font-weight:640;letter-spacing:-.03em;line-height:1.1}
+.sous{margin:0;color:#4C5D6C}
+form{display:flex;flex-direction:column;gap:16px;margin-top:4px}
+label{display:flex;flex-direction:column;gap:7px;font-size:14px;font-weight:550}
+input{font:inherit;min-height:50px;padding:0 15px;border:1px solid #C3CDD6;border-radius:13px;background:#fff;color:#0C1A25;transition:border-color .15s,box-shadow .15s}
+input:hover{border-color:#4C5D6C}input:focus{outline:none;border-color:#0F4D5C;box-shadow:0 0 0 4px #E1EFF1}
+button{font:600 16px Geist,system-ui,sans-serif;min-height:52px;margin-top:6px;border:0;border-radius:13px;background:#0F4D5C;color:#fff;cursor:pointer;box-shadow:0 1px 2px rgba(12,26,37,.15),0 8px 20px rgba(15,77,92,.18);transition:background .15s}
+button:hover{background:#0B3D49}button:focus-visible{outline:3px solid #0F4D5C;outline-offset:3px}
+.error{margin:0;padding:12px 14px;border-radius:12px;background:#FDEBEC;color:#B21F2A;font-weight:550}.error:empty{display:none}
+.note{margin:0;font-size:13.5px;color:#4C5D6C;border-top:1px solid #DAE1E8;padding-top:18px}
+@media (max-width:860px){body{grid-template-columns:1fr}.marque{padding:28px 24px;gap:24px}.marque svg.halo{width:480px;height:480px;right:-180px;top:-200px}.marque h1{font-size:32px}.etapes,.pied{display:none}.acces{padding:28px 20px 40px}}
+</style></head><body>
+<section class="marque" aria-label="IASELO"><svg class="halo" viewBox="0 0 760 760" fill="none" aria-hidden="true"><g stroke="#fff"><circle cx="380" cy="380" r="370" stroke-opacity=".10"/><circle cx="380" cy="380" r="300" stroke-opacity=".13"/><circle cx="380" cy="380" r="230" stroke-opacity=".17"/><circle cx="380" cy="380" r="160" stroke-opacity=".22"/><circle cx="380" cy="380" r="90" stroke-opacity=".3"/></g><circle cx="380" cy="380" r="40" fill="#fff" fill-opacity=".12"/></svg>
+<img src="/assets/marque/iaselo-sombre.webp" alt="iaselo" width="495" height="160">
+<div><h1>Le parcours de chaque patient, d’un seul regard.</h1><p>De l’annonce chirurgicale au suivi, toute l’équipe travaille dans le même dossier : consultation, bloc, réveil, hospitalisation et sortie.</p>
+<ul class="etapes"><li>Annonce</li><li>Consultation</li><li>Préparation</li><li>Bloc</li><li>SSPI</li><li>Hospitalisation</li><li>Sortie</li><li>Suivi</li></ul></div>
+<p class="pied">Données de santé hébergées en France chez un hébergeur certifié HDS.</p></section>
+<div class="acces"><main><img class="etab" src="/assets/marque/etablissement.webp" alt="Clinique du Trocadéro" width="369" height="200"><div><h2>Connexion</h2><p class="sous">Espace des professionnels de l’établissement.</p></div><p class="error" role="alert">${message}</p><form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form><p class="note">Patients : utilisez le lien personnel qui vous a été remis. Prototype réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></div></body></html>`}
