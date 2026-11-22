@@ -1,5 +1,6 @@
 import {patientQuestionnaireApi,staffQuestionnaireApi} from './questionnaire.mjs';
 import {professionalAccess,professionalRoutes} from './professional-access.mjs';
+import {veilleApi} from './veille.mjs';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const validKey=k=>typeof k==='string'&&k.length<180&&/^(stay\/[^/]{1,80}\/[a-zA-Z][a-zA-Z0-9]*|management\/[a-zA-Z]+|identities\/(records|reviews))$/.test(k);
 const rawRowValue=row=>row?{key:row.key,data:JSON.parse(row.data),revision:row.revision,actor:row.actor,updatedAt:row.updated_at}:null;
@@ -32,6 +33,7 @@ export async function workspaceApi(request,env){
  async function audit(action,target){await env.DB.prepare('INSERT INTO workspace_access(actor,at,action,target) VALUES(?,?,?,?)').bind(user,at,action,target).run();}
  try{
   const invitationResponse=await staffQuestionnaireApi(request,env,acl);if(invitationResponse)return invitationResponse;
+  const veilleResponse=await veilleApi(request,env,acl);if(veilleResponse)return veilleResponse;
   if(path==='/api/workspace'&&method==='GET'){
    const result=await env.DB.prepare('SELECT key,data,revision,actor,updated_at FROM workspace_documents ORDER BY key').all(),visible=result.results.filter(row=>acl.canRead(row.key));await acl.log('read','workspace','allowed','',JSON.stringify(visible.map(r=>r.key)));return json({user,role,access:{profile:acl.profile,teams:acl.teams,epoch:acl.epoch,planningOccupancy:acl.planningOccupancy(JSON.parse(result.results.find(r=>r.key==='management/reservations')?.data||'[]'))},canInitialize:env.ENABLE_DEMO_SEED===true&&acl.isAdmin&&result.results.length===0,documents:visible.map(rowValue)});
   }
