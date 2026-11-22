@@ -4,10 +4,12 @@ export function createPool(env=process.env){
  const url=env.DATABASE_URL||env.POSTGRESQL_ADDON_URI;
  const connection=url?{connectionString:url}:{host:env.POSTGRESQL_ADDON_HOST,port:Number(env.POSTGRESQL_ADDON_PORT||5432),user:env.POSTGRESQL_ADDON_USER,password:env.POSTGRESQL_ADDON_PASSWORD,database:env.POSTGRESQL_ADDON_DB};
  if(!url&&!connection.host)throw Error('DATABASE_URL ou les variables POSTGRESQL_ADDON_* sont requises.');
- const mode=env.PGSSL||'verify-full';if(!['verify-full','disable'].includes(mode))throw Error('PGSSL doit valoir verify-full ou disable.');
+ // PGSSL=require : transport chiffré sans vérification du certificat. Réservé au mode recette (données fictives),
+ // pour un add-on dont le certificat est auto-signé. Refusé ailleurs : la production garde verify-full ou PGSSL_CA.
+ const mode=env.PGSSL||'verify-full',test=env.IASELO_RECETTE==='true';if(!['verify-full','disable',...(test?['require']:[])].includes(mode))throw Error(mode==='require'?'PGSSL=require est réservé au mode recette (IASELO_RECETTE=true).':'PGSSL doit valoir verify-full ou disable.');
  // L’URL ne peut pas réduire la vérification TLS choisie explicitement ici.
  if(url){const u=new URL(url);for(const key of ['sslmode','sslcert','sslkey','sslrootcert'])u.searchParams.delete(key);connection.connectionString=u.toString()}
- return new pg.Pool({...connection,max:Number(env.PG_POOL_SIZE||5),connectionTimeoutMillis:10000,idleTimeoutMillis:30000,ssl:mode==='disable'?false:{rejectUnauthorized:true,...(env.PGSSL_CA?{ca:env.PGSSL_CA.replace(/\\n/g,'\n')}:{})}});
+ return new pg.Pool({...connection,max:Number(env.PG_POOL_SIZE||5),connectionTimeoutMillis:10000,idleTimeoutMillis:30000,ssl:mode==='disable'?false:mode==='require'?{rejectUnauthorized:false}:{rejectUnauthorized:true,...(env.PGSSL_CA?{ca:env.PGSSL_CA.replace(/\\n/g,'\n')}:{})}});
 }
 export function translateSQL(sql){
  let out='',quoted=false,double=false,index=0;

@@ -18,3 +18,10 @@ test('recette : bucket privé nommé automatiquement',()=>{
  assert.doesNotThrow(()=>cellarBinding({IASELO_RECETTE:'true',CELLAR_ADDON_HOST:'cellar-c2.services.clever-cloud.com',CELLAR_ADDON_KEY_ID:'ABC_123',CELLAR_ADDON_KEY_SECRET:'x'}));
  assert.throws(()=>cellarBinding({CELLAR_ADDON_HOST:'cellar-c2.services.clever-cloud.com',CELLAR_ADDON_KEY_ID:'ABC',CELLAR_ADDON_KEY_SECRET:'x'}),/bucket/);
 });
+import {createPool} from '../../server/database.mjs';
+test('PGSSL=require : accepté seulement en recette, jamais en production',async()=>{
+ const base={DATABASE_URL:'postgres://u:p@db.example.test:5432/x'};
+ assert.throws(()=>createPool({...base,PGSSL:'require'}),/réservé au mode recette/);
+ const pool=createPool({...base,PGSSL:'require',IASELO_RECETTE:'true'});assert.deepEqual(pool.options.ssl,{rejectUnauthorized:false});await pool.end();
+ const strict=createPool(base);assert.equal(strict.options.ssl.rejectUnauthorized,true);await strict.end();
+});
