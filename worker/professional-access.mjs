@@ -59,7 +59,7 @@ export async function professionalAccess(env,request,user,member,at){
    if(module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='droitsRgpd')return (['anesthesiste','chirurgien'].includes(job)||isAdmin)&&Array.isArray(data);
    // Modules issus de la veille marché : statut bloc, check-list HAS, suivi J+1 (soignants) ; aide CPA (anesthésiste) ; envois DMP/MSSanté (médecins).
-   if(['checklistBloc','blocStatut','suiviAmbu'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(['checklistBloc','blocStatut','suiviAmbu','bionettoyage'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='aideCpa')return job==='anesthesiste'&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='envoisInterop')return ['anesthesiste','chirurgien'].includes(job)&&appendOnly(old||[],data);
    if(job==='infirmier'){

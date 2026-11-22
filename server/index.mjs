@@ -11,6 +11,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(pathname==='/login'&&request.method==='GET')return new Response(loginPage('',undefined,auth.pscEnabled()),{headers:{'Content-Type':mime['.html']}});
   if(pathname==='/auth/login'&&request.method==='POST')return auth.login(request);
   if(pathname==='/auth/logout'&&request.method==='POST')return auth.logout(request);
+  if(pathname==='/auth/lock'&&request.method==='POST')return auth.lock(request);
+  if(pathname==='/auth/unlock'&&request.method==='POST')return auth.unlock(request);
   if(pathname==='/api/questionnaire/submit'||pathname==='/api/questionnaire/resolve')return workspaceApi(request,{DB,BUCKET:bucket,ENABLE_DEMO_SEED:cfg.enableDemoSeed});
   const staff=await auth.user(request);
   if(pathname.startsWith('/api/workspace')){

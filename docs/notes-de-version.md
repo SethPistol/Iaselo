@@ -1,3 +1,7 @@
+# IASELO 1.1.0 — dix améliorations (22 novembre 2026)
+
+Recherche rapide Ctrl K, verrouillage automatique du poste (côté serveur), contrôle allergies ↔ médicaments, réinjection d’antibioprophylaxie au bloc, étiquettes et bracelet avec code-barres, import du programme opératoire depuis E-med (CSV), bionettoyage partagé entre postes, export du dossier pour le droit d’accès, feuille de relève de service, score NEWS2 en surveillance postopératoire. Détail : docs/ameliorations-1-1.md. La limite « bionettoyage propre à chaque poste » est levée.
+
 # IASELO 1.0.0 — notes de version
 
 Version consolidée du 22 novembre 2026. Elle réunit dans une seule branche tout le travail mené en parallèle, vérifié de bout en bout sur des données fictives.
@@ -49,4 +53,3 @@ L'application reste limitée aux patients fictifs. Avant la première donnée r�
 ## Limites connues
 
 - Le planning Bloc & lits démarre vide ; le bouton « Charger un programme de démonstration » le remplit. Les indicateurs de Pilotage se remplissent à partir des horodatages saisis dans la tour de contrôle.
-- Le statut de bionettoyage des chambres est propre à chaque poste dans cette version.

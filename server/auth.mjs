@@ -22,7 +22,7 @@ export async function createAuth(pool,cfg,{psc=null}={}){
  const fingerprint=v=>createHmac('sha256',cfg.sessionSecret).update(v).digest('hex'),cookieName=cfg.secure?'__Host-parcours_session':'parcours_session',dummy=await hashPassword(randomBytes(32).toString('hex'));
  const sessionCookie=(token,age)=>cookieName+'='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+age+(cfg.secure?'; Secure':'');
  function getToken(request){const value=(request.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);return /^[a-f0-9]{64}$/.test(value||'')?value:null}
- async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
+ async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
  async function login(request){
   if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});
   const bytes=await request.arrayBuffer();if(bytes.byteLength>8192)return new Response('Requête trop volumineuse',{status:413});let d;try{const raw=new TextDecoder().decode(bytes);d=request.headers.get('Content-Type')?.includes('application/json')?JSON.parse(raw):Object.fromEntries(new URLSearchParams(raw))}catch{return new Response('Requête invalide',{status:400})}
@@ -53,7 +53,23 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   const res=await openSession(account.id,'psc',r.idToken),headers=new Headers(res.headers);headers.append('Set-Cookie',stateCookie('',0));return new Response(null,{status:303,headers});
  }
  async function logout(request){if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});const token=getToken(request);let location='/login';if(token){const row=(await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1 RETURNING id_token',[fingerprint(token)])).rows?.[0];if(row?.id_token&&psc)try{location=await psc.logoutUrl(row.id_token)||location}catch{}}return new Response(null,{status:303,headers:{Location:location,'Set-Cookie':sessionCookie('',0)}})}
- return {user,login,logout,pscStart,pscCallback,pscEnabled:()=>!!psc?.enabled()};
+ // Verrouillage du poste (inactivité ou bouton « Verrouiller ») : la session est suspendue côté serveur,
+ // aucune donnée n'est servie tant que le même professionnel n'a pas ressaisi son mot de passe.
+ // 5 échecs en 15 minutes ferment la session.
+ async function sessionRow(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT s.token_hash,s.user_id,s.method,s.locked_at,u.password_hash,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
+ async function lock(request){if(!sameOrigin(request,cfg))return Response.json({error:'Origine refusée'},{status:403});const s=await sessionRow(request);if(!s)return Response.json({error:'Session expirée.'},{status:401});const at=new Date().toISOString();if(!s.locked_at){await pool.query('UPDATE auth_sessions SET locked_at=$1 WHERE token_hash=$2',[at,s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'lock'])}return Response.json({locked:true,name:s.display_name,method:s.method})}
+ async function unlock(request){
+  if(!sameOrigin(request,cfg))return Response.json({error:'Origine refusée'},{status:403});
+  const bytes=await request.arrayBuffer();if(bytes.byteLength>4096)return Response.json({error:'Requête trop volumineuse'},{status:413});let d;try{d=JSON.parse(new TextDecoder().decode(bytes))}catch{return Response.json({error:'Requête invalide'},{status:400})}
+  const s=await sessionRow(request);if(!s)return Response.json({error:'Session expirée : reconnectez-vous.',logout:true},{status:401});
+  const identity=fingerprint('unlock:'+s.user_id),at=new Date().toISOString(),since=new Date(Date.now()-15*60000).toISOString();
+  const ok=await verifyPassword(String(d.password||''),s.password_hash||dummy);
+  await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,ok?1:0]);
+  if(!ok){const lastOk=(await pool.query('SELECT MAX(at) AS at FROM auth_attempts WHERE identity_hash=$1 AND success=1',[identity])).rows[0]?.at,from=lastOk&&lastOk>since?lastOk:since;const n=Number((await pool.query('SELECT COUNT(*) AS n FROM auth_attempts WHERE identity_hash=$1 AND at>$2 AND success=0',[identity,from])).rows[0].n);if(n>=5){await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'unlock-refused-logout']);return Response.json({error:'Trop d’essais : la session est fermée. Reconnectez-vous.',logout:true},{status:401,headers:{'Set-Cookie':sessionCookie('',0)}})}return Response.json({error:'Mot de passe incorrect ('+(5-n)+' essai'+(5-n>1?'s':'')+' restant'+(5-n>1?'s':'')+').'},{status:401})}
+  await pool.query('UPDATE auth_sessions SET locked_at=NULL WHERE token_hash=$1',[s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'unlock']);
+  return Response.json({unlocked:true});
+ }
+ return {user,login,logout,lock,unlock,pscStart,pscCallback,pscEnabled:()=>!!psc?.enabled()};
 }
 export function loginPage(message='',test=recette(),psc=false){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
 @font-face{font-family:Geist;font-weight:100 900;font-display:swap;src:url(/assets/fonts/geist-latin-wght-normal.woff2) format('woff2-variations')}
