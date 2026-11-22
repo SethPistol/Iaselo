@@ -54,6 +54,10 @@ export async function professionalAccess(env,request,user,member,at){
    if(module==='nursingRecord')return ['anesthesiste','chirurgien','infirmier'].includes(job)&&appendOnly(old||[],data);
    if(module==='medicationCircuit')return ['anesthesiste','chirurgien','pharmacien'].includes(job)&&appendOnly(old||[],data)&&data.slice((old||[]).length).every(e=>['analysis','reconciliation','validation'].includes(e.kind)&&(e.kind!=='validation'||job==='pharmacien')&&e.author?.trim()&&e.note?.trim()&&Number.isFinite(Date.parse(e.at)));
    if(module==='events')return clinical&&Array.isArray(data)&&additions(old||[],data);
+   // Modules issus de la veille marché : statut bloc, check-list HAS, suivi J+1 (soignants) ; aide CPA (anesthésiste) ; envois DMP/MSSanté (médecins).
+   if(['checklistBloc','blocStatut','suiviAmbu'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(module==='aideCpa')return job==='anesthesiste'&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(module==='envoisInterop')return ['anesthesiste','chirurgien'].includes(job)&&appendOnly(old||[],data);
    if(job==='infirmier'){
     if(module==='postopVitals')return appendOnly(old||[],data)&&(data||[]).slice((old||[]).length).every(x=>x.kind==='Surveillance'&&['SSPI','Hospitalisation'].includes(x.values?.location));
     if(module==='perop')return data&&same(old?.context||{},data.context||{})&&appendOnly(old?.records||[],data.records||[])&&(data.records||[]).slice((old?.records||[]).length).every(x=>x.kind==='Surveillance');
