@@ -97,6 +97,11 @@ Clever Cloud déploie un dépôt Git ; le ZIP est le paquet source à décompres
 
 Après le premier démarrage réussi, retirer les trois variables `BOOTSTRAP_ADMIN_*` de l’environnement de l’application : le compte est conservé dans PostgreSQL. Elles ne remplacent jamais un compte déjà créé. Si la base est vide et qu’elles sont absentes, le démarrage échoue ; personne ne peut s’attribuer le rôle de propriétaire en étant le premier visiteur.
 
+
+## Serveur de recette (test, données fictives)
+
+Pour un serveur de test séparé de la production, sans aucune manipulation technique : créer une **autre** application Node.js 24 avec ses propres add-ons PostgreSQL et Cellar, puis ajouter la seule variable `IASELO_RECETTE=true`. Le serveur déduit alors son adresse `https://app-….cleverapps.io` de `APP_ID`, tire un secret de session à chaque démarrage (les sessions sont perdues au redémarrage), active les patients fictifs, crée son bucket privé `iaselo-recette-…` et un compte de test affiché sur la page de connexion. Ne jamais activer ce mode sur l’application de production ni y saisir de données réelles. `BASE_URL`, `SESSION_SECRET`, `S3_BUCKET` restent prioritaires s’ils sont renseignés.
+
 ## 4. Comptes et habilitations
 
 Les sessions professionnelles sont gérées par le serveur, avec mot de passe scrypt, cookie HttpOnly/SameSite/Secure en HTTPS, expiration et limitation des tentatives. Les en-têtes d’identité entrants de l’ancien hébergeur sont supprimés. Les droits métier et les équipes de soins restent contrôlés côté serveur.

@@ -1,4 +1,4 @@
-import {randomBytes,randomUUID,scrypt as scryptCb,timingSafeEqual,createHmac} from 'node:crypto';import {promisify} from 'node:util';
+import {randomBytes,randomUUID,scrypt as scryptCb,timingSafeEqual,createHmac} from 'node:crypto';import {promisify} from 'node:util';import {recette,RECETTE_EMAIL,RECETTE_PASSWORD} from './config.mjs';
 const scrypt=promisify(scryptCb);
 export async function hashPassword(password){if(typeof password!=='string'||password.length<14||password.length>1024)throw Error('Mot de passe : entre 14 et 1024 caractères.');const salt=randomBytes(16).toString('hex'),key=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return 'scrypt$16384$'+salt+'$'+key.toString('hex')}
 export async function verifyPassword(password,hash){if(typeof password!=='string'||password.length>1024||!/^scrypt\$16384\$[a-f0-9]{32}\$[a-f0-9]{128}$/.test(hash||''))return false;const [,,salt,expected]=hash.split('$'),actual=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return timingSafeEqual(actual,Buffer.from(expected,'hex'))}
@@ -13,7 +13,7 @@ export async function createAccount(pool,{email,name,passwordHash,admin=false}){
  await client.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,id,admin?'bootstrap-admin':'account-created']);await client.query('COMMIT');return id;
  }catch(e){await client.query('ROLLBACK');throw e}finally{client.release()}
 }
-export async function bootstrap(pool,env=process.env){if((await pool.query('SELECT id FROM auth_users LIMIT 1')).rows.length)return;await createAccount(pool,{email:env.BOOTSTRAP_ADMIN_EMAIL,name:env.BOOTSTRAP_ADMIN_NAME||'Administrateur',passwordHash:env.BOOTSTRAP_ADMIN_PASSWORD_HASH,admin:true})}
+export async function bootstrap(pool,env=process.env){if((await pool.query('SELECT id FROM auth_users LIMIT 1')).rows.length)return;if(recette(env)){await createAccount(pool,{email:RECETTE_EMAIL,name:'Dr Démo (recette)',passwordHash:await hashPassword(RECETTE_PASSWORD),admin:true});return}await createAccount(pool,{email:env.BOOTSTRAP_ADMIN_EMAIL,name:env.BOOTSTRAP_ADMIN_NAME||'Administrateur',passwordHash:env.BOOTSTRAP_ADMIN_PASSWORD_HASH,admin:true})}
 // Formulaires HTML : avec Referrer-Policy: no-referrer, les navigateurs envoient « Origin: null » pour un POST
 // de formulaire, même vers la même origine. Sec-Fetch-Site, fixé par le navigateur et non modifiable par une page,
 // confirme alors que la requête vient bien de cette origine. Toute autre origine reste refusée.
@@ -38,7 +38,7 @@ export async function createAuth(pool,cfg){
  async function logout(request){if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});const token=getToken(request);if(token)await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[fingerprint(token)]);return new Response(null,{status:303,headers:{Location:'/login','Set-Cookie':sessionCookie('',0)}})}
  return {user,login,logout};
 }
-export function loginPage(message=''){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
+export function loginPage(message='',test=recette()){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
 @font-face{font-family:Geist;font-weight:100 900;font-display:swap;src:url(/assets/fonts/geist-latin-wght-normal.woff2) format('woff2-variations')}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%}
 body{font:16px/1.55 Geist,system-ui,-apple-system,'Segoe UI',sans-serif;color:#0C1A25;background:#F3F5F8;-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(380px,1fr);min-height:100vh}
@@ -55,6 +55,7 @@ main{width:100%;max-width:420px;display:flex;flex-direction:column;gap:22px}
 .etab{height:68px;width:auto;align-self:flex-start}
 h2{margin:6px 0 0;font-size:30px;font-weight:640;letter-spacing:-.03em;line-height:1.1}
 .sous{margin:0;color:#4C5D6C}
+.recette{margin:0;padding:12px 14px;border-radius:12px;background:#FFF4E5;border:1px solid #E8B36A;color:#5C3300;font-size:14px}.recette code{font:600 13px/1.4 ui-monospace,monospace}
 form{display:flex;flex-direction:column;gap:16px;margin-top:4px}
 label{display:flex;flex-direction:column;gap:7px;font-size:14px;font-weight:550}
 input{font:inherit;min-height:50px;padding:0 15px;border:1px solid #C3CDD6;border-radius:13px;background:#fff;color:#0C1A25;transition:border-color .15s,box-shadow .15s}
@@ -70,4 +71,4 @@ button:hover{background:#0B3D49}button:focus-visible{outline:3px solid #0F4D5C;o
 <div><h1>Le parcours de chaque patient, d’un seul regard.</h1><p>De l’annonce chirurgicale au suivi, toute l’équipe travaille dans le même dossier : consultation, bloc, réveil, hospitalisation et sortie.</p>
 <ul class="etapes"><li>Annonce</li><li>Consultation</li><li>Préparation</li><li>Bloc</li><li>SSPI</li><li>Hospitalisation</li><li>Sortie</li><li>Suivi</li></ul></div>
 <p class="pied">Données de santé hébergées en France chez un hébergeur certifié HDS.</p></section>
-<div class="acces"><main><img class="etab" src="/assets/marque/etablissement.webp" alt="Clinique du Trocadéro" width="369" height="200"><div><h2>Connexion</h2><p class="sous">Espace des professionnels de l’établissement.</p></div><p class="error" role="alert">${message}</p><form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form><p class="note">Patients : utilisez le lien personnel qui vous a été remis. Prototype réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></div></body></html>`}
+<div class="acces"><main><img class="etab" src="/assets/marque/etablissement.webp" alt="Clinique du Trocadéro" width="369" height="200"><div><h2>Connexion</h2><p class="sous">Espace des professionnels de l’établissement.</p></div><p class="error" role="alert">${message}</p>${test?`<p class="recette"><strong>Serveur de recette · patients fictifs uniquement.</strong> Compte de test : <code>${RECETTE_EMAIL}</code> · mot de passe <code>${RECETTE_PASSWORD}</code></p>`:''}<form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required${test?` value="${RECETTE_EMAIL}"`:''}></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form><p class="note">Patients : utilisez le lien personnel qui vous a été remis. Prototype réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></div></body></html>`}
