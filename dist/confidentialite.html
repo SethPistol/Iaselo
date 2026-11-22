@@ -4,14 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Confidentialité · Parcours Anesthésie</title>
-<link rel="icon" type="image/webp" href="assets/sceau-trocadero.webp">
+<title>Confidentialité · IASELO</title>
+<link rel="icon" type="image/png" href="assets/marque/favicon.png"><script src="theme.js"></script>
 <style>
-:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f4f1eb;color:#24343b;font:16px/1.65 system-ui,sans-serif}main{max-width:900px;margin:auto;padding:32px 22px 60px}h1,h2{font-family:Georgia,serif;font-weight:400;line-height:1.2}h1{font-size:clamp(32px,5vw,47px)}h2{font-size:26px;margin-top:32px}a{color:#285967;text-underline-offset:3px}a:focus-visible{outline:2px solid #956b3f;outline-offset:3px}.notice{padding:16px 20px;border-left:3px solid #a78556;background:#eee5d6}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;background:#fffdf8}th,td{border:1px solid #ded8cb;padding:12px;text-align:left;vertical-align:top}th{background:#eee5d6}
+@font-face{font-family:Geist;font-weight:100 900;font-display:swap;src:url(assets/fonts/geist-latin-wght-normal.woff2) format('woff2-variations')}
+:root{--bg:#F3F5F8;--s1:#FFFFFF;--s2:#EDF1F5;--line:#DAE1E8;--ink:#0C1A25;--mut:#4C5D6C;--acc:#0F4D5C;--acc-soft:#E1EFF1;color-scheme:light}
+:root[data-theme=dark]{--bg:#0A1016;--s1:#111A22;--s2:#17222C;--line:#26343F;--ink:#E6EDF3;--mut:#9BACBA;--acc:#7FCAD8;--acc-soft:#12313A;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 Geist,system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:900px;margin:auto;padding:32px 22px 60px}
+.retour{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-size:14px;font-weight:600}.retour img{height:28px;width:auto}
+.i-sombre{display:none}:root[data-theme=dark] .i-clair{display:none}:root[data-theme=dark] .i-sombre{display:inline}
+h1,h2{font-weight:640;line-height:1.15;letter-spacing:-.03em}h1{font-size:clamp(30px,5vw,44px);margin:28px 0 8px}h2{font-size:23px;letter-spacing:-.02em;margin-top:40px}
+a{color:var(--acc);text-underline-offset:3px}a:focus-visible{outline:3px solid var(--acc);outline-offset:3px;border-radius:4px}
+.notice{padding:16px 20px;border-radius:14px;border:1px solid var(--line);border-left:4px solid var(--acc);background:var(--acc-soft)}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--s1)}table{width:100%;border-collapse:collapse}
+th,td{border-bottom:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}tr:last-child td{border-bottom:0}th{background:var(--s2);font-size:13px;font-weight:600;color:var(--mut)}
+@media print{:root{--bg:#fff}}
 </style>
 </head>
 <body><main>
-<a href="./">Parcours Anesthésie</a>
+<a class="retour" href="./"><img class="i-clair" src="assets/marque/iaselo.webp" alt="IASELO" width="87" height="28"><img class="i-sombre" src="assets/marque/iaselo-sombre.webp" alt="IASELO" width="87" height="28"></a>
 <h1>Confidentialité et données de santé</h1>
 <p>État du 19 novembre 2026.</p>
 <p class="notice"><strong>Version de démonstration destinée aux données fictives.</strong> La préparation à l’utilisation clinique est en cours. La conformité RGPD de l’exploitation clinique et le périmètre d’hébergement HDS restent à établir.</p>

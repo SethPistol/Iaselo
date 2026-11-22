@@ -1,0 +1,205 @@
+/* Fichier généré par scripts/theme-generate.mjs : ne pas modifier à la main. */
+/* Thème clair */
+:root{--bg:#f2f4f7;--card:#ffffff;--ink:#113c47;--muted:#2b9cb9;--primary:#134551;--accent:#1c6779;--warn:#a05908;--danger:#c32530;--ok:#1c7856;--border:#dee2e7;--soft:#eef1f4}
+button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #288fa9}
+header{background:#0f3842;color:#ffffff}
+.brand-mark{background:#185665;color:#7dcce0}
+header p{color:#9cd9e8}
+.offline{color:#d0d6dd}
+.offline i{background:#6cc6dd}
+.tab{color:#a6dcea}
+.tab.active{background:#d7f4e9;color:#144753}
+.tab:hover:not(.active){background:#16505e;color:#ffffff}
+.welcome-symbol{background:#e2e7ed;color:#227a90}
+.banner{background:#eef8fa;color:#1d697c;border:1px solid #bae4ef}
+.banner b{color:#1c6679}
+.card h2{border-bottom:1px solid #e8ecf1;background:#ffffff}
+.card h2:before{background:#227b92}
+label{color:#2689a2}
+input,select,textarea{border:1px solid #d9dee3;background:#fafafb}
+input::placeholder,textarea::placeholder{color:#7f90a3}
+input:focus,select:focus,textarea:focus{border-color:#227b92;background:#ffffff}
+input[type=checkbox]{accent-color:#1d687a}
+.check{border:1px solid #e1e6ec;background:#fbfbfc;color:#1f6f83}
+.check:has(input:checked){background:#f0f2f5;border-color:#64c3db;color:#164e5c}
+.primary{background:#154e5c;color:#ffffff}
+.secondary{background:#eaeef2;color:#1a5e6f}
+.dangerbtn{background:#ffffff;color:#b3222c;border:1px solid #d3ecf2!important}
+.actions{background:#fffffff5;border-top:1px solid #dee2e7}
+.item{border:1px solid #e0e4e8;border-left:3px solid #67c4db;background:#f9fafb}
+.item.danger{border-color:#f4c4c7;background:#f8f9fa}
+.item.warn{border-color:#b4e2ee;border-left-color:#d7780b;background:#f5f7f9}
+.item.ok{border-color:#ced5dc;background:#f2f4f7}
+.item.info{border-color:#d3d9e0;border-left-color:#2ca1be;background:#f3f5f8}
+.src{color:#2891ac}
+.pill.red{background:#f5dbdd;color:#ac212a}
+.pill.amber{background:#cbebf3;color:#1c677a}
+.pill.blue{background:#e2e7ed;color:#20758b}
+.pill.green{background:#e1e5ea;color:#1a6d4f}
+.note,small.note{color:#637589}
+.footer-note{color:#687a8f}
+.abx-link{color:#1c6375}
+.abx-drug{background:#ffffff;border:1px solid #cad1d9}
+.abx-selected,.vte-factor{color:#1d687b;background:#eff1f4}
+.coord-task,.has-ref{background:#ffffff}
+.coord-status{color:#965408}
+.coord-warning{background:#f8f9fa}
+.clinical-details{border-top:1px solid #dfe3e8}
+.clinical-details summary{color:#207387}
+.routine-details{border:1px solid #d1d7dd;background:#f7f8fa}
+.concise-limit{color:#566576}
+.hem-question{border-bottom:1px solid #dfe3e8}
+.vte-missing button{background:#ffffff;border:1px solid #64c3db;color:#113e49}
+.overview-head{background:#12404b;color:#ffffff}
+.overview-head h2{color:#ffffff}
+.overview-kicker{color:#a8ddeb}
+.overview-card{background:#f8f9fa;border:1px solid #d9dee4}
+.overview-task{border-bottom:1px solid #d9dee4}
+.overview-task small{color:#505e6e}
+.overview-link{color:#195b6c}
+.overview-details{border:1px solid #d9dee4}
+#exportText{border:1px solid #9ed9e8}
+#exportBox{border-top:1px solid #d9dee4}
+body{background:#f6f7f9}
+.restore-context{background:#edf0f3;border-bottom:1px solid #ced5dc;color:#185767}
+:root{--ink:#144753;--muted:#58687a;--line:#d7dce2;--blue:#1a5f71;--bg:#f0f2f5;--navy:#113f4b}
+body{background:#f0f2f5;color:#144753}
+header{background:#113f4b;color:#ffffff}
+header h1{color:#e6eaef}
+.tabs .tab{color:#cad1d8;border:1px solid #ffffff20}
+.tabs .tab.active{background:#e4e9ee;color:#16505e;border-color:#e4e9ee}
+.restore-context{background:#e2e7ed;color:#1f825e}
+.card{border:1px solid #d5dae0;background:#fcfcfd}
+.card>h2{color:#16505f;border-bottom:1px solid #dde1e6;background:#f7f8fa}
+h3{color:#1a5d6e}
+label{color:#207286}
+input,select,textarea{border:1px solid #c8cfd8;background:#ffffff;color:#144753}
+input:focus,select:focus,textarea:focus{outline:2px solid #a0e9ce;border-color:#278ea8}
+.check{border:1px solid #dce1e6;background:#f2f4f7}
+.check input{accent-color:#1d6a7e}
+.primary,.abx-action{background:#1b6071;color:#ffffff;border:1px solid #1b6071}
+.secondary{background:#ffffff;color:#1c6375;border:1px solid #cad1d9}
+.banner{background:#e9edf1;border:1px solid #d3d9e0;color:#229369}
+.item{background:#eff1f4;border-color:#d2d8df}
+.item strong{color:#175261}
+.item.warn{background:#e2f3f7;border-color:#c5ccd5}
+.item.danger{background:#e5f4f8;border-color:#cad1d9}
+.abx-small,.note{color:#5a6a7c}
+.src{color:#5f7084}
+.abx-link,a{color:#1b6071}
+.abx-drug{background:#e6eaef;border:1px solid #cad1d9}
+.vte-block{border:1px solid #d5dbe1;background:#f9fafb}
+.abx-selected{background:#e5e9ee;border-color:#cbd2da;color:#1c7856}
+.coord-task{border:1px solid #d6dce2;background:#ffffff}
+.coord-task h4{color:#1b7252}
+.clinical-details,.coord-why{border-color:#ced5dc;background:#f0f3f6}
+.clinical-details summary,.coord-why summary{color:#23956b}
+.overview-head{background:#134552;color:#ffffff}
+.overview-head h2{color:#e2e7ec}
+.overview-head p,.overview-head small{color:#c7ced6}
+.overview-card{background:#f9fafb;border-color:#d1d7dd}
+.overview-task{border-color:#d5dae0}
+.actions{background:#113f4b}
+button:focus-visible,a:focus-visible{outline:3px solid #7ee1bd}
+/* Mode sombre */
+:root:where([data-theme=dark]){--bg:#14181d;--card:#1a1f26;--ink:#c2e2eb;--muted:#a1d3e0;--primary:#c2e2eb;--accent:#c1e2ea;--warn:#f1d3b0;--danger:#ec9398;--ok:#baf3de;--border:#212830;--soft:#171b21}
+:where(:root[data-theme=dark]) button:focus-visible,:where(:root[data-theme=dark]) summary:focus-visible,:where(:root[data-theme=dark]) a:focus-visible{outline:3px solid #a9d7e2}
+:where(:root[data-theme=dark]) header{background:#c2e2eb;color:#1a1f26}
+:where(:root[data-theme=dark]) .brand-mark{background:#c2e2eb;color:#6fbccf}
+:where(:root[data-theme=dark]) header p{color:#6ebbcf}
+:where(:root[data-theme=dark]) .offline{color:#2a323c}
+:where(:root[data-theme=dark]) .offline i{background:#77c0d2}
+:where(:root[data-theme=dark]) .tab{color:#6ebbcf}
+:where(:root[data-theme=dark]) .tab.active{background:#1e3e32;color:#c2e2eb}
+:where(:root[data-theme=dark]) .tab:hover:not(.active){background:#c2e2eb;color:#1a1f26}
+:where(:root[data-theme=dark]) .welcome-symbol{background:#1e242a;color:#b6dde7}
+:where(:root[data-theme=dark]) .banner{background:#172b30;color:#c0e2ea;border:1px solid #26464e}
+:where(:root[data-theme=dark]) .banner b{color:#c2e2eb}
+:where(:root[data-theme=dark]) .card h2{border-bottom:1px solid #1a1f25;background:#1a1f26}
+:where(:root[data-theme=dark]) .card h2:before{background:#b5dce6}
+:where(:root[data-theme=dark]) label{color:#add9e3}
+:where(:root[data-theme=dark]) input,:where(:root[data-theme=dark]) select,:where(:root[data-theme=dark]) textarea{border:1px solid #242c34;background:#101317}
+:where(:root[data-theme=dark]) input::placeholder,:where(:root[data-theme=dark]) textarea::placeholder{color:#5c6f84}
+:where(:root[data-theme=dark]) input:focus,:where(:root[data-theme=dark]) select:focus,:where(:root[data-theme=dark]) textarea:focus{border-color:#b5dce6;background:#1a1f26}
+:where(:root[data-theme=dark]) input[type=checkbox]{accent-color:#c1e2ea}
+:where(:root[data-theme=dark]) .check{border:1px solid #1e242b;background:#1a1f26;color:#bce0e9}
+:where(:root[data-theme=dark]) .check:has(input:checked){background:#161a1f;border-color:#7bc2d3;color:#c2e2eb}
+:where(:root[data-theme=dark]) .primary{background:#c2e2eb;color:#1a1f26}
+:where(:root[data-theme=dark]) .secondary{background:#191e24;color:#c2e2eb}
+:where(:root[data-theme=dark]) .dangerbtn{background:#1a1f26;color:#ed9ba1;border:1px solid #1f3a41!important}
+:where(:root[data-theme=dark]) .actions{background:#1a1f26f5;border-top:1px solid #212830}
+:where(:root[data-theme=dark]) .item{border:1px solid #20272e;border-left:3px solid #7ac1d3;background:#101317}
+:where(:root[data-theme=dark]) .item.danger{border-color:#472225;background:#111418}
+:where(:root[data-theme=dark]) .item.warn{border-color:#274951;border-left-color:#ecc495;background:#12161a}
+:where(:root[data-theme=dark]) .item.ok{border-color:#2b343e;background:#14181d}
+:where(:root[data-theme=dark]) .item.info{border-color:#283039;border-left-color:#9ed2df;background:#13171c}
+:where(:root[data-theme=dark]) .src{color:#a8d6e2}
+:where(:root[data-theme=dark]) .pill.red{background:#3c1d1f;color:#ee9fa4}
+:where(:root[data-theme=dark]) .pill.amber{background:#213d44;color:#c1e2ea}
+:where(:root[data-theme=dark]) .pill.blue{background:#1e242a;color:#b8dee7}
+:where(:root[data-theme=dark]) .pill.green{background:#1f252d;color:#baf3de}
+:where(:root[data-theme=dark]) .note,:where(:root[data-theme=dark]) small.note{color:#72869d}
+:where(:root[data-theme=dark]) .footer-note{color:#6d8299}
+:where(:root[data-theme=dark]) .abx-link{color:#c2e2eb}
+:where(:root[data-theme=dark]) .abx-drug{background:#1a1f26;border:1px solid #2d3741}
+:where(:root[data-theme=dark]) .abx-selected,:where(:root[data-theme=dark]) .vte-factor{color:#c0e2ea;background:#161b20}
+:where(:root[data-theme=dark]) .coord-task,:where(:root[data-theme=dark]) .has-ref{background:#1a1f26}
+:where(:root[data-theme=dark]) .coord-status{color:#f2d6b5}
+:where(:root[data-theme=dark]) .coord-warning{background:#111418}
+:where(:root[data-theme=dark]) .clinical-details{border-top:1px solid #20272f}
+:where(:root[data-theme=dark]) .clinical-details summary{color:#badfe8}
+:where(:root[data-theme=dark]) .routine-details{border:1px solid #29323c;background:#111519}
+:where(:root[data-theme=dark]) .concise-limit{color:#8395a9}
+:where(:root[data-theme=dark]) .hem-question{border-bottom:1px solid #20272f}
+:where(:root[data-theme=dark]) .vte-missing button{background:#1a1f26;border:1px solid #7bc2d3;color:#c2e2eb}
+:where(:root[data-theme=dark]) .overview-head{background:#c2e2eb;color:#1a1f26}
+:where(:root[data-theme=dark]) .overview-head h2{color:#1a1f26}
+:where(:root[data-theme=dark]) .overview-kicker{color:#6ebbcf}
+:where(:root[data-theme=dark]) .overview-card{background:#111418;border:1px solid #242b34}
+:where(:root[data-theme=dark]) .overview-task{border-bottom:1px solid #242b34}
+:where(:root[data-theme=dark]) .overview-task small{color:#8a9bae}
+:where(:root[data-theme=dark]) .overview-link{color:#c2e2eb}
+:where(:root[data-theme=dark]) .overview-details{border:1px solid #242b34}
+:where(:root[data-theme=dark]) #exportText{border:1px solid #6ebbcf}
+:where(:root[data-theme=dark]) #exportBox{border-top:1px solid #242b34}
+:where(:root[data-theme=dark]) body{background:#12161a}
+:where(:root[data-theme=dark]) .restore-context{background:#171c22;border-bottom:1px solid #2b343e;color:#c2e2eb}
+:root:where([data-theme=dark]){--ink:#c2e2eb;--muted:#8092a7;--line:#252d36;--blue:#c2e2eb;--bg:#161a1f;--navy:#c2e2eb}
+:where(:root[data-theme=dark]) body{background:#161a1f;color:#c2e2eb}
+:where(:root[data-theme=dark]) header{background:#c2e2eb;color:#1a1f26}
+:where(:root[data-theme=dark]) header h1{color:#1b2127}
+:where(:root[data-theme=dark]) .tabs .tab{color:#2e3742;border:1px solid #1a1f2620}
+:where(:root[data-theme=dark]) .tabs .tab.active{background:#1c2229;color:#c2e2eb;border-color:#1c2229}
+:where(:root[data-theme=dark]) .restore-context{background:#1e242a;color:#b4f2db}
+:where(:root[data-theme=dark]) .card{border:1px solid #272f38;background:#1a1f26}
+:where(:root[data-theme=dark]) .card>h2{color:#c2e2eb;border-bottom:1px solid #222931;background:#111519}
+:where(:root[data-theme=dark]) h3{color:#c2e2eb}
+:where(:root[data-theme=dark]) label{color:#bbdfe8}
+:where(:root[data-theme=dark]) input,:where(:root[data-theme=dark]) select,:where(:root[data-theme=dark]) textarea{border:1px solid #2e3843;background:#1a1f26;color:#c2e2eb}
+:where(:root[data-theme=dark]) input:focus,:where(:root[data-theme=dark]) select:focus,:where(:root[data-theme=dark]) textarea:focus{outline:2px solid #5ae2b0;border-color:#aad7e3}
+:where(:root[data-theme=dark]) .check{border:1px solid #222931;background:#14181d}
+:where(:root[data-theme=dark]) .check input{accent-color:#bfe1ea}
+:where(:root[data-theme=dark]) .primary,:where(:root[data-theme=dark]) .abx-action{background:#c2e2eb;color:#1a1f26;border:1px solid #c2e2eb}
+:where(:root[data-theme=dark]) .secondary{background:#1a1f26;color:#c2e2eb;border:1px solid #2d3741}
+:where(:root[data-theme=dark]) .banner{background:#1a1f25;border:1px solid #283039;color:#aaf0d7}
+:where(:root[data-theme=dark]) .item{background:#161b20;border-color:#28313a}
+:where(:root[data-theme=dark]) .item strong{color:#c2e2eb}
+:where(:root[data-theme=dark]) .item.warn{background:#1b3237;border-color:#313b46}
+:where(:root[data-theme=dark]) .item.danger{background:#1a3035;border-color:#2d3741}
+:where(:root[data-theme=dark]) .abx-small,:where(:root[data-theme=dark]) .note{color:#7e90a5}
+:where(:root[data-theme=dark]) .src{color:#778aa1}
+:where(:root[data-theme=dark]) .abx-link,:where(:root[data-theme=dark]) a{color:#c2e2eb}
+:where(:root[data-theme=dark]) .abx-drug{background:#1b2127;border:1px solid #2d3741}
+:where(:root[data-theme=dark]) .vte-block{border:1px solid #272e37;background:#101317}
+:where(:root[data-theme=dark]) .abx-selected{background:#1c2228;border-color:#2d3640;color:#baf3de}
+:where(:root[data-theme=dark]) .coord-task{border:1px solid #262e36;background:#1a1f26}
+:where(:root[data-theme=dark]) .coord-task h4{color:#baf3de}
+:where(:root[data-theme=dark]) .clinical-details,:where(:root[data-theme=dark]) .coord-why{border-color:#2b343e;background:#151a1f}
+:where(:root[data-theme=dark]) .clinical-details summary,:where(:root[data-theme=dark]) .coord-why summary{color:#a9f0d6}
+:where(:root[data-theme=dark]) .overview-head{background:#c2e2eb;color:#1a1f26}
+:where(:root[data-theme=dark]) .overview-head h2{color:#1e242b}
+:where(:root[data-theme=dark]) .overview-head p,:where(:root[data-theme=dark]) .overview-head small{color:#303944}
+:where(:root[data-theme=dark]) .overview-card{background:#101317;border-color:#29323c}
+:where(:root[data-theme=dark]) .overview-task{border-color:#272f38}
+:where(:root[data-theme=dark]) .actions{background:#c2e2eb}
+:where(:root[data-theme=dark]) button:focus-visible,:where(:root[data-theme=dark]) a:focus-visible{outline:3px solid #5be2b0}

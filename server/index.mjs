@@ -31,7 +31,9 @@ export function httpServer(handle,cfg){return http.createServer(async(req,res)=>
   const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>16*1024*1024){res.writeHead(413);res.end('Requête trop volumineuse');return}chunks.push(chunk)}
   const target=new URL(req.url,cfg.baseUrl);if(!req.url.startsWith('/')||req.url.startsWith('//')||target.origin!==cfg.baseUrl){res.writeHead(400);res.end('Chemin invalide');return}
   const request=new Request(target,{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:Buffer.concat(chunks)}:{})});const response=await handle(request);const output=new Headers(response.headers);
-  output.set('X-Content-Type-Options','nosniff');output.set('Referrer-Policy','no-referrer');output.set('X-Frame-Options','DENY');output.set('Cache-Control','no-store');
+  output.set('X-Content-Type-Options','nosniff');
+  // Polices publiques : lisibles par l’aide scientifique, cadre isolé d’origine « null ».
+  if(req.url.startsWith('/assets/fonts/'))output.set('Access-Control-Allow-Origin','*');output.set('Referrer-Policy','no-referrer');output.set('X-Frame-Options','DENY');output.set('Cache-Control','no-store');
   output.set('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");if(cfg.secure)output.set('Strict-Transport-Security','max-age=31536000');
   // Les cadres scientifiques internes sont nécessaires au dossier ; eux seuls peuvent être embarqués.
   if(req.url.startsWith('/scientifique-')){output.set('X-Frame-Options','SAMEORIGIN');output.set('Content-Security-Policy',"default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'self'; object-src 'none'")}

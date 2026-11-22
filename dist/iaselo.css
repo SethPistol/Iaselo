@@ -239,3 +239,31 @@ html body .patient-space { font-size: 13px; font-weight: 600; color: var(--i-acc
 html body .i-propulse { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: var(--i-mut); margin: 28px 0 8px; }
 html body .i-propulse img { height: 20px; width: auto; }
 html body [tabindex="-1"]:focus:not(:focus-visible), html body h1:focus:not(:focus-visible), html body h2:focus { outline: none; }
+
+/* ---------- Finitions transversales (tous les écrans) ---------- */
+html body .professional-identity { border-top-color: var(--i-line); }
+html body .professional-identity strong { color: var(--i-ink); }
+html body .professional-identity span { color: var(--i-mut); font-size: 12.5px; line-height: 1.45; }
+html body .integrated-science .eyebrow { color: var(--i-acc); }
+/* Champs fichier (photo Doctolib, pièces jointes) */
+html body input[type=file] { font: inherit; font-size: 14px; color: var(--i-mut); padding: 8px; border: 1px dashed var(--i-line-strong); border-radius: var(--i-r-m); background: var(--i-s2); width: 100%; cursor: pointer; }
+html body input[type=file]::file-selector-button { font: inherit; font-size: 14px; font-weight: 600; margin-right: 12px; padding: 9px 16px; border: 0; border-radius: var(--i-r-s); background: var(--i-acc); color: var(--i-on-acc); cursor: pointer; }
+html body input[type=file]:hover::file-selector-button { background: var(--i-acc-hover); }
+/* Champs date et heure : icône lisible dans les deux thèmes */
+html body :is(input[type=date], input[type=time], input[type=datetime-local]) { color-scheme: light; }
+:root[data-theme=dark] body :is(input[type=date], input[type=time], input[type=datetime-local], select) { color-scheme: dark; }
+/* Questionnaire patient et formulaires historiques : même typographie partout */
+html body :is(.pq-form, .pq-portal, .pq-box, .pq-question, legend, .peri-sheet-window, .science-shell, .integrated-science) { font-family: var(--i-font); }
+html body :is(.pq-portal h1, .pq-portal h2, .portal h1, .portal h2) { font-family: var(--i-font); letter-spacing: -.025em; }
+html body .pq-box { border-radius: var(--i-r-m); }
+html body .pq-number { font-family: var(--i-mono); }
+/* Feuille d'anesthésie : chiffres tabulaires */
+html body :is(.peri-sheet-cell, .peri-sheet-label) { font-variant-numeric: tabular-nums; }
+/* Cadre de l'aide scientifique */
+html body .integrated-frame { border: 1px solid var(--i-line); border-radius: var(--i-r-l); background: var(--i-s1); }
+
+/* ---------- Impression : toujours en clair, sur fond blanc ---------- */
+@media print {
+  html body { background: #fff !important; }
+  html body aside, html body .demo, html body .shared-save, html body #theme-toggle { display: none !important; }
+}

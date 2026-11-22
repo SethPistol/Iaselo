@@ -16,8 +16,18 @@ import fs from 'node:fs';
 const SOURCES = ['parcours-v8.css', 'parcours-v9.css', 'atelier.css', 'trocadero.css', 'questionnaire.css',
   'patient-invitation.css', 'service.css', 'gestion.css', 'nursing-record.css', 'identitovigilance.css',
   'dossier-partage.css', 'acces-professionnels.css'];
-const COLOR = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g;
+// Couleurs reconnues : hexadécimales, rgb()/rgba() et les mots-clés white/black.
+const COLOR = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b|rgba?\(\s*\d+[\s,]+\d+[\s,]+\d+(?:\s*[,/]\s*[\d.]+%?)?\s*\)|\b(?:white|black)\b/g;
+// Version sans /g pour les tests : une RegExp globale garde lastIndex entre deux appels de test()
+// et sautait une déclaration sur deux (ex. le fond après une bordure dans la même règle).
+const HAS_COLOR = new RegExp(COLOR.source);
 
+function parseColor(text) {
+  if (text === 'white') return { r: 255, g: 255, b: 255, a: 1 };
+  if (text === 'black') return { r: 0, g: 0, b: 0, a: 1 };
+  if (text.startsWith('rgb')) { const v = text.match(/[\d.]+%?/g); const a = v[3] === undefined ? 1 : v[3].endsWith('%') ? parseFloat(v[3]) / 100 : +v[3]; return { r: +v[0], g: +v[1], b: +v[2], a }; }
+  return hexToRgb(text);
+}
 function hexToRgb(hex) {
   let h = hex.slice(1);
   if (h.length <= 4) h = [...h].map(c => c + c).join('');
@@ -103,19 +113,28 @@ function darkSelector(selector) {
   }).join(',');
 }
 
-const lightRules = [], darkRules = [];
-for (const file of SOURCES) {
-  for (const rule of parse(fs.readFileSync('dist/' + file, 'utf8'))) {
-    if (rule.media && /print/.test(rule.media) && !/screen/.test(rule.media)) continue;
-    const decls = rule.body.split(';').map(d => d.trim()).filter(d => d.includes(':') && COLOR.test(d));
-    COLOR.lastIndex = 0;
-    if (!decls.length) continue;
-    const map = fn => decls.map(d => d.replace(COLOR, m => fn(hexToRgb(m)))).join(';');
-    const wrap = (sel, body) => rule.media ? `${rule.media}{${sel}{${body}}}` : `${sel}{${body}}`;
-    lightRules.push(wrap(rule.selector, map(light)));
-    darkRules.push(wrap(darkSelector(rule.selector), map(dark)));
+function recolor(texts) {
+  const lightRules = [], darkRules = [];
+  for (const text of texts) {
+    for (const rule of parse(text)) {
+      if (rule.media && /print/.test(rule.media) && !/screen/.test(rule.media)) continue;
+      const decls = rule.body.split(';').map(d => d.trim()).filter(d => { const i = d.indexOf(':'); return i > 0 && !/^(white-space|font|content|grid|transition|animation|box-shadow|text-shadow|filter)/.test(d.slice(0, i).trim()) && HAS_COLOR.test(d.slice(i + 1)); });
+      if (!decls.length) continue;
+      const map = fn => decls.map(d => { const i = d.indexOf(':'); return d.slice(0, i + 1) + d.slice(i + 1).replace(COLOR, m => fn(parseColor(m))); }).join(';');
+      const wrap = (sel, body) => rule.media ? `${rule.media}{${sel}{${body}}}` : `${sel}{${body}}`;
+      lightRules.push(wrap(rule.selector, map(light)));
+      darkRules.push(wrap(darkSelector(rule.selector), map(dark)));
+    }
   }
+  return { count: lightRules.length, css: '/* Fichier généré par scripts/theme-generate.mjs : ne pas modifier à la main. */\n/* Thème clair */\n' + lightRules.join('\n') + '\n/* Mode sombre */\n' + darkRules.join('\n') + '\n' };
 }
-const header = '/* Fichier généré par scripts/theme-generate.mjs : ne pas modifier à la main. */\n';
-fs.writeFileSync('dist/iaselo-couleurs.css', header + '/* Thème clair */\n' + lightRules.join('\n') + '\n/* Mode sombre */\n' + darkRules.join('\n') + '\n');
-console.log(`iaselo-couleurs.css : ${lightRules.length} règles recolorées par thème.`);
+const app = recolor(SOURCES.map(file => fs.readFileSync('dist/' + file, 'utf8')));
+fs.writeFileSync('dist/iaselo-couleurs.css', app.css);
+console.log(`iaselo-couleurs.css : ${app.count} règles recolorées par thème.`);
+
+// Aide scientifique (cadre isolé) : styles intégrés de la page et feuille science-atelier.css.
+const page = fs.readFileSync('dist/scientifique-v022.html', 'utf8');
+const inline = [...page.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]);
+const science = recolor([...inline, fs.readFileSync('dist/science-atelier.css', 'utf8')]);
+fs.writeFileSync('dist/science-couleurs.css', science.css);
+console.log(`science-couleurs.css : ${science.count} règles recolorées par thème.`);

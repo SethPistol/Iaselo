@@ -27,3 +27,11 @@ sur la page patient et les documents, l'établissement en premier, IASELO en sig
 - Une seule couleur d'action, le bleu pétrole du logo (`#0F4D5C`, `#7FCAD8` en sombre).
 - Rouge, ambre et vert réservés aux statuts cliniques, toujours doublés d'un mot.
 - Cibles tactiles de 44 px minimum ; contraste du texte ≥ 4,5:1 dans les deux thèmes.
+
+## Aide scientifique et pages annexes
+
+- `dist/science-couleurs.css` est généré par le même script, à partir des styles intégrés de `scientifique-v022.html` et de `science-atelier.css`. `dist/science-iaselo.css` fixe la typographie et les éléments structurants.
+- Le cadre de l'aide scientifique est isolé (origine « null »). Il reçoit le thème par l'ancre de son URL (`#…&theme=dark`), et `theme.js` le met à jour quand on change de thème. Le serveur autorise les polices `/assets/fonts/` en lecture croisée pour ce cadre.
+- `confidentialite.html` reprend les jetons de couleur, la police Geist et le logo IASELO.
+- À l'impression, la page repasse toujours en thème clair (`beforeprint` / `afterprint`).
+- Le générateur reconnaît les couleurs hexadécimales, `rgb()/rgba()`, `white` et `black`. Il ignore les ombres, qui gardent leur teinte d'origine.
