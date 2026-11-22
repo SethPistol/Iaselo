@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),R=require('../dist/veille-regles.js');
 const stay=(over={})=>({id:'TEST',mode:'Hospitalisation',identity:{lastName:'MARTIN',firstName:'Camille',birthDate:'1950-01-01'},
  consult:{treatments:'',validated:false,ext:{sex:'Homme',age:'70',weight:'110',height:'175',surgeryDate:'2026-11-30',...over.ext},...over.consult},
- questionnaire:over.questionnaire,surgicalAnnouncement:over.surgicalAnnouncement,discharge:over.discharge||{}});
+ questionnaire:over.questionnaire,surgicalAnnouncement:over.surgicalAnnouncement,discharge:over.discharge||{},espacePatient:over.espacePatient});
 
 test('STOP-Bang : critères calculés et déclarés, manquants signalés',()=>{
  const s=stay({questionnaire:{answers:{diseases:['Hypertension artérielle','Apnée du sommeil']}}});
@@ -37,8 +37,10 @@ test('Consignes datées : apixaban selon le risque hémorragique, metformine la 
 
 test('Complétude : programmation bloquée puis prête',()=>{
  let c=R.completude(stay({consult:{treatments:'Xarelto'}}));assert.equal(c.ready,false);assert.ok(c.blocking.some(i=>i.id==='traitements'));
- const ready=stay({consult:{treatments:'Xarelto',validated:true},ext:{identityReviewed:'Oui',patientAgreement:'Accord recueilli',testStatus:'Évalué — pas d’action retenue',fasting:'6 h'},questionnaire:{answers:{}},surgicalAnnouncement:{published:{fields:{procedure:'PTH'}}}});
+ const ready=stay({consult:{treatments:'Xarelto',validated:true},ext:{identityReviewed:'Oui',patientAgreement:'Accord recueilli',testStatus:'Évalué — pas d’action retenue',fasting:'6 h'},questionnaire:{answers:{}},surgicalAnnouncement:{published:{fields:{procedure:'PTH'}}},espacePatient:{consentement:{envoi:{at:'2026-11-22T10:00:00Z'},recu:{mode:'signature',at:'2026-11-22T11:00:00Z'}}}});
  assert.equal(R.completude(ready,{}).ready,false);
+ // Consentement d'anesthésie non reçu : bloquant.
+ assert.ok(R.completude({...ready,espacePatient:null},{consignes:{validatedAt:'x'}}).blocking.some(i=>i.id==='consentementSigne'));
  c=R.completude(ready,{consignes:{validatedAt:'2026-11-22T10:00:00Z'}});assert.equal(c.ready,true,JSON.stringify(c.blocking));
  const ambu={...ready,mode:'Ambulatoire'};assert.equal(R.completude(ambu,{consignes:{validatedAt:'x'}}).ready,false);
 });

@@ -2165,6 +2165,10 @@ if(ameliorations){const renderBeforeAmeliorations=render;render=function(){if(am
 const prescriptionsPreop=window.createPrescriptionsPreop?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,shared:()=>!!durableWorkspace,flush:()=>durableWorkspace?.flush()})||null;
 if(prescriptionsPreop&&veilleModule){const panelBeforePreop=veilleModule.panel;veilleModule.panel=t=>prescriptionsPreop.panel(t)||panelBeforePreop(t)}
 
+// Documents transmis par le patient et consentement d'anesthésie (dist/documents-consentement.js, espace patient).
+const documentsConsentement=window.createDocumentsConsentement?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),tab:()=>tab,goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},shared:()=>!!durableWorkspace,flush:()=>durableWorkspace?.flush(),refresh:()=>durableWorkspace?.refresh?.()||Promise.resolve()})||null;
+if(documentsConsentement&&veilleModule){const panelBeforeDocs=veilleModule.panel;veilleModule.panel=t=>documentsConsentement.panel(t)||panelBeforeDocs(t);const detailBeforeDocs=detail;detail=function(){detailBeforeDocs();documentsConsentement.detail(tab)}}
+
 // Accès direct au plan de soins du séjour sélectionné.
 if($('#open-nursing-record'))$('#open-nursing-record').onclick=()=>{
  if(view==='patients'&&tab==='consult'&&p())captureConsult();
