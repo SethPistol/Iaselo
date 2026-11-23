@@ -36,6 +36,14 @@ Analyse du texte : libellés abîmés par l'OCR reconnus (« Nom de naissar »),
 
 Repli manuel : la liste « Texte lu » s'ouvre quand un champ manque ; chaque ligne a des boutons Nom / Prénom / Naissance qui remplissent le champ (la case de vérification est alors décochée). Si le nom ne vient que de l'en-tête de la fiche, un avertissement rappelle qu'il peut s'agir du nom d'usage.
 
+## Fiche « Coordonnées » de Doctolib (photo réelle de Romain, 23/11/2026)
+
+Une vraie photo (non conservée, jamais versée au dépôt) a montré la mise en page réelle : libellés à gauche, valeurs dans des champs à droite, libellés repliés sur deux lignes (« 1er prénom de / naissance »), « Nom de naissance » souvent vide avec seulement un « Nom utilisé », date de naissance chevauchée par l'âge (« 02/08/198(44 ans) »). Une fiche fictive reproduisant cette mise en page sert de banc d'essai.
+
+- Les rangées sont reconstituées à partir de la position des lignes (Tesseract lit sinon la colonne des libellés puis celle des valeurs).
+- Nom de naissance vide : le « Nom utilisé » est repris et un avertissement demande de vérifier le nom de naissance sur une pièce d'identité.
+- Date : l'âge affiché contrôle l'année. Une année qui ne correspond pas à l'âge est rejetée ; une année tronquée n'est reconstituée que si une seule valeur concorde avec l'âge. Sinon le champ reste vide avec l'avertissement « Date de naissance illisible ».
+
 ## Envoi par SMS et e-mail (Brevo)
 
 Quand Brevo est configuré (voir `clevercloud/environment.example`), l’écran affiche « Envoyer par SMS », « Envoyer par e-mail » et « Envoyer les deux » après la préparation du lien. Sinon, les anciens boutons de brouillon (mailto/sms) restent affichés.
