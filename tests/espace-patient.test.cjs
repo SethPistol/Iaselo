@@ -50,3 +50,11 @@ test('documents : type réel, PDF actifs refusés, tailles et nombre limités, n
  assert.equal(R.nomFichier('../../etc/passwd','application/pdf'),'etc passwd.pdf');
  assert.equal(R.nomFichier('photo.HEIC','image/jpeg'),'photo.jpg');assert.equal(R.nomFichier('bilan.jpeg','image/jpeg'),'bilan.jpeg');assert.equal(R.nomFichier('','application/pdf'),'document.pdf');
 });
+test('documents : dépôt ouvert jusqu’au lendemain de l’intervention inclus (heure de Paris)',()=>{
+ assert.equal(R.depotOuvert('2026-12-03',new Date('2026-12-02T10:00:00Z')),true);
+ assert.equal(R.depotOuvert('2026-12-03',new Date('2026-12-03T10:00:00Z')),true);
+ assert.equal(R.depotOuvert('2026-12-03',new Date('2026-12-04T22:30:00Z')),true);   // 23 h 30 à Paris, le lendemain
+ assert.equal(R.depotOuvert('2026-12-03',new Date('2026-12-04T23:30:00Z')),false);  // 0 h 30 à Paris, surlendemain
+ assert.equal(R.depotOuvert('',new Date()),true);
+ assert.ok(new Date(R.expiration('2026-12-03',new Date('2026-11-23T08:00:00Z')))>=new Date('2026-12-04T22:59:00Z'));
+});

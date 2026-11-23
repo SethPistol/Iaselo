@@ -5,7 +5,7 @@ Deux nouveaux onglets dans l’étape **Consultation d’anesthésie** du dossie
 ## Documents avant la consultation
 - Le médecin ou le secrétariat clique **Envoyer la demande**. Le patient reçoit un lien, saisit sa date de naissance et dépose ses documents depuis son téléphone : type (bilan, ordonnance, courrier, compte rendu, carte de groupe, autre), fichier, commentaire.
 - Les documents arrivent directement dans l’onglet **Documents** du séjour (pastille « n documents du patient » dans le bandeau). L’équipe les ouvre, les marque « lus » ou les écarte avec un motif ; rien n’est jamais supprimé.
-- Contrôles : PDF, JPEG ou PNG reconnus par leur contenu réel (pas par l’extension) ; PDF contenant du JavaScript, des lancements d’application ou des fichiers incorporés refusés ; 10 Mo par fichier, 20 documents et 80 Mo par séjour ; doublons refusés ; dépôt fermé la veille de l’intervention.
+- Contrôles : PDF, JPEG ou PNG reconnus par leur contenu réel (pas par l’extension) ; PDF contenant du JavaScript, des lancements d’application ou des fichiers incorporés refusés ; 10 Mo par fichier, 20 documents et 80 Mo par séjour ; doublons refusés ; dépôt possible jusqu’au lendemain de l’intervention inclus (heure de Paris), comme le lien.
 
 ## Consentement d’anesthésie
 - Texte repris mot pour mot du formulaire de la Clinique du Trocadéro (2 pages : information puis consentement, CSP L. 1111-2 et L. 1111-4). Fiche préremplie depuis le dossier (nom de naissance, date de naissance, intervention, date prévue, date de consultation, médecin), vérifiée puis **Envoyer au patient** (anesthésiste).
@@ -27,6 +27,6 @@ Deux nouveaux onglets dans l’étape **Consultation d’anesthésie** du dossie
 - Serveur : `worker/espace-patient.mjs`, migration `006_espace_patient.sql` (tables `patient_space_links`, `consent_evidence`), tests `tests/clever/espace-patient.test.mjs`.
 
 ## À valider par l’équipe
-- Délai de relance (48 h / J-3), fermeture du dépôt la veille, limites de taille.
+- Délai de relance (48 h / J-3), fermeture du dépôt le lendemain de l’intervention, limites de taille.
 - Lecture des documents par le secrétariat (aujourd’hui : non, données de santé).
 - Relance automatique sans clic (nécessite une tâche planifiée Clever Cloud) : non faite.

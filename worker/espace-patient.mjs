@@ -211,8 +211,8 @@ async function authenticate(env,token,birthDate,{checkBirth=true}={}){
  }
  return {row,hash,at};
 }
-// Dépôt de documents ouvert jusqu'à la veille de l'intervention incluse (ou tant que le lien est valide sans date).
-async function depotOuvert(env,stay){const consult=await docData(env,'stay/'+stay+'/consult'),d=consult?.ext?.surgeryDate;return !R.isDate(d)||new Date().toISOString().slice(0,10)<d}
+// Dépôt de documents ouvert jusqu'au lendemain de l'intervention inclus, heure de Paris (ou tant que le lien est valide sans date).
+async function depotOuvert(env,stay){const consult=await docData(env,'stay/'+stay+'/consult');return R.depotOuvert(consult?.ext?.surgeryDate)}
 
 async function patientView(env,row,space,etablissement){
  const c=space.consentement,st=R.statut(c),showConsent=!!c?.envoi&&st.code!=='annule';
@@ -267,7 +267,7 @@ async function upload(request,env,url,etab){
  const bytes=new Uint8Array(await request.arrayBuffer());
  const categorie=kind==='consentement'?'autre':String(url.searchParams.get('categorie')||'');
  const space=(await docData(env,docKey(stay)))||empty();
- if(kind==='document'&&!await depotOuvert(env,stay))return json({error:'Le dépôt en ligne est fermé : apportez vos documents le jour de l’intervention.'},409);
+ if(kind==='document'&&!await depotOuvert(env,stay))return json({error:'Le dépôt en ligne est fermé depuis le lendemain de votre intervention. Pour transmettre un document, contactez la clinique.'},409);
  if(kind==='consentement'){const c=space.consentement,st=R.statut(c);if(!c?.envoi||st.code==='annule')return json({error:'Aucun consentement à déposer pour ce lien.'},409);if(st.recu||c.recu)return json({error:'Votre consentement a déjà été reçu.'},409)}
  const check=R.controleFichier(bytes,{deja:(space.documents||[]).filter(x=>x.source==='patient'),categorie});
  if(check.error){await patientLog(env,stay,'document-patient-depot','denied',check.error.slice(0,120),at);return json({error:check.error},400)}

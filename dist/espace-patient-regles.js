@@ -119,11 +119,20 @@ function alerteBloc(stay,now=new Date()){
 }
 function datePrevueSejour(stay){const d=stay?.consult?.ext?.surgeryDate||stay?.surgicalAnnouncement?.published?.fields?.date||'';return isDate(d)?d:''}
 
+/* ---------- Dépôt de documents ---------- */
+// Ouvert jusqu'au lendemain de l'intervention inclus (date du jour à Paris) ; sans date prévue, tant que le lien est valide.
+const parisDay=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+function depotOuvert(datePrevue,now=new Date()){
+ if(!isDate(datePrevue))return true;
+ const lendemain=new Date(datePrevue+'T12:00:00Z');lendemain.setUTCDate(lendemain.getUTCDate()+1);
+ return parisDay(now)<=lendemain.toISOString().slice(0,10);
+}
+
 /* ---------- Validité du lien ---------- */
 // Jusqu'au lendemain de l'intervention ; au moins 48 h, au plus 45 jours ; 30 jours sans date.
 function expiration(datePrevue,now=new Date()){
  const min=now.getTime()+48*3600000,max=now.getTime()+45*86400000;
- const t=isDate(datePrevue)?new Date(datePrevue+'T23:59:00').getTime()+86400000:now.getTime()+30*86400000;
+ const t=isDate(datePrevue)?new Date(datePrevue+'T23:59:00Z').getTime()+86400000:now.getTime()+30*86400000;
  return new Date(Math.max(min,Math.min(max,t))).toISOString();
 }
 
@@ -195,5 +204,5 @@ function documentHTML(f,r,{medecin=null,mode='',empreinte='',verification=null}=
  return `<div class="cs-doc">${p1}${p2}</div>`;
 }
 
-return {FORMULAIRE,QUESTIONS,fiche,ficheManquants,validerReponse,nonCoches,canonique,statut,relance,alerteBloc,datePrevueSejour,expiration,CATEGORIES,CATEGORIE,LIMITES,TYPES,typeReel,pdfActif,nomFichier,controleFichier,taille,documentHTML,isDate,fmtD,fmtDT};
+return {depotOuvert,FORMULAIRE,QUESTIONS,fiche,ficheManquants,validerReponse,nonCoches,canonique,statut,relance,alerteBloc,datePrevueSejour,expiration,CATEGORIES,CATEGORIE,LIMITES,TYPES,typeReel,pdfActif,nomFichier,controleFichier,taille,documentHTML,isDate,fmtD,fmtDT};
 });

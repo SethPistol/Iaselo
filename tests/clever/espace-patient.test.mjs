@@ -91,6 +91,14 @@ test('espace patient : demande de documents, dépôt contrôlé, consentement en
   r=await api('POST','/espace-patient/action',{stay:'P2',action:'papier',note:'Signé en consultation, dossier papier'});assert.equal(r.status,200);
   assert.equal(R.statut(r.data.espacePatient.consentement).code,'papier');
 
+  // Dépôt encore possible le lendemain de l'intervention, fermé ensuite.
+  const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10),before=new Date(Date.now()-3*86400000).toISOString().slice(0,10);
+  let cons=(await api('GET','')).data.documents.find(d=>d.key==='stay/P1/consult');
+  await api('PUT','/document',edit('stay/P1/consult',{...cons.data,ext:{...cons.data.ext,surgeryDate:yesterday}},cons.revision));
+  r=await up(t1,new TextEncoder().encode('%PDF-1.4\n% lendemain\n%%EOF'),{nom:'lendemain.pdf'});assert.equal(r.status,201,JSON.stringify(r.data));
+  cons=(await api('GET','')).data.documents.find(d=>d.key==='stay/P1/consult');
+  await api('PUT','/document',edit('stay/P1/consult',{...cons.data,ext:{...cons.data.ext,surgeryDate:before}},cons.revision));
+  r=await up(t1,new TextEncoder().encode('%PDF-1.4\n% trop tard\n%%EOF'),{nom:'tard.pdf'});assert.equal(r.status,409);assert.match(r.data.error,/fermé/);
   // 4. Droits : un compte sans équipe ne voit ni n'envoie rien.
   await createAccount(pool,{email:'autre@example.test',name:'Autre fictif',passwordHash:await hashPassword('Mot de passe test 2026')});
   const other=await login('autre@example.test','Mot de passe test 2026');

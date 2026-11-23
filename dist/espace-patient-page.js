@@ -76,7 +76,7 @@ function printDoc(c,r){
 /* ---------- Documents ---------- */
 function docsHTML(d){
  const L=d.limites||R.LIMITES,list=d.documents||[];
- return `<section class="dc-pt-card" id="dc-docs"><p class="dc-pt-kicker">Avant votre consultation</p><h2>Mes documents</h2>
+ return `<section class="dc-pt-card" id="dc-docs"><p class="dc-pt-kicker">Jusqu’au lendemain de votre intervention</p><h2>Mes documents</h2>
   ${d.ouvert?`<p>Transmettez ici vos documents utiles : prise de sang, ordonnances, courriers de vos médecins, comptes rendus, carte de groupe sanguin. Ils sont rangés directement dans votre dossier à la clinique.</p>
   <form id="dc-up" class="dc-pt-up" novalidate>
    <label class="dc-pt-l">Type de document<select name="categorie" required><option value="">Choisir</option>${R.CATEGORIES.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></label>
@@ -85,7 +85,7 @@ function docsHTML(d){
    <p class="pp-err" id="dc-up-err" role="alert" hidden></p>
    <button class="primary dc-pt-big" type="submit">Envoyer</button></form>
   <p class="sessionnote">Photographiez chaque page à plat, bien éclairée et lisible. ${L.nombre} documents au maximum. N’envoyez pas de pièce d’identité ou de carte Vitale ici : présentez-les à l’accueil.</p>`
-  :`<p>Le dépôt en ligne est fermé. Apportez vos documents le jour de votre intervention.</p>`}
+  :`<p>Le dépôt en ligne est fermé depuis le lendemain de votre intervention. Pour transmettre un document, contactez la clinique.</p>`}
   ${list.length?`<h3 class="dc-pt-h3">Déjà transmis (${list.length})</h3><ul class="dc-pt-list">${list.map(x=>`<li><b>${esc(x.nom)}</b><span>${esc(R.CATEGORIE[x.categorie]||'Document')} · ${esc(R.taille(x.taille))} · le ${esc(fmt(x.recuLe))}</span></li>`).join('')}</ul>`:''}
  </section>`;
 }
