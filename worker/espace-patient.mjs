@@ -56,12 +56,18 @@ export function espaceMessages(establishment,link,purpose,relance=false){
 /* ---------------- Professionnels ---------------- */
 async function send(request,env,acl,url){
  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
- const d=await body(request),stay=String(d.stay||''),purpose=d.purpose;
+ const d=await body(request);
+ const r=await envoyer(env,acl,url.origin,{stay:String(d.stay||''),purpose:d.purpose,channels:d.channels,fiche:d.fiche,relance:d.relance===true});
+ return json(r.body,r.status);
+}
+// Envoi d'un lien patient (bouton du dossier ou envoi automatique à la validation de la consultation).
+async function envoyer(env,acl,origin,{stay,purpose,channels:asked,fiche:ficheDemandee,relance:relanceDemandee=false,auto=false}){
+ const json=(body,status=200)=>({body,status});
  if(!validStay(stay)||!['documents','consentement'].includes(purpose))return json({error:'Demande invalide.'},400);
  const contactKey='stay/'+stay+'/invitationContact';
  const allowedJobs=purpose==='consentement'?['anesthesiste']:['anesthesiste','chirurgien','secretariat'];
  if(!acl.canRead(contactKey)||!allowedJobs.includes(acl.job))return json({error:purpose==='consentement'?'Envoi du consentement réservé à l’anesthésiste du séjour.':'Envoi hors habilitation.'},403);
- const channels=Array.isArray(d.channels)?[...new Set(d.channels)]:[];
+ const channels=Array.isArray(asked)?[...new Set(asked)]:[];
  if(!channels.length||channels.some(c=>!['sms','email'].includes(c)))return json({error:'Choisissez SMS et/ou e-mail.'},400);
  const messaging=env.MESSAGING;if(!messaging)return json({error:'Envoi Brevo non configuré sur ce serveur.'},503);
  // Destinataire : coordonnées vérifiées du séjour, jamais une adresse transmise par la requête.
@@ -73,11 +79,11 @@ async function send(request,env,acl,url){
  let fiche=null,relance=false;
  if(purpose==='consentement'){
   const st=R.statut(space.consentement);
-  relance=d.relance===true;
+  relance=relanceDemandee;
   if(st.recu)return json({error:'Le consentement a déjà été reçu pour ce séjour.'},409);
   if(relance){if(!space.consentement?.envoi||st.code==='annule')return json({error:'Aucun consentement en attente à relancer.'},409);fiche=space.consentement.envoi.fiche}
   else{
-   fiche=R.fiche({...d.fiche,etablissement:messaging.establishment||d.fiche?.etablissement});
+   fiche=R.fiche({...ficheDemandee,etablissement:messaging.establishment||ficheDemandee?.etablissement});
    const missing=R.ficheManquants(fiche);if(missing.length)return json({error:'À compléter avant l’envoi : '+missing.join(', ')+'.'},400);
    if(fiche.patient.naissance!==contact.birthDate)return json({error:'La date de naissance de la fiche ne correspond pas aux coordonnées vérifiées du patient.'},409);
   }
@@ -89,8 +95,8 @@ async function send(request,env,acl,url){
   env.DB.prepare('UPDATE patient_space_links SET revoked=1 WHERE stay_id=? AND purpose=? AND revoked=0').bind(stay,purpose),
   env.DB.prepare('INSERT INTO patient_space_links(token_hash,stay_id,purpose,birth_date,created_by,created_at,expires_at,channels) VALUES(?,?,?,?,?,?,?,?)').bind(hash,stay,purpose,contact.birthDate,acl.profile.user_id,at,expiresAt,channels.join(','))
  ]);
- const link=url.origin+'/espace-patient.html#acces='+token,text=espaceMessages(messaging.establishment,link,purpose,relance),results=[];
- const action=purpose==='consentement'?(relance?'consentement-relance':'consentement-envoi'):'documents-demande';
+ const link=origin+'/espace-patient.html#acces='+token,text=espaceMessages(messaging.establishment,link,purpose,relance),results=[];
+ const action=purpose==='consentement'?(relance?'consentement-relance':auto?'consentement-envoi-auto':'consentement-envoi'):'documents-demande';
  for(const channel of channels){
   const to=channel==='sms'?contact.phone:contact.email,label=channel==='sms'?'SMS':'E-mail';
   if(!to){results.push({channel,sent:false,error:label+' : aucune coordonnée vérifiée.'});continue}
@@ -110,11 +116,74 @@ async function send(request,env,acl,url){
  const saved=await updateSpace(env,stay,acl.profile.user_id,purpose==='consentement'?(relance?'Relance du consentement':'Consentement envoyé au patient'):'Demande de documents envoyée',data=>{
   if(purpose==='documents'){data.demandeDocuments={at,by:who,channels:ch,expiresAt,historique:[...(data.demandeDocuments?.historique||[]),{at,by:who,channels:ch}].slice(-20)};return}
   if(relance){data.consentement.relances=[...(data.consentement.relances||[]),{at,by:who,channels:ch}];data.consentement.expiresAt=expiresAt;return}
-  data.consentement={envoi:{at,by:who,channels:ch,fiche},relances:[],expiresAt,ouvertLe:null,recu:null,verification:null,contreSigne:null,annule:null};
+  data.consentement={envoi:{at,by:who,channels:ch,fiche,...(auto?{automatique:true}:{})},relances:[],expiresAt,ouvertLe:null,recu:null,verification:null,contreSigne:null,annule:null};
  });
  if(saved.error)return json({error:saved.error},saved.status||409);
  return json({results,expiresAt},200);
 }
+
+
+/* ---------------- Envoi automatique à la validation de la consultation ---------------- */
+// Dès que la consultation d'anesthésie passe à « validée », le consentement part au patient (SMS + e-mail),
+// sans clic supplémentaire. Jamais de double envoi ; si l'envoi est impossible, une alerte reste visible au dossier.
+const pendingAuto=new Set(),enCours=new Set();
+export const attendreConsentements=()=>Promise.allSettled([...pendingAuto]);
+const trackAuto=p=>{pendingAuto.add(p);p.catch(e=>console.error('consentement_auto',e?.message||e)).finally(()=>pendingAuto.delete(p));return p};
+const consultRe=/^stay\/([^/]{1,80})\/consult$/;
+const parisToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+// Avant l'écriture : la consultation était-elle déjà validée ?
+export async function consentAvant(env,docs){
+ const out=new Map();
+ for(const d of docs)if(consultRe.test(d.key))out.set(d.key,(await docData(env,d.key))?.validated===true);
+ return out;
+}
+// Après l'écriture confirmée : passage à « validée » → envoi automatique en arrière-plan.
+export async function consentDeclencher(env,acl,docs,avant,origin){
+ try{for(const d of docs){
+  if(!avant.has(d.key)||avant.get(d.key)||d.data?.validated!==true)continue;
+  const stay=consultRe.exec(d.key)[1];
+  if(acl.job!=='anesthesiste'){await acl.log('consentement-envoi-auto',docKey(stay),'denied','Consultation validée hors profil anesthésiste : envoi automatique non lancé');continue}
+  trackAuto(autoConsent(env,acl,stay,origin,docs));
+ }}catch(e){console.error('consentement_auto_declenchement',e?.message||e)}// l'enregistrement reste confirmé ; l'envoi manuel reste possible
+}
+export function ficheDepuisDossier(docs,{etablissement='',medecin=''}={}){
+ const id=docs.core?.identity||{},e=docs.consult?.ext||{},ann=docs.surgicalAnnouncement?.published?.fields||{};
+ return R.fiche({etablissement,patient:{nom:id.birthName||id.lastName||'',prenom:id.firstName||'',naissance:id.birthDate||''},
+  intervention:[ann.procedure||e.operation,ann.laterality&&ann.laterality!=='Non applicable'?String(ann.laterality).toLowerCase():''].filter(Boolean).join(' · '),
+  datePrevue:R.datePrevueSejour({consult:docs.consult,surgicalAnnouncement:docs.surgicalAnnouncement}),
+  consultation:{date:R.isDate(e.consultDate)?e.consultDate:parisToday(),medecin:e.author||medecin}});
+}
+async function autoConsent(env,acl,stay,origin,batch){
+ if(enCours.has(stay))return {skipped:'en-cours'};
+ enCours.add(stay);
+ try{
+  const key=docKey(stay),get=async k=>{const d=batch.find(x=>x.key==='stay/'+stay+'/'+k);return d?d.data:await docData(env,'stay/'+stay+'/'+k)};
+  const space=(await docData(env,key))||empty(),st=R.statut(space.consentement);
+  if(st.recu||(space.consentement?.envoi&&st.code!=='annule')){
+   await acl.log('consentement-envoi-auto',key,'allowed','Consultation validée : consentement déjà '+(st.recu?'reçu':'envoyé')+', pas de nouvel envoi');
+   return {skipped:'deja'};
+  }
+  const at=new Date().toISOString(),who=acl.profile.display_name||'Anesthésiste';
+  const echec=async raison=>{
+   await acl.log('consentement-envoi-auto',key,'denied','Consentement non envoyé automatiquement',raison);
+   await updateSpace(env,stay,acl.profile.user_id,'Envoi automatique du consentement impossible',data=>{data.consentementAuto={at,by:who,ok:false,raison}});
+   return {ok:false,raison};
+  };
+  const contact=(await docData(env,'stay/'+stay+'/invitationContact'))?.contact;
+  if(!contact)return echec('Coordonnées vérifiées du patient introuvables : enregistrez son téléphone et son e-mail dans « Questionnaire patient », puis envoyez le consentement.');
+  const messaging=env.MESSAGING;
+  if(!messaging)return echec('Envoi SMS et e-mail non configuré sur ce serveur.');
+  const channels=['sms','email'].filter(c=>(c==='sms'?contact.phone:contact.email)&&messaging.channels?.[c]!==false);
+  if(!channels.length)return echec(!contact.phone&&!contact.email?'Ni téléphone ni e-mail vérifié pour ce patient.':'Aucun canal d’envoi disponible (SMS ou e-mail) pour les coordonnées du patient.');
+  const fiche=ficheDepuisDossier({core:await get('core'),consult:await get('consult'),surgicalAnnouncement:await get('surgicalAnnouncement')},{etablissement:messaging.establishment,medecin:acl.profile.display_name||''});
+  const r=await envoyer(env,acl,origin,{stay,purpose:'consentement',channels,fiche,auto:true});
+  if(r.status!==200)return echec(r.body.error||(r.body.results||[]).map(x=>x.error).filter(Boolean).join(' · ')||'Envoi impossible.');
+  const manques=[...['sms','email'].filter(c=>!channels.includes(c)).map(c=>(c==='sms'?'SMS':'E-mail')+' : aucune coordonnée vérifiée.'),...r.body.results.filter(x=>!x.sent).map(x=>x.error)];
+  await updateSpace(env,stay,acl.profile.user_id,'Consentement envoyé automatiquement',data=>{data.consentementAuto={at,by:who,ok:true,resultats:r.body.results,...(manques.length?{partiel:manques}:{})}});
+  return {ok:true,results:r.body.results};
+ }finally{enCours.delete(stay)}
+}
+
 
 async function status(request,env,acl,url){
  const stay=String(url.searchParams.get('stay')||'');

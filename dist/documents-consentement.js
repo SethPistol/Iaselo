@@ -128,9 +128,9 @@ window.createDocumentsConsentement=function(ctx){
   const done=()=>{document.body.classList.remove('dc-printing');host.remove();window.removeEventListener('afterprint',done)};
   window.addEventListener('afterprint',done);setTimeout(()=>{try{window.print()}finally{setTimeout(done,500)}},50);
  }
- function timeline(c,lk){
+ function timeline(c,lk,auto){
   const st=R.statut(c),items=[];
-  if(c?.envoi)items.push(['ok',I.send,'Envoyé le '+fmt(c.envoi.at),'par '+c.envoi.by+' · '+c.envoi.channels.map(x=>x==='sms'?'SMS':'e-mail').join(' + ')]);
+  if(c?.envoi)items.push(['ok',I.send,(c.envoi.automatique?'Envoyé automatiquement le ':'Envoyé le ')+fmt(c.envoi.at),(c.envoi.automatique?'à la validation de la consultation par ':'par ')+c.envoi.by+' · '+c.envoi.channels.map(x=>x==='sms'?'SMS':'e-mail').join(' + ')]);
   for(const r of c?.relances||[])items.push(['ok',I.clock,'Relancé le '+fmt(r.at),'par '+r.by+' · '+r.channels.map(x=>x==='sms'?'SMS':'e-mail').join(' + ')]);
   if(c?.ouvertLe)items.push(['ok',I.eye,'Ouvert par le patient le '+fmt(c.ouvertLe),'']);
   for(const h of c?.historique||[])items.push(['crit',I.alert,'Document déposé le '+fmt(h.recu?.at)+' jugé non conforme',h.verification?.by+' · '+(h.verification?.note||'')]);
@@ -138,6 +138,7 @@ window.createDocumentsConsentement=function(ctx){
   if(c?.verification&&c.recu)items.push([c.verification.conforme?'ok':'crit',I.check,(c.verification.conforme?'Vérifié conforme':'Non conforme')+' le '+fmt(c.verification.at),c.verification.by+(c.verification.note?' · '+c.verification.note:'')]);
   if(c?.contreSigne)items.push(['ok',I.check,'Contresigné le '+fmt(c.contreSigne.at),c.contreSigne.by]);
   if(c?.annule&&!c.recu)items.push(['crit',I.lock,'Lien désactivé le '+fmt(c.annule.at),c.annule.by]);
+  if(auto?.ok&&auto.partiel?.length&&c?.envoi?.automatique&&!st.recu)items.push(['warn',I.alert,'Envoi automatique partiel',auto.partiel.join(' · ')]);
   if(!st.recu&&c?.envoi&&!c.annule&&lk&&!lk.active)items.push(['crit',I.lock,lk.locked?'Lien fermé après 5 erreurs de date de naissance':'Lien expiré','Relancez pour envoyer un nouveau lien']);
   return items.length?`<ol class="dc-time">${items.map(([k,ic,t,sub])=>`<li class="is-${k}">${ic}<span><b>${esc(t)}</b>${sub?`<small>${esc(sub)}</small>`:''}</span></li>`).join('')}</ol>`:'';
  }
@@ -148,7 +149,8 @@ window.createDocumentsConsentement=function(ctx){
   const r=c?.recu?.mode==='signature'?c.recu:null,non=R.nonCoches(r);
   const field=(k,label,value,type='text',ro=false)=>`<label>${label}<input name="${k}" type="${type}" value="${esc(value)}" ${ro||!edit?'disabled':''}></label>`;
   const pill=`<span class="pp-state dc-st is-${st.niveau}">${st.niveau==='ok'?I.check:st.niveau==='todo'?I.pen:I.alert}${esc(st.label)}</span>`;
-  const banner=st.recu&&!st.aRevoir?'':`<div class="pp-banner is-${al.niveau==='crit'?'crit':'warn'}">${I.alert}<span><b>${esc(al.message)}</b>${al.bloquant?' L’entrée au bloc reste bloquée tant que le consentement n’est pas reçu (passage outre possible avec motif tracé).':''}</span></div>`;
+  const autoKo=autoEchec(sp);
+  const banner=(autoKo?`<div class="pp-banner is-crit dc-auto-ko">${I.alert}<span><b>Consentement non envoyé à la validation de la consultation.</b> ${esc(autoKo.raison)}${isAnesth()?' Complétez puis cliquez sur « Envoyer au patient ».':''}</span></div>`:'')+(st.recu&&!st.aRevoir?'':`<div class="pp-banner is-${al.niveau==='crit'?'crit':'warn'}">${I.alert}<span><b>${esc(al.message)}</b>${al.bloquant?' L’entrée au bloc reste bloquée tant que le consentement n’est pas reçu (passage outre possible avec motif tracé).':''}</span></div>`);
   const answers=r?`<section class="v-card"><header class="v-card-head"><div><h4>Réponses du patient</h4><p>Signé en ligne par ${esc(r.signataire)} le ${esc(fmt(r.at))}${r.lieu?' à '+esc(r.lieu):''}</p></div></header>
    <ul class="dc-answers">${R.QUESTIONS.map(([id,t])=>`<li class="${r.reponses[id]==='non'?'is-non':''}"><span>${esc(t)}</span><b>${r.reponses[id]==='non'?'Non':'Oui'}</b></li>`).join('')}</ul>
    ${r.reserves?`<div class="pp-banner is-warn"><span><b>Réserves ou précisions</b> ${esc(r.reserves)}</span></div>`:''}
@@ -157,7 +159,7 @@ window.createDocumentsConsentement=function(ctx){
    <div class="v-actions"><button type="button" class="secondary" id="dc-open-depot">${I.eye}Ouvrir le document</button>${isAnesth()&&!c.verification?`<button type="button" class="primary" id="dc-conforme">${I.check}Conforme</button><button type="button" class="secondary" id="dc-non-conforme">Non conforme</button>`:''}</div>
    ${!c.verification?'<p class="pp-rgpd">Vérifiez les deux pages : identité, une réponse par ligne, accord à la procédure, date. « Non conforme » rouvre le lien : le patient peut déposer un autre document ou signer en ligne.</p>':''}</section>`:'';
   content.innerHTML=`<div class="v-wrap pp-wrap dc-wrap">
-   <div class="v-head"><div><p class="v-kicker">Consultation d’anesthésie</p><h3>Consentement d’anesthésie</h3><p class="v-sub">Formulaire de la clinique envoyé au patient en fin de consultation. Il le lit, coche ses réponses et le signe en ligne, ou dépose le formulaire signé à la main.</p></div>${pill}</div>
+   <div class="v-head"><div><p class="v-kicker">Consultation d’anesthésie</p><h3>Consentement d’anesthésie</h3><p class="v-sub">Formulaire de la clinique envoyé automatiquement au patient (SMS et e-mail) dès la validation de la consultation. Il le lit, coche ses réponses et le signe en ligne, ou dépose le formulaire signé à la main.</p></div>${pill}</div>
    ${banner}
    <div class="pp-layout">
     <div class="dc-main">
@@ -174,7 +176,7 @@ window.createDocumentsConsentement=function(ctx){
     <div class="pp-side">
      <section class="v-card pp-actions">
       <div id="dc-server"></div>
-      ${timeline(c,lk)}
+      ${timeline(c,lk,sp.consentementAuto)}
       ${rel.conseillee?`<p class="dc-relance">${I.clock}<span><b>Relance conseillée</b> ${esc(rel.raison)}</span></p>`:''}
       <div class="v-actions">
        ${isAnesth()&&!sent&&!st.recu?'':''}
@@ -217,14 +219,43 @@ window.createDocumentsConsentement=function(ctx){
   const pb=$('#dc-print-btn');if(pb)pb.onclick=()=>print(edit?read():f,r||null,{medecin:c?.contreSigne?{nom:c.contreSigne.by,at:c.contreSigne.at}:null,mode:r?'signature':'',empreinte:r?.empreinte||''});
  }
 
+ /* ================= Envoi automatique à la validation de la consultation ================= */
+ // Le serveur envoie le consentement dès que la consultation validée est enregistrée ; ici on suit le résultat.
+ const valide=new Map(),suivis=new Set();
+ function autoEchec(sp){const c=sp.consentement,st=R.statut(c),a=sp.consentementAuto;return a&&a.ok===false&&!st.recu&&(!c?.envoi||st.code==='annule')?a:null}
+ // Passage de la consultation affichée à « validée » (quel que soit l'écran qui l'a validée).
+ function surveiller(s){const v=s.consult?.validated===true,prev=valide.get(s.id);valide.set(s.id,v);if(prev===false&&v&&isAnesth()&&shared())suivreEnvoiAuto(s)}
+ setInterval(()=>{const s=cur();if(s)surveiller(s)},1000);
+ async function suivreEnvoiAuto(s){
+  if(suivis.has(s.id))return;suivis.add(s.id);
+  try{
+   // État connu juste avant la validation (le serveur peut répondre avant notre première lecture).
+   const sp0=space(s),st0=R.statut(sp0.consentement);
+   if(st0.recu||(sp0.consentement?.envoi&&st0.code!=='annule'))return;// déjà envoyé : pas de second envoi
+   const avant=JSON.stringify(sp0.consentementAuto||null);
+   toast('Consultation validée : envoi du consentement au patient…');
+   await ctx.flush?.();
+   for(let i=0;i<12;i++){
+    await new Promise(r=>setTimeout(r,i?1500:300));await load(s);
+    const a=space(s).consentementAuto;if(JSON.stringify(a||null)===avant)continue;
+    const ch=(a.resultats||[]).filter(z=>z.sent).map(z=>z.channel==='sms'?'SMS':'e-mail').join(' et ');
+    if(a.ok){toast('Consentement d’anesthésie envoyé au patient par '+ch+(a.partiel?.length?' · '+a.partiel.join(' · '):''));trace(s,'Consentement d’anesthésie envoyé automatiquement au patient ('+ch+')')}
+    else{toast('Consentement NON envoyé : '+a.raison);trace(s,'Consentement d’anesthésie non envoyé automatiquement · '+a.raison)}
+    if(cur()?.id===s.id){if(ctx.tab?.()===TAB_CONS)panelCons();else{document.querySelectorAll('#detail .dc-chip').forEach(x=>x.remove());detail(ctx.tab?.())}}
+    return;
+   }
+  }finally{suivis.delete(s.id)}
+ }
+
  /* ================= Alertes dans le dossier ================= */
  function detail(tab){
   const s=cur();if(!s)return;
+  surveiller(s);
   const sp=space(s),al=R.alerteBloc({...s,espacePatient:sp}),chips=document.querySelector('#detail .pb-chips');
   const nouveaux=(sp.documents||[]).filter(d=>d.source==='patient'&&!d.vu&&!d.ecarte).length;
   if(chips&&!chips.querySelector('.dc-chip')){
-   const showCons=al.bloquant&&(al.niveau==='crit'||al.statut.code!=='aucun')||al.statut.aRevoir;
-   chips.insertAdjacentHTML('beforeend',`${showCons?`<button type="button" class="pb-chip dc-chip ${al.niveau==='crit'?'pb-crit':'pb-warn'}" data-dc-goto="${TAB_CONS}">${I.pen}${esc(al.statut.aRevoir?'Consentement à revoir':al.statut.code==='aucun'?'Consentement non envoyé':al.statut.code==='depose'?'Consentement à vérifier':'Consentement non reçu')}</button>`:''}${nouveaux?`<button type="button" class="pb-chip dc-chip pb-info" data-dc-goto="${TAB_DOCS}">${I.file}${nouveaux} document${nouveaux>1?'s':''} du patient</button>`:''}`);
+   const autoKo=autoEchec(sp),showCons=autoKo||al.bloquant&&(al.niveau==='crit'||al.statut.code!=='aucun')||al.statut.aRevoir;
+   chips.insertAdjacentHTML('beforeend',`${showCons?`<button type="button" class="pb-chip dc-chip ${autoKo||al.niveau==='crit'?'pb-crit':'pb-warn'}" data-dc-goto="${TAB_CONS}">${I.pen}${esc(autoKo?'Consentement non envoyé : à compléter':al.statut.aRevoir?'Consentement à revoir':al.statut.code==='aucun'?'Consentement non envoyé':al.statut.code==='depose'?'Consentement à vérifier':'Consentement non reçu')}</button>`:''}${nouveaux?`<button type="button" class="pb-chip dc-chip pb-info" data-dc-goto="${TAB_DOCS}">${I.file}${nouveaux} document${nouveaux>1?'s':''} du patient</button>`:''}`);
    chips.querySelectorAll('[data-dc-goto]').forEach(b=>b.onclick=()=>ctx.goTab?.(b.dataset.dcGoto));
   }
   // Feuille d'anesthésie : rappel visible avant l'induction.

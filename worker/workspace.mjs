@@ -2,7 +2,7 @@ import {patientQuestionnaireApi,staffQuestionnaireApi} from './questionnaire.mjs
 import {professionalAccess,professionalRoutes} from './professional-access.mjs';
 import {veilleApi} from './veille.mjs';
 import {patientPrescriptionsApi,staffPrescriptionsApi} from './prescriptions.mjs';
-import {patientEspacePatientApi,staffEspacePatientApi} from './espace-patient.mjs';
+import {patientEspacePatientApi,staffEspacePatientApi,consentAvant,consentDeclencher} from './espace-patient.mjs';
 import {patientLettreLiaisonApi,staffLettreLiaisonApi,lettresAvant,declencher} from './lettre-liaison.mjs';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const validKey=k=>typeof k==='string'&&k.length<180&&/^(stay\/[^/]{1,80}\/[a-zA-Z][a-zA-Z0-9]*|management\/[a-zA-Z]+|identities\/(records|reviews))$/.test(k);
@@ -73,24 +73,24 @@ export async function workspaceApi(request,env){
    async function replays(){const rows=await Promise.all(docs.map(d=>env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first()));return rows.every((r,i)=>r&&r.key===docs[i].key&&r.actor===user&&JSON.stringify(acl.filter(r.key,JSON.parse(r.data)))===JSON.stringify(acl.filter(docs[i].key,docs[i].data)))?rows:null;}
    const previous=await replays();if(previous)return json({documents:previous.map(rowValue),replayed:true});
    // Lettre de liaison : version relue avant l'écriture, pour l'envoi automatique d'une nouvelle version.
-   const liaisonAvant=await lettresAvant(env,docs);
+   const liaisonAvant=await lettresAvant(env,docs),consentAvantEcriture=await consentAvant(env,docs);
    const checks=docs.map(d=>env.DB.prepare('INSERT INTO workspace_write_checks(operation,valid) VALUES(?,CASE WHEN COALESCE((SELECT revision FROM workspace_documents WHERE key=?),0)=? THEN 1 ELSE 0 END)').bind(d.operation,d.key,d.revision));
    const updates=docs.map(d=>d.revision===0?env.DB.prepare('INSERT INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES(?,?,1,?,?,?,?)').bind(d.key,JSON.stringify(d.data),user,at,d.operation,d.reason):env.DB.prepare('UPDATE workspace_documents SET data=?,revision=revision+1,actor=?,updated_at=?,operation=?,reason=? WHERE key=? AND revision=?').bind(JSON.stringify(d.data),user,at,d.operation,d.reason,d.key,d.revision));
    const cleanup=docs.map(d=>env.DB.prepare('DELETE FROM workspace_write_checks WHERE operation=?').bind(d.operation));
    try{await env.DB.batch([acl.policyGuard(),...checks,...updates,...authorized.grants,...cleanup,env.DB.prepare("DELETE FROM workspace_write_checks WHERE operation LIKE 'policy-%'")]);}catch(error){const replay=await replays();if(replay)return json({documents:replay.map(rowValue),replayed:true});const conflicts=[];for(const d of docs){const current=await env.DB.prepare('SELECT * FROM workspace_documents WHERE key=?').bind(d.key).first();if((current?.revision||0)!==d.revision)conflicts.push({key:d.key,current:rowValue(current)});}if(conflicts.length)return json({error:'Conflit : aucune modification du lot n’a été enregistrée.',conflicts},409);throw error;}
-   const versions=await Promise.all(docs.map(d=>env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first()));for(const d of docs)await acl.log('write',d.key,'allowed',d.reason,'Révision '+(d.revision+1));await declencher(env,acl,docs,liaisonAvant,url.origin);return json({documents:versions.map(rowValue)});
+   const versions=await Promise.all(docs.map(d=>env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first()));for(const d of docs)await acl.log('write',d.key,'allowed',d.reason,'Révision '+(d.revision+1));await declencher(env,acl,docs,liaisonAvant,url.origin);await consentDeclencher(env,acl,docs,consentAvantEcriture,url.origin);return json({documents:versions.map(rowValue)});
   }
   if(path==='/api/workspace/document'&&method==='PUT'){
    let d=await body(request);
    if(!validKey(d.key)||!Number.isSafeInteger(d.revision)||d.revision<0||!Object.hasOwn(d,'data')||typeof d.operation!=='string'||!/^[a-f0-9-]{36}$/.test(d.operation)||typeof d.reason!=='string'||d.reason.length<3||d.reason.length>500)return json({error:'Document ou version invalide.'},400);
    const authorized=await authDocs([d]);if(!authorized)return reject(d.key,acl.planningError||'Modification refusée : métier ou équipe de soins non habilité.');d=authorized.docs[0];
-   const payload=JSON.stringify(d.data),liaisonAvant=await lettresAvant(env,[d]);
+   const payload=JSON.stringify(d.data),liaisonAvant=await lettresAvant(env,[d]),consentAvantEcriture=await consentAvant(env,[d]);
    const replay=await env.DB.prepare('SELECT key,data,revision,actor,updated_at FROM workspace_versions WHERE operation=?').bind(d.operation).first();
    if(replay)return replay.key===d.key&&replay.actor===user&&JSON.stringify(acl.filter(replay.key,JSON.parse(replay.data)))===JSON.stringify(acl.filter(d.key,d.data))?json({document:rowValue(replay),replayed:true}):json({error:'Identifiant d’opération déjà utilisé.'},409);
    const statement=d.revision===0?env.DB.prepare('INSERT OR IGNORE INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES(?,?,1,?,?,?,?)').bind(d.key,payload,user,at,d.operation,d.reason):env.DB.prepare('UPDATE workspace_documents SET data=?,revision=revision+1,actor=?,updated_at=?,operation=?,reason=? WHERE key=? AND revision=?').bind(payload,user,at,d.operation,d.reason,d.key,d.revision);
    const results=await env.DB.batch([acl.policyGuard(),statement,...authorized.grants,env.DB.prepare("DELETE FROM workspace_write_checks WHERE operation LIKE 'policy-%'")]);const result=results[1];
    if(!result.meta.changes){const current=await env.DB.prepare('SELECT * FROM workspace_documents WHERE key=?').bind(d.key).first();return json({error:'Cette rubrique a changé sur un autre poste. Comparez les versions.',current:rowValue(current)},409)}
-   const ownVersion=await env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first();await acl.log('write',d.key,'allowed',d.reason,'Révision '+ownVersion.revision);await declencher(env,acl,[d],liaisonAvant,url.origin);return json({document:rowValue(ownVersion)});
+   const ownVersion=await env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first();await acl.log('write',d.key,'allowed',d.reason,'Révision '+ownVersion.revision);await declencher(env,acl,[d],liaisonAvant,url.origin);await consentDeclencher(env,acl,[d],consentAvantEcriture,url.origin);return json({document:rowValue(ownVersion)});
   }
   if(path==='/api/workspace/history'&&method==='GET'){
    const key=url.searchParams.get('key');if(!validKey(key))return json({error:'Rubrique invalide.'},400);
