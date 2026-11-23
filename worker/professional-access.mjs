@@ -4,6 +4,7 @@ import planningCore from '../dist/planning-core.js';
 const professions={unassigned:'Non attribué',anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier',secretariat:'Secrétariat',pharmacien:'Pharmacien',dim:'DIM',facturation:'Facturation',administration:'Administration'};
 const stable=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const same=(a,b)=>stable(a)===stable(b);
+const filled=o=>Object.fromEntries(Object.entries(o&&typeof o==='object'?o:{}).filter(([,v])=>v!==''&&v!=null));
 const appendOnly=(old=[],next=[])=>Array.isArray(old)&&Array.isArray(next)&&next.length>=old.length&&old.every((x,i)=>same(x,next[i]));
 const additions=(old=[],next=[])=>Array.isArray(next)&&old.every(x=>next.some(y=>same(x,y)));
 const fileReferences=v=>{const out=[];function scan(x){if(!x||typeof x!=='object')return;if(typeof x.$file==='string'&&/^[a-f0-9]{64}$/.test(x.$file))out.push(x.$file);for(const a of Object.values(x))scan(a);}scan(v);return [...new Set(out)];};
@@ -16,8 +17,8 @@ export async function professionalAccess(env,request,user,member,at){
   if(request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8')try{display=decodeURIComponent(display)}catch{}
   await DB.prepare('INSERT OR IGNORE INTO professional_profiles(user_id,display_name,email,profession,active,updated_at,updated_by) VALUES(?,?,?,?,1,?,?)').bind(user,display.slice(0,160),(request.headers.get('oai-authenticated-user-email')||'').slice(0,200),isAdmin?'anesthesiste':'unassigned',at,user).run();
   if(isAdmin){await DB.batch([
-   DB.prepare("INSERT OR IGNORE INTO care_teams(id,label) VALUES('demo-clinique','Équipe de démonstration de la clinique')"),
-   DB.prepare("INSERT OR IGNORE INTO professional_teams(user_id,team_id,valid_from) VALUES(?,'demo-clinique',?)").bind(user,at),
+   DB.prepare("INSERT OR IGNORE INTO care_teams(id,label) VALUES('endoscopie','Endoscopie'),('demo-clinique','Chirurgie'),('sejour-medical','Séjour médical')"),
+   ...['endoscopie','demo-clinique','sejour-medical'].map(team=>DB.prepare("INSERT OR IGNORE INTO professional_teams(user_id,team_id,valid_from) VALUES(?,?,?)").bind(user,team,at)),
    DB.prepare("INSERT OR IGNORE INTO stay_teams(stay_id,team_id,valid_from) SELECT substr(key,6,length(key)-10),'demo-clinique',? FROM workspace_documents WHERE key LIKE 'stay/%/core'").bind(at)
   ]);}
   profile=await DB.prepare('SELECT * FROM professional_profiles WHERE user_id=?').bind(user).first();await log('account-first-connection',user,'allowed','Compte individuel issu de la connexion du site');
@@ -27,13 +28,13 @@ export async function professionalAccess(env,request,user,member,at){
   for(const row of rows.results)for(const hash of fileReferences(JSON.parse(row.data)))statements.push(DB.prepare('INSERT OR IGNORE INTO file_scopes(hash,document_key) VALUES(?,?)').bind(hash,row.key));
   statements.push(DB.prepare("INSERT OR IGNORE INTO access_migrations(id) VALUES('file-scopes-v1')"));await DB.batch(statements);
  }
- const teams=(await DB.prepare('SELECT t.id,t.label,m.valid_from,m.valid_until FROM care_teams t JOIN professional_teams m ON m.team_id=t.id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?)').bind(user,at,at).all()).results;
+ const teams=(await DB.prepare('SELECT t.id,t.label,m.valid_from,m.valid_until FROM care_teams t JOIN professional_teams m ON m.team_id=t.id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?) ORDER BY t.label').bind(user,at,at).all()).results;
  const stays=(await DB.prepare('SELECT DISTINCT s.stay_id FROM stay_teams s JOIN professional_teams m ON s.team_id=m.team_id JOIN care_teams t ON t.id=s.team_id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?) AND s.valid_from<=? AND (s.valid_until IS NULL OR s.valid_until>?)').bind(user,at,at,at,at).all()).results;
  const allowed=new Set(stays.map(x=>x.stay_id)),job=profile.profession,active=!!profile.active,clinical=['anesthesiste','chirurgien','infirmier','pharmacien','dim'].includes(job);
  if(!active||['unassigned','administration'].includes(job))allowed.clear();
  const epoch=(await DB.prepare('SELECT revision FROM professional_policy_revision WHERE id=1').first()).revision;
  const globalRead={planningResources:['anesthesiste','chirurgien','infirmier','secretariat'],vacations:['anesthesiste','chirurgien','infirmier','secretariat'],reservations:['anesthesiste','chirurgien','infirmier','secretariat'],acts:['anesthesiste','chirurgien','dim','facturation'],lots:['anesthesiste','chirurgien','infirmier','pharmacien'],movements:['anesthesiste','chirurgien','infirmier','pharmacien'],pmsi:['dim','anesthesiste','chirurgien'],invoices:['facturation'],patientDrafts:[]};
- function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact')return ['anesthesiste','chirurgien','secretariat'].includes(job);return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||allowed.size>0&&(globalRead[id]||[]).includes(job));return false;}
+ function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact'||module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job);return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||allowed.size>0&&(globalRead[id]||[]).includes(job));return false;}
  function filter(key,data){if(data===null||data===undefined)return data;const [group,name,module]=key.split('/');
   if(group==='stay'&&module==='core'&&!clinical)return Object.fromEntries(Object.entries(data).filter(([k])=>['id','specialty','mode','stage','sector','identity','careTeamId'].includes(k)));
   if(group==='management'){
@@ -54,6 +55,19 @@ export async function professionalAccess(env,request,user,member,at){
    if(module==='nursingRecord')return ['anesthesiste','chirurgien','infirmier'].includes(job)&&appendOnly(old||[],data);
    if(module==='medicationCircuit')return ['anesthesiste','chirurgien','pharmacien'].includes(job)&&appendOnly(old||[],data)&&data.slice((old||[]).length).every(e=>['analysis','reconciliation','validation'].includes(e.kind)&&(e.kind!=='validation'||job==='pharmacien')&&e.author?.trim()&&e.note?.trim()&&Number.isFinite(Date.parse(e.at)));
    if(module==='events')return clinical&&Array.isArray(data)&&additions(old||[],data);
+   if(['periopPlus','peropRapide','soinsPlus','sortiePlus','iaTrace'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object';
+   if(module==='codage')return ['anesthesiste','chirurgien','dim'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(module==='droitsRgpd')return (['anesthesiste','chirurgien'].includes(job)||isAdmin)&&Array.isArray(data);
+   // Modules issus de la veille marché : statut bloc, check-list HAS, suivi J+1 (soignants) ; aide CPA (anesthésiste) ; envois DMP/MSSanté (médecins).
+   if(['checklistBloc','blocStatut','suiviAmbu','bionettoyage'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   // Prescriptions préopératoires de la consultation : rédigées et signées par un médecin du séjour.
+   if(module==='prescriptionsPreop')return ['anesthesiste','chirurgien'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   // Visite pré-anesthésique : l'anesthésiste remplit, conclut et signe ; l'infirmier saisit le recueil sans toucher à la conclusion, à la signature ni aux versions.
+   if(module==='vpa'){if(!data||typeof data!=='object'||Array.isArray(data))return false;if(job==='anesthesiste')return true;
+    return job==='infirmier'&&same(old?.signed??null,data.signed??null)&&same(old?.history||[],data.history||[])&&same(filled(old?.draft?.conclusion),filled(data.draft?.conclusion))&&same(old?.draft?.acquittees||[],data.draft?.acquittees||[])&&same(old?.draft?.motifAlertes||'',data.draft?.motifAlertes||'');}
+   if(module==='aideCpa')return job==='anesthesiste'&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(module==='envoisInterop')return ['anesthesiste','chirurgien'].includes(job)&&appendOnly(old||[],data);
    if(job==='infirmier'){
     if(module==='postopVitals')return appendOnly(old||[],data)&&(data||[]).slice((old||[]).length).every(x=>x.kind==='Surveillance'&&['SSPI','Hospitalisation'].includes(x.values?.location));
     if(module==='perop')return data&&same(old?.context||{},data.context||{})&&appendOnly(old?.records||[],data.records||[])&&(data.records||[]).slice((old?.records||[]).length).every(x=>x.kind==='Surveillance');

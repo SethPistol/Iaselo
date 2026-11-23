@@ -4,13 +4,13 @@
 const stages=['Consultation','Préopératoire','Intervention','SSPI','Hospitalisation','Sortie'];
 const fictitiousIdentities=[['Martin', 'Camille', '1984-04-12'], ['Lefèvre', 'Élodie', '1975-09-23'], ['Bernard', 'Noé', '1993-02-08'], ['Rousseau', 'Lina', '1988-12-15'], ['Dubois', 'Sacha', '1966-06-30'], ['Martin', 'Camille', '1991-07-04']];
 const patients=[['DÉMO-001','Orthopédie','Hospitalisation','Préopératoire','Bilan à compléter'],['DÉMO-002','Chirurgie digestive','Hospitalisation','Hospitalisation','Transmission attendue','etage-1'],['DÉMO-003','ORL','Ambulatoire','Consultation','Consultation à valider'],['DÉMO-004','Gynécologie','Ambulatoire','SSPI','Surveillance en cours','sspi-chir'],['DÉMO-005','Urologie','Hospitalisation','Intervention','Dossier disponible','bloc-chir'],['DÉMO-006','Orthopédie','Hospitalisation','Sortie','Synthèse à compléter']].map((p,i)=>({id:p[0],specialty:p[1],mode:p[2],stage:p[3],task:p[4],sector:p[5]||'',identity:Object.fromEntries(['lastName','firstName','birthDate'].map((key,j)=>[key,fictitiousIdentities[i][j]])),done:false,consult:{asa:'Non renseigné',history:'',allergies:'À vérifier',treatments:'',plan:'',checks:[],validated:false},notes:[],rx:[],discharge:{summary:'',instructions:'',validated:false},events:[{at:'Exemple initial',role:'Démonstration',text:'Séjour fictif créé',kind:'Dossier'}]}));
-let selected='DÉMO-001',tab='consult',view='patients',query='',filter='Tous',role='Anesthésiste';
+let selected='DÉMO-001',tab='consult',view='patients',query='',filter='Tous',role='Anesthésiste';let veilleModule=null;
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const p=()=>patients.find(x=>x.id===selected);const nurseProfile=()=>role==='Infirmier';const physician=()=>!nurseProfile();
 function toast(s){$('#toast').textContent=s;$('#toast').style.display='block';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$('#toast').style.display='none',4000)}
 function event(text,kind='Modification'){p().events.unshift({at:new Date().toLocaleString('fr-FR'),role,text,kind})}
 function stats(){const pending=patients.filter(x=>!x.done).length;$('#stats').innerHTML=[[patients.length,'Séjours fictifs'],[patients.filter(x=>['Intervention','SSPI','Hospitalisation'].includes(x.stage)).length,'Prises en charge en cours'],[pending,'Actions en attente'],[patients.filter(x=>x.stage==='Sortie').length,'Séjours en sortie']].map((x,i)=>`<div class="stat ${i===2?'accent':''}"><span>${x[1]}</span><strong>${x[0]}</strong></div>`).join('')}
 function render(){stats();$('#title').textContent={patients:'Patients & séjours',service:'Vue du service',search:'Recherche patient',tasks:'Actions à suivre',portal:'Préparer ma consultation'}[view];document.querySelectorAll('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));if(view==='portal'){renderPortal();return}if(view==='service'){renderService();return}if(view==='search'){renderPatientSearch();return}if(view==='tasks'){renderTasks();return}$('#workspace').innerHTML=`<div class="layout"><section class="panel"><div class="panelhead"><h3>Liste des séjours</h3><div class="filters"><input id="search" aria-label="Rechercher un séjour fictif" placeholder="Identifiant ou spécialité" value="${esc(query)}"><select id="filter" aria-label="Filtrer le parcours">${['Tous',...stages].map(s=>`<option ${filter===s?'selected':''}>${s}</option>`).join('')}</select></div></div><div id="patientlist"></div></section><section class="panel" id="detail"></section></div>`;$('#search').oninput=e=>{query=e.target.value;list()};$('#filter').onchange=e=>{filter=e.target.value;list()};list();detail()}
-function list(){const matches=patients.filter(x=>(filter==='Tous'||filter===x.stage)&&`${x.id} ${x.specialty}`.toLowerCase().includes(query.toLowerCase()));$('#patientlist').innerHTML=matches.length?matches.map(x=>`<button class="patient ${x.id===selected?'selected':''}" data-patient="${x.id}"><div class="row"><strong>${x.id}</strong><span class="pill">${x.stage}</span></div><small>${x.specialty} · ${x.mode}</small><small>${x.done?'Action réalisée':x.task}</small></button>`).join(''):'<div class="empty">Aucun séjour ne correspond à ce filtre.</div>';document.querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(tab==='consult')captureConsult();selected=b.dataset.patient;tab=role==='Chirurgien'?'surgeryAnnouncement':nurseProfile()?'follow':'consult';list();detail()})}
+function list(){const matches=patients.filter(x=>(filter==='Tous'||filter===x.stage)&&`${x.id} ${x.specialty} ${x.identity?.lastName||''} ${x.identity?.firstName||''}`.toLowerCase().includes(query.toLowerCase()));$('#patientlist').innerHTML=matches.length?matches.map(x=>`<button class="patient ${x.id===selected?'selected':''}" data-patient="${x.id}"><div class="ui-patient">${stayAvatar(x)}<span class="ui-who"><strong>${esc(stayName(x))}</strong><span>${esc(x.id)} · ${esc(x.specialty)} · ${esc(x.mode)}</span></span></div><div class="row"><span class="pill">${esc(x.stage)}</span><small>${esc(x.done?'Action réalisée':x.task)}</small></div></button>`).join(''):'<div class="empty">Aucun séjour ne correspond à ce filtre.</div>';document.querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(tab==='consult')captureConsult();selected=b.dataset.patient;tab=role==='Chirurgien'?'surgeryAnnouncement':nurseProfile()?'follow':'consult';list();detail()})}
 function patientIdentityFields(){
  return `<div class="patient-identity-fields">
   <label>Nom fictif<input name="lastName" maxlength="80" autocomplete="off"></label>
@@ -71,7 +71,7 @@ function bindPatientSearch(open){
    const name=[lastName,firstName].filter(Boolean).join(' ');
    const birth=birthDate?birthDate.split('-').reverse().join('/'):'Date de naissance non renseignée';
    return `<li class="patient-search-result">
-    <div><strong>${esc(name||'Identité non renseignée')}</strong><p>${esc(birth)} · Dossier ${esc(stay.id)}</p><p>${esc(stay.specialty)} · ${esc(stay.stage)}</p></div>
+    ${stayAvatar(stay)}<div><strong>${esc(name||'Identité non renseignée')}</strong><p>${esc(birth)} · Dossier ${esc(stay.id)}</p><p>${esc(stay.specialty)} · ${esc(stay.stage)}</p></div>
     ${open?`<button type="button" class="secondary" data-patient-result="${esc(stay.id)}" aria-label="Ouvrir le dossier ${esc(stay.id)}">Ouvrir le dossier</button>`:''}
    </li>`;
   }).join('');
@@ -113,8 +113,11 @@ function sectorOptions(current){
   `<option value="${id}" ${current===id?'selected':''}>${esc(label)}</option>`).join('');
 }
 
+function stayAvatar(stay){const n=stay.identity||{};return `<span class="ui-avatar" aria-hidden="true">${esc((((n.lastName||'')[0]||'')+((n.firstName||'')[0]||'')).toUpperCase()||'?')}</span>`}
+function stayName(stay){const n=stay.identity||{};return n.lastName?`${String(n.lastName).toUpperCase()} ${n.firstName||''}`.trim():stay.id}
+function staySteps(stay){const list=['Consultation','Préopératoire','Intervention','SSPI','Hospitalisation','Sortie'],i=list.indexOf(stay.stage);return `<span class="ui-steps" role="img" aria-label="Étape ${i+1} sur 6 : ${esc(stay.stage)}">${list.map((_,k)=>`<i class="${k<i?'done':k===i?'now':''}"></i>`).join('')}</span>`}
 function serviceStayCard(stay,canOpen){
- const description=`<strong>${esc(stay.id)}</strong><span>${esc(stay.specialty)} · ${esc(stay.stage)}</span>`;
+ const description=`${stayAvatar(stay)}<span class="ui-who"><strong>${esc(stayName(stay))}</strong><span>${esc(stay.id)} · ${esc(stay.specialty)} · ${esc(stay.stage)}</span>${staySteps(stay)}</span>`;
  return canOpen
   ? `<button type="button" class="service-stay" data-service-stay="${esc(stay.id)}">${description}</button>`
   : `<div class="service-stay">${description}</div>`;
@@ -266,12 +269,15 @@ function surgeryAnnouncement(){
  };
 }
 
+// En-tête des documents imprimés : établissement, identité complète du patient (identitovigilance) et date d’impression.
+function printHead(x){const id=x.identity||{},name=[String(id.lastName||'').toUpperCase(),id.firstName].filter(Boolean).join(' ')||'Patient fictif',born=id.birthDate?frDate(id.birthDate):'';return `<div class="print-head" aria-hidden="true"><img src="assets/marque/etablissement.webp" alt="" width="185" height="100"><div><strong>${esc(name)}</strong><span>${born?'Né(e) le '+esc(born)+' · ':''}Séjour ${esc(x.id)} · ${esc(x.specialty||'')}</span><span class="print-date">Imprimé le ${esc(new Date().toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}))}</span></div></div>`}
+window.addEventListener('beforeprint',()=>document.querySelectorAll('.print-date').forEach(e=>e.textContent='Imprimé le '+new Date().toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})));
 function dossierStageFor(key){return dossierStages.find(g=>g.items.some(([k])=>k===key))||dossierStages[0]}
 function detail(){
  closeCroDictation();
  if(nurseProfile()&&tab==='science')tab='consult';
  const x=p(),group=dossierStageFor(tab);if(!group.items.some(([k])=>k===tab))tab=group.defaultTab;
- $('#detail').innerHTML=`<div class="detailhead"><div class="row"><div><h2>${x.id}</h2><p>${esc(x.specialty)} · ${esc(x.mode)}</p>${x.identity?.lastName||x.identity?.firstName?`<p>${esc([x.identity.lastName,x.identity.firstName].filter(Boolean).join(' '))}</p>`:''}</div><div class="actions"><span class="identity">Patient fictif</span><button type="button" class="focus-toggle" id="focusdossier" aria-pressed="${document.body.classList.contains('dossier-focus')}">${document.body.classList.contains('dossier-focus')?'Afficher la liste':'Agrandir le dossier'}</button></div></div><div class="dossier-status"><span class="pill ${x.done?'good':'warn'}">${x.done?'Action réalisée':esc(x.task)}</span><label for="stage-status">Étape du séjour<select id="stage-status" ${!physician()?'disabled':''}>${stages.map(stage=>`<option ${stage===x.stage?'selected':''}>${esc(stage)}</option>`).join('')}</select></label><label for="sector-status">Secteur actuel<select id="sector-status" ${!physician()?'disabled':''}>${sectorOptions(x.sector)}</select></label></div></div><div class="dossier-tabs" role="tablist" aria-label="Étapes de la prise en charge">${dossierStages.map((g,i)=>`<button type="button" id="dossier-tab-${g.id}" role="tab" aria-label="${g.label}" aria-selected="${g.id===group.id}" aria-controls="dossier-panel" tabindex="${g.id===group.id?'0':'-1'}" data-dossier-stage="${g.id}" class="${g.id===group.id?'active':''}"><span class="dossier-tab-number" aria-hidden="true">0${i+1}</span><span class="dossier-tab-text"><strong>${g.label}</strong><small>${g.hint}</small></span></button>`).join('')}</div><section id="dossier-panel" role="tabpanel" aria-labelledby="dossier-tab-${group.id}">${group.id==='consultation'?`<div class="dossier-subnav"><label for="dossier-section">${group.id==='consultation'?'Contenu de la consultation':'Prescription et suivi'}<select id="dossier-section">${group.items.filter(([key])=>!nurseProfile()||key!=='science').map(([k,n])=>`<option value="${k}" ${k===tab?'selected':''}>${n}</option>`).join('')}</select></label><span>${esc(group.items.find(([k])=>k===tab)?.[1]||'')}</span></div>`:''}<div class="content" id="content"></div></section>`;
+ $('#detail').innerHTML=`${printHead(x)}<div class="detailhead"><div class="row"><div><h2>${x.id}</h2><p>${esc(x.specialty)} · ${esc(x.mode)}</p>${x.identity?.lastName||x.identity?.firstName?`<p>${esc([x.identity.lastName,x.identity.firstName].filter(Boolean).join(' '))}</p>`:''}</div><div class="actions"><span class="identity">Patient fictif</span><button type="button" class="focus-toggle" id="focusdossier" aria-pressed="${document.body.classList.contains('dossier-focus')}">${document.body.classList.contains('dossier-focus')?'Afficher la liste':'Agrandir le dossier'}</button></div></div><div class="dossier-status"><span class="pill ${x.done?'good':'warn'}">${x.done?'Action réalisée':esc(x.task)}</span><label for="stage-status">Étape du séjour<select id="stage-status" ${!physician()?'disabled':''}>${stages.map(stage=>`<option ${stage===x.stage?'selected':''}>${esc(stage)}</option>`).join('')}</select></label><label for="sector-status">Secteur actuel<select id="sector-status" ${!physician()?'disabled':''}>${sectorOptions(x.sector)}</select></label></div></div><div class="dossier-tabs" role="tablist" aria-label="Étapes de la prise en charge">${dossierStages.map((g,i)=>`<button type="button" id="dossier-tab-${g.id}" role="tab" aria-label="${g.label}" aria-selected="${g.id===group.id}" aria-controls="dossier-panel" tabindex="${g.id===group.id?'0':'-1'}" data-dossier-stage="${g.id}" class="${g.id===group.id?'active':''}"><span class="dossier-tab-number" aria-hidden="true">0${i+1}</span><span class="dossier-tab-text"><strong>${g.label}</strong><small>${g.hint}</small></span></button>`).join('')}</div><section id="dossier-panel" role="tabpanel" aria-labelledby="dossier-tab-${group.id}">${group.items.length>1?`<div class="dossier-subnav"><label for="dossier-section">${({consultation:'Contenu de la consultation',peroperatoire:'Bloc opératoire'})[group.id]||'Prescription et suivi'}<select id="dossier-section">${group.items.filter(([key])=>!nurseProfile()||key!=='science').map(([k,n])=>`<option value="${k}" ${k===tab?'selected':''}>${n}</option>`).join('')}</select></label><span>${esc(group.items.find(([k])=>k===tab)?.[1]||'')}</span></div>`:''}<div class="content" id="content"></div></section>`;
  $('#focusdossier').onclick=()=>{const focused=document.body.classList.toggle('dossier-focus');$('#focusdossier').textContent=focused?'Afficher la liste':'Agrandir le dossier';$('#focusdossier').setAttribute('aria-pressed',String(focused))};
  $('#stage-status').onchange=e=>{if(!physician())return;x.stage=e.target.value;event('Étape : '+x.stage,'Parcours');stats();list();toast('Étape du séjour simulée mise à jour')};
  $('#sector-status').onchange=e=>{
@@ -283,7 +289,7 @@ function detail(){
  const navigate=key=>{if(tab==='consult')captureConsult();tab=nurseProfile()&&key==='science'?'consult':key;detail()};
  document.querySelectorAll('[data-dossier-stage]').forEach(button=>{button.onclick=()=>navigate(dossierStages.find(g=>g.id===button.dataset.dossierStage).defaultTab);button.onkeydown=e=>{const index=dossierStages.findIndex(g=>g.id===button.dataset.dossierStage),count=dossierStages.length;let target;if(e.key==='ArrowRight')target=(index+1)%count;if(e.key==='ArrowLeft')target=(index+count-1)%count;if(e.key==='Home')target=0;if(e.key==='End')target=count-1;if(target===undefined)return;e.preventDefault();navigate(dossierStages[target].defaultTab);$('#dossier-tab-'+dossierStages[target].id).focus()}});
  if($('#dossier-section'))$('#dossier-section').onchange=e=>navigate(e.target.value);
- ({surgeryAnnouncement,overview,preparation,instructions:patientInstructions,questionnaire:questionnaireReview,consult,science,perop,follow,rx:prescriptions,discharge,dischargeRx,dischargeLiaison,operativeReport,history})[tab]();
+ (({surgeryAnnouncement,overview,preparation,instructions:patientInstructions,questionnaire:questionnaireReview,consult,science,perop,follow,rx:prescriptions,discharge,dischargeRx,dischargeLiaison,operativeReport,history})[tab]||(()=>veilleModule?.panel(tab)))();
  if(nurseProfile()){
   $('#content').insertAdjacentHTML('afterbegin',`<section class="notice nurse-tools no-print">
    <strong>Profil infirmier · prescriptions médicales en lecture seule, dossier de soins selon habilitation</strong>
@@ -413,7 +419,9 @@ function bindCroDictation(editor){
   closeCroDictation=()=>{};
  };
 }
+let croModule=null;
 function operativeReport(){
+ if(croModule){croModule.render();return}
  const stay=p(),saved=stay.cro,write=role==='Chirurgien';
  const announced=publishedSurgery(stay)?.fields;
  const defaultOperation=announced?.procedure||consultData().operation||'';
@@ -599,11 +607,25 @@ function prescriptions(){
  });
 }
 const postopVitalKeys=['sbp','dbp','hr','rr','spo2','temp'];
+let surveillanceUi=null;
+const postopUi=()=>surveillanceUi??=window.createSurveillancePostop?.({esc})||null;
+function postopHistory(ui,records){
+ const item=record=>`<article class="event"><strong>${esc(record.values.location)} · ${esc(periTime(record.at))}</strong>
+ <p>${esc(ui.decrire(record.values)||periDescription(record))}</p>${ui.alertesHtml(record.values)?`<div class="sp-hist-alerts">${ui.alertesHtml(record.values)}</div>`:''}
+ <p class="muted">${esc(record.author)} · ${esc(record.role)} · Saisi le ${esc(periTime(record.created))}${record.photo?' · source photo validée':''}</p></article>`;
+ if(!records.length)return '<p class="muted">Aucun relevé postopératoire enregistré.</p>';
+ return records.slice(0,4).map(item).join('')+(records.length>4?`<details class="sp-older"><summary>Relevés plus anciens (${records.length-4})</summary>${records.slice(4).map(item).join('')}</details>`:'');
+}
 function postopVitals(stay){
- const fields=periVitals.filter(([key])=>postopVitalKeys.includes(key));
+ const ui=postopUi();
  const records=periSorted(stay.postopVitals||[]).reverse();
+ const canWrite=nurseProfile()||role==='Anesthésiste';
+ if(ui)return `<section class="workflow-form nurse-vitals sp"><h4>Surveillance postopératoire · graphe</h4>${ui.graph(stay.postopVitals||[])}
+ ${canWrite?ui.form({location:stay.stage==='Hospitalisation'||stay.stage==='Sortie'?'Hospitalisation':'SSPI',at:periNow(),author:!sharedWorkspace}):''}
+ <h4>Derniers relevés</h4>${postopHistory(ui,records.filter(r=>!r.voided))}</section>`;
+ const fields=periVitals.filter(([key])=>postopVitalKeys.includes(key));
  return `<section class="workflow-form nurse-vitals"><h4>Relevé des constantes</h4>
- ${nurseProfile()||role==='Anesthésiste'?`<form id="postop-vitals-form"><div class="formgrid">
+ ${canWrite?`<form id="postop-vitals-form"><div class="formgrid">
  <label>Lieu de surveillance<select name="location">${optionHTML(['SSPI','Hospitalisation'],'SSPI')}</select></label>
  ${periField('at','Date et heure du relevé','datetime-local',periNow(),'required')}
  ${sharedWorkspace?'':periField('author','Soignant · nom ou initiales fictifs','text','','required maxlength="80"')}
@@ -615,19 +637,24 @@ function postopVitals(stay){
  <p class="muted">${esc(record.author)} · ${esc(record.role)} · Saisi le ${esc(periTime(record.created))}</p></article>`).join('')||'<p class="muted">Aucun relevé postopératoire enregistré.</p>'}</section>`;
 }
 function bindPostopVitals(stay){
+ const ui=postopUi();
+ ui?.bind(document.querySelector('.nurse-vitals.sp'),()=>stay.postopVitals||[]);
  const form=$('#postop-vitals-form');
  if(!form)return;
  form.onsubmit=e=>{
   e.preventDefault();
   if((!nurseProfile()&&role!=='Anesthésiste')||p()!==stay)return;
   const values=Object.fromEntries(new FormData(form));
-  if(values.pain!==''&&(!Number.isInteger(Number(values.pain))||Number(values.pain)<0||Number(values.pain)>10)){
+  if(typeof values.note==='string')values.note=values.note.trim();
+  const uiError=ui?ui.verifier(values):'';
+  if(uiError){form.querySelector('[role="alert"]').textContent=uiError;return}
+  if(!ui&&values.pain!==''&&(!Number.isInteger(Number(values.pain))||Number(values.pain)<0||Number(values.pain)>10)){
    form.querySelector('[role="alert"]').textContent='La douleur doit être comprise entre 0 et 10.';
    return;
   }
   if(sharedWorkspace)values.author=role;
-  const hasMeasurement=postopVitalKeys.some(key=>values[key]!==''&&values[key]!==undefined)||values.pain!=='';
-  const error=hasMeasurement?periValidate('Surveillance',{...values,clinical:values.pain!==''?'Douleur':''}):'Renseignez au moins une mesure.';
+  const hasMeasurement=ui?ui.renseigne(values):postopVitalKeys.some(key=>values[key]!==''&&values[key]!==undefined)||values.pain!=='';
+  const error=hasMeasurement?periValidate('Surveillance',{...values,clinical:'Surveillance'}):'Renseignez au moins une mesure ou une cotation.';
   if(error){form.querySelector('[role="alert"]').textContent=error;return}
   if(sharedWorkspace){
    const fingerprint=JSON.stringify(values);
@@ -828,39 +855,8 @@ function dischargeRx(){
  const print=$('#print-discharge-rx');
  if(print)print.onclick=()=>{if(physician()&&p()===stay&&!preview.hidden)printDischargeDocument(dischargeRxDoc(stay.id,saved))};
 }
-const liaisonSections=[
- ['Identité et destinataires',[
-  ['birthname','Nom de naissance','text',true],['firstname','Prénom(s)','text',true],
-  ['dob','Date de naissance','date',true],['sex','Sexe','text',true],
-  ['gpStatus','Médecin traitant déclaré','select',true,['Déclaré','Aucun déclaré','Information inconnue']],
-  ['gpName','Nom du médecin traitant'],['gpContact','Adresse postale ou électronique du médecin traitant'],
-  ['referrer','Praticien adresseur et coordonnées, si applicable']
- ]],
- ['Séjour et signataire',[
-  ['admission','Date d’entrée','date',true],['admissionMode','Modalité d’entrée','text',true],
-  ['departure','Date de sortie','date',true],['departureMode','Modalité / destination de sortie','text',true],
-  ['doctor','Médecin signataire','text',true],['unit','Service','text',true],
-  ['facility','Établissement','text',true],['contact','Coordonnées professionnelles','text',true],['rpps','RPPS']
- ]],
- ['Synthèse médicale',[
-  ['reason','Motif d’hospitalisation','textarea',true],
-  ['summary','Synthèse de la prise en charge et de l’évolution','textarea',true],
-  ['condition','Situation clinique à la sortie','textarea',true],
-  ['procedures','Actes techniques et examens réalisés · résultats utiles','textarea',true],
-  ['incidents','Événements indésirables, si applicable','textarea'],
-  ['infection','Micro-organismes multirésistants ou émergents, si applicable','textarea'],
-  ['blood','Produits sanguins ou dérivés administrés, si applicable','textarea'],
-  ['implant','Dispositif médical implanté, si applicable','textarea'],
-  ['pending','Résultats en attente · suivi et responsable','textarea',true]
- ]],
- ['Traitements et suite des soins',[
-  ['medications','Traitements de sortie · médicament, dose, rythme, voie et durée','textarea',true],
-  ['changes','Traitements habituels poursuivis, modifiés ou arrêtés · préciser le motif','textarea',true],
-  ['followup','Soins, rendez-vous et examens à programmer','textarea',true],
-  ['surveillance','Recommandations, surveillances et conduite en cas de complication','textarea',true],
-  ['urgentPhone','Téléphone à contacter en cas d’urgence','tel']
- ]]
-];
+// Rubriques, destinataires et envoi automatique : lettre-liaison-regles.js (partagé avec le serveur).
+const LL=window.IaseloLettreLiaison,liaisonSections=LL.SECTIONS;
 const liaisonFields=liaisonSections.flatMap(([,fields])=>fields);
 function liaisonPrefill(stay,consult,announcement){
  const identity=stay.questionnaire?.answers||{},rx=stay.discharge.ordinance,head=rx?.header||{};
@@ -876,7 +872,8 @@ function liaisonPrefill(stay,consult,announcement){
   blood:(stay.perop?.records||[]).filter(r=>!r.voided&&r.kind==='Bilan hydrique'&&r.values.fluid==='Produit sanguin administré')
    .map(r=>periDescription(r)).join('\n'),
   medications:(rx?.items||[]).map(item=>[item.drug,item.dose,item.frequency,item.route,item.duration,item.notes].filter(Boolean).join(' · ')).join('\n'),
-  followup:stay.discharge.instructions||''
+  followup:stay.discharge.instructions||'',
+  patientEnvoi:LL.PATIENT_ENVOI[0]
  };
 }
 function liaisonMissing(values,mode,today){
@@ -885,6 +882,7 @@ function liaisonMissing(values,mode,today){
  if(mode==='Ambulatoire'&&!values.urgentPhone)errors.push('Téléphone à contacter en cas d’urgence');
  if(values.departure&&values.admission>values.departure)errors.push('Vérifier l’ordre des dates d’entrée et de sortie');
  if(values.departure>today)errors.push('Confirmer la date de sortie effective');
+ errors.push(...LL.controlerDiffusion(values));
  return errors;
 }
 function liaisonDocument(stay,letter){
@@ -894,15 +892,15 @@ function liaisonDocument(stay,letter){
   <div class="discharge-rx-heading"><div><strong>${esc(values.facility)}</strong><p>${esc(values.unit)}</p></div>
   <p>Rédigée le ${esc(dischargeRxDate(letter.date))}</p></div>
   <h2>Lettre de liaison à la sortie</h2><p>${esc(stay.id)} · ${esc(stay.mode)}</p>
-  ${liaisonSections.map(([title,fields])=>`<section><h3>${esc(title)}</h3>${fields.filter(([key])=>values[key]).map(([key,label,type])=>
+  ${liaisonSections.map(([title,fields])=>`<section><h3>${esc(title)}</h3>${fields.filter(([key])=>values[key]&&!LL.DIFFUSION.has(key)).map(([key,label,type])=>
    `<div><strong>${esc(label)}</strong><p class="preserve">${esc(type==='date'?dischargeRxDate(values[key]):values[key])}</p></div>`).join('')}</section>`).join('')}
   <div class="discharge-rx-signature"><strong>Signature du médecin</strong><p>${esc(values.doctor)}</p></div>
  </article>`;
 }
 function liaisonDelivery(letter,write=physician()){
  const trace=letter.delivery||{};
- return `<section class="liaison-delivery"><h4>Remise au patient et transmission</h4>
-  <p class="muted">Tracez les actions réalisées pour cette version. Ce formulaire n’envoie aucun document.</p>
+ return `<section class="liaison-delivery"><h4>Remise en main propre et autres transmissions</h4>
+  <p class="muted">Les envois électroniques sont tracés automatiquement ci-dessus. Tracez ici la remise de la lettre imprimée et toute transmission par un autre canal. Ce formulaire n’envoie aucun document.</p>
   ${trace.patientStatus||trace.gpDelivery?`<p class="preserve">${esc([
    trace.patientStatus&&['Patient',trace.patientStatus,trace.patientDate&&dischargeRxDate(trace.patientDate),trace.patientReason].filter(Boolean).join(' · '),
    trace.gpDelivery&&['Destinataires',trace.gpDelivery,trace.sentDate&&dischargeRxDate(trace.sentDate),trace.gpDetail].filter(Boolean).join(' · ')
@@ -939,20 +937,25 @@ function dischargeLiaison(){
    <p class="muted">En ambulatoire, le numéro à appeler en cas d’urgence est également attendu.</p>
    <details><summary>Consulter les éléments actuellement disponibles dans le dossier</summary><dl class="answers">${liaisonFields.filter(([key])=>prefill[key]).map(([key,label])=>`<div class="answer"><dt>${esc(label)}</dt><dd class="preserve">${esc(prefill[key])}</dd></div>`).join('')}</dl>
    <button type="button" class="secondary" id="liaison-fill">Compléter les champs encore vides</button></details>
+   <div id="liaison-apercu"></div>
    <p id="liaison-error" class="warn liaison-error" role="alert"></p>
    <div class="actions"><button class="secondary" name="liaisonAction" value="draft">Enregistrer le brouillon</button>
-   <button class="primary" name="liaisonAction" value="review">Valider la relecture et préparer l’impression</button></div>
+   <button class="primary" name="liaisonAction" value="review">Valider la relecture et envoyer</button></div>
   </form>`:''}
   <section id="liaison-preview">
    ${current&&current.date!==current.values.departure?'<p class="notice warn">La lettre a été rédigée après la date de sortie renseignée.</p>':''}
    ${write&&current&&!stale&&!letter.draft?'<button class="primary no-print" type="button" id="liaison-print">Imprimer la lettre de liaison</button>':''}
+   ${current?'<div id="liaison-diffusion" class="no-print"></div>':''}
    ${preview}
    ${current?liaisonDelivery(current):''}
    ${letter?.previous?.length?`<details><summary>Versions précédentes (${letter.previous.length})</summary>${letter.previous.map(document=>liaisonDocument(stay,document)+liaisonDelivery(document,false)).join('')}</details>`:''}
   </section>
   <p class="muted no-print"><a href="https://www.has-sante.fr/jcms/p_3587797/fr/iqss-2025-secteur-mco-fiche-descriptive-de-l-indicateur-qualite-de-la-lettre-de-liaison-a-la-sortie-janvier-2025" target="_blank" rel="noopener noreferrer">Critères HAS MCO</a> · <a href="https://www.has-sante.fr/jcms/p_3893099/fr/iqss-2026-ca-consignes-de-remplissage-dossier-du-patient-en-chirurgie-ambulatoire-en-mco-mars-2026" target="_blank" rel="noopener noreferrer">Critères HAS ambulatoire 2026</a></p>`;
+ const ecran=window.IaseloLettreLiaisonEcran;
+ if(current)ecran?.suivi($('#liaison-diffusion'),stay,{canRelaunch:write,toast});
  if(!write)return;
  const form=$('#liaison-form'),print=$('#liaison-print');
+ ecran?.apercu($('#liaison-apercu'),stay,form);
  const editing=()=>{if(print)print.hidden=true};
  form.oninput=editing;
  $('#liaison-fill').onclick=()=>{
@@ -987,7 +990,7 @@ function dischargeLiaison(){
   state.document={values:data,source,date:today,delivery:revised?undefined:current?.delivery};
   if(stay.identityDocumentReview)stay.identityDocumentReview.liaison=false;
   delete state.draft;
-  event('Lettre de liaison de sortie relue et enregistrée','Sortie');
+  event('Lettre de liaison de sortie relue et enregistrée · envoi automatique','Sortie');
   detail();
   $('#liaison-print')?.focus();
  };
@@ -1130,7 +1133,9 @@ function savePatientDraft(form){
  }
  patientDrafts[patientTarget]=draft;
 }
-function rawSummary(d){return Object.entries(patientLabels).filter(([k])=>d[k]&&(!Array.isArray(d[k])||d[k].length)).map(([k,label])=>`<div class="answer"><dt>${label}</dt><dd>${esc(Array.isArray(d[k])?d[k].join(', '):d[k])}</dd></div>`).join('')}
+// Dates du questionnaire affichées au format français (jj/mm/aaaa), jamais en ISO brut.
+function frDate(v){const s=String(v??'');if(/^\d{4}-\d{2}-\d{2}$/.test(s)){const [y,m,d]=s.split('-');return d+'/'+m+'/'+y}if(/^\d{4}-\d{2}-\d{2}T/.test(s)){const t=new Date(s);if(!isNaN(t))return t.toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(' ',' à ')}return s}
+function rawSummary(d){return Object.entries(patientLabels).filter(([k])=>d[k]&&(!Array.isArray(d[k])||d[k].length)).map(([k,label])=>`<div class="answer"><dt>${label}</dt><dd>${esc(Array.isArray(d[k])?d[k].join(', '):frDate(d[k]))}</dd></div>`).join('')}
 
 function renderPortal(){
  $('#new').hidden=true;
@@ -1231,10 +1236,39 @@ function showPatientReceipt(transmitted){
  $('#patient-receipt').focus();
  if(!transmitted)$('#restartpatient').onclick=()=>openPatientPage(0);
 }
+// Relecture du questionnaire patient : réponses brutes + reprise proposée champ par champ dans la consultation.
+// Le médecin coche ce qu'il reprend ; rien n'écrase une saisie médicale (ajout en fin de texte, listes déjà remplies conservées).
+let questionnaireChoices=null;
 function questionnaireReview(){const x=p(),q=x.questionnaire;if(!q){$('#content').innerHTML='<h3>Questionnaire patient</h3><p>Aucun questionnaire reçu pour ce séjour.</p><button class="primary" id="tryquestionnaire">Tester le formulaire patient</button>';if(nurseProfile())$('#tryquestionnaire').hidden=true;$('#tryquestionnaire').onclick=()=>{if(nurseProfile())return;patientTarget=x.id;patientStep=0;view='portal';render()};return}
- const d=q.answers,attention=[];if(d.allergy==='Oui')attention.push('Allergie déclarée : vérifier le produit et la réaction');if(d.anesthesia==='Oui')attention.push('Problème anesthésique personnel ou familial à préciser');if(d.bleeding?.length)attention.push('Antécédents de saignement à explorer');if(d.devices?.some(v=>v.includes('Pacemaker')))attention.push('Pacemaker ou défibrillateur à documenter');if(d.diseases?.includes('Apnée du sommeil'))attention.push('Apnée du sommeil déclarée');if(d.treatments)attention.push('Traitements à rapprocher de l’ordonnance');
- $('#content').innerHTML=`<h3>Réponses du patient · ${q.reviewed?'Reprises dans le brouillon':'À vérifier'}</h3><p class="muted">Reçues le ${esc(q.received)} · déclarations du patient fictif, à confirmer en consultation.</p>${attention.length?`<div class="notice warn"><strong>Points à vérifier</strong><ul>${attention.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`:''}<dl class="answers">${rawSummary(d)}</dl><div class="notice">Les réponses restent distinctes de l’évaluation médicale. Aucun score ni traitement n’est déduit automatiquement.</div><button class="primary" id="importanswers" ${role!=='Anesthésiste'||q.reviewed?'disabled':''}>${q.reviewed?'Réponses reprises':'Confirmer la revue et reprendre dans le brouillon'}</button><p class="muted">Action réservée au profil anesthésiste simulé. Une consultation déjà validée doit être rouverte.</p>`;
- $('#importanswers').onclick=()=>{if(role!=='Anesthésiste'||q.reviewed)return;if(x.consult.validated){toast('Ouvrez une révision de la consultation avant de reprendre les réponses.');return}const c=x.consult,append=(old,s)=>[old,s].filter(Boolean).join('\n');c.history=append(c.history,['Questionnaire patient revu :',d.diseases?.join(', '),d.operations&&'Opérations : '+d.operations,d.hospitalDetails&&'Hospitalisations : '+d.hospitalDetails,d.other,d.anesthesiaDetails&&'Anesthésie : '+d.anesthesiaDetails,d.bleeding?.length&&'Saignements : '+d.bleeding.join('; ')].filter(Boolean).join('\n'));if(d.allergy)c.allergies=append(c.allergies,'Déclaration revue : '+d.allergy+(d.allergyDetails?' — '+d.allergyDetails:''));if(d.treatments)c.treatments=append(c.treatments,d.treatments);c.ext??={};for(const k of ['weight','height'])if(!c.ext[k]&&Number(d[k])>0)c.ext[k]=d[k];q.reviewed=true;q.reviewedAt=new Date().toLocaleString('fr-FR');x.task='Consultation à compléter';event('Questionnaire revu et repris dans le brouillon (simulation)','Questionnaire');detail();toast('Réponses reprises ; consultation médicale à compléter et valider')};
+ const d=q.answers,R=window.IaseloReprise,sections=Object.fromEntries(consultSections.flatMap(s=>s.fields.map(f=>[f[0],s.title])));sections.medicationRows='Traitements';sections.history=sections.history||'Antécédents';
+ const labelOf=k=>k==='medicationRows'?'Traitements structurés (une ligne par médicament)':cfLabel(k);
+ const alerts=R?R.alertes(d,window.IaseloRegles?.REGLES):[];
+ const lines=R&&!q.reviewed&&!consultModele?R.propositions(x,{sections}):[];
+ if(questionnaireChoices?.stay!==x.id)questionnaireChoices={stay:x.id,off:new Set(lines.filter(l=>!l.checked).map(l=>l.id)),on:new Set()};
+ const isOn=l=>l.mode!=='same'&&(questionnaireChoices.on.has(l.id)||(!questionnaireChoices.off.has(l.id)&&l.checked));
+ const canImport=role==='Anesthésiste'&&!q.reviewed&&!x.consult.validated;
+ const modeText={fill:'Champ vide : sera rempli',append:'Sera ajouté après le texte existant',same:'Déjà présent dans le dossier',keep:'Déjà renseigné : votre saisie est conservée',add:'Lignes ajoutées, conduite « À déterminer »'};
+ const show=l=>l.kind==='meds'?`<ul class="qr-meds">${l.value.map(m=>`<li><strong>${esc(m.name)}</strong> ${esc([m.dose,m.frequency].filter(Boolean).join(' · '))}${m.classe?` <span class="pill warn">${esc(m.classe)}</span>`:''}</li>`).join('')}</ul>`:`<div class="qr-value">${esc(l.kind==='date'?frDate(l.value):l.value).replace(/\n/g,'<br>')}</div>${l.note?`<small class="muted">${esc(l.note)}</small>`:''}`;
+ const order=[...consultSections.map(s=>s.title),'Autres'],groups=[...new Set(lines.map(l=>l.section||'Autres'))].sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+ const review=consultModele?consultModele.bandeau(x)+'<div class="actions"><button class="primary" id="cpa-ouvrir">Ouvrir la consultation</button></div>':q.reviewed?`<div class="notice"><strong>Reprise effectuée</strong> le ${esc(frDate(q.reviewedAt))}${q.reviewedBy?' par '+esc(q.reviewedBy):''}${q.importedFields?.length?` · ${q.importedFields.length} rubrique${q.importedFields.length>1?'s':''} préremplie${q.importedFields.length>1?'s':''} : ${esc(q.importedFields.map(labelOf).join(', '))}`:''}. Les éléments restent à confirmer en consultation.</div>`
+  :lines.length?`<section class="qr-import" aria-labelledby="qr-title"><div class="row"><div><h3 id="qr-title">Préremplir la consultation</h3><p class="muted">${lines.filter(isOn).length} élément${lines.filter(isOn).length>1?'s':''} sur ${lines.length} coché${lines.filter(isOn).length>1?'s':''}. Décochez ce que vous ne voulez pas reprendre. Chaque texte repris est marqué « Déclaré par le patient » ; aucune de vos saisies n’est effacée.</p></div><div class="actions"><button type="button" class="secondary" id="qr-all">Tout cocher</button><button type="button" class="secondary" id="qr-none">Tout décocher</button></div></div>
+  ${groups.map(g=>`<fieldset class="qr-group"><legend>${esc(g)}</legend>${lines.filter(l=>(l.section||'Autres')===g).map(l=>`<label class="qr-line ${l.mode==='same'?'is-same':''}"><input type="checkbox" data-qr="${esc(l.id)}" ${isOn(l)?'checked':''} ${l.mode==='same'||!canImport?'disabled':''}><span class="qr-field"><strong>${esc(labelOf(l.field))}</strong><small class="qr-mode qr-${l.mode}">${esc(modeText[l.mode])}</small>${l.current&&l.mode==='keep'?`<small class="muted">Dans le dossier : ${esc(l.current)}</small>`:''}</span><span class="qr-proposed">${show(l)}</span></label>`).join('')}</fieldset>`).join('')}
+  <div class="actions qr-actions"><button class="primary" id="importanswers" ${canImport?'':'disabled'}>Valider la relecture et préremplir la consultation</button></div>
+  <p class="muted">${role!=='Anesthésiste'?'Action réservée aux anesthésistes.':x.consult.validated?'La consultation est déjà validée : ouvrez une révision avant de reprendre les réponses.':'Les scores sont pré-calculés à partir des déclarations : complétez les critères manquants à l’examen.'}</p></section>`
+  :`<div class="actions"><button class="primary" id="importanswers" ${canImport?'':'disabled'}>Confirmer la relecture</button></div>`;
+ $('#content').innerHTML=`<div class="qr-head"><div><p class="eyebrow">QUESTIONNAIRE PATIENT</p><h3>Réponses du patient · ${q.reviewed?'Relues et reprises':'À relire'}</h3><p class="muted">Reçues le ${esc(frDate(q.received))}${q.source?' · '+esc(q.source):''} · déclarations du patient, à confirmer en consultation.</p></div></div>
+ ${alerts.length?`<div class="notice warn qr-alerts"><strong>Points à vérifier</strong><ul>${alerts.map(a=>`<li class="qr-${a.level}">${a.level==='crit'?'<strong>Prioritaire</strong> · ':''}${esc(a.text)}</li>`).join('')}</ul></div>`:''}
+ ${review}
+ <details class="qr-raw" ${lines.length&&!q.reviewed?'':'open'}><summary>Toutes les réponses du patient</summary><dl class="answers">${rawSummary(d)}</dl></details>`;
+ document.querySelectorAll('[data-qr]').forEach(b=>b.onchange=()=>{const id=b.dataset.qr;if(b.checked){questionnaireChoices.off.delete(id);questionnaireChoices.on.add(id)}else{questionnaireChoices.on.delete(id);questionnaireChoices.off.add(id)}const n=lines.filter(isOn).length;$('#qr-title').nextElementSibling.textContent=`${n} élément${n>1?'s':''} sur ${lines.length} coché${n>1?'s':''}. Décochez ce que vous ne voulez pas reprendre. Chaque texte repris est marqué « Déclaré par le patient » ; aucune de vos saisies n’est effacée.`});
+ const setAll=v=>{for(const l of lines){questionnaireChoices.off[v?'delete':'add'](l.id);questionnaireChoices.on[v?'add':'delete'](l.id)}questionnaireReview()};
+ if($('#qr-all'))$('#qr-all').onclick=()=>setAll(true);if($('#qr-none'))$('#qr-none').onclick=()=>setAll(false);
+ if(consultModele){if($('#cpa-voirq'))$('#cpa-voirq').hidden=true;$('#cpa-ouvrir').onclick=()=>{tab='consult';detail()};if($('#cpa-inserer'))$('#cpa-inserer').onclick=()=>{if(role!=='Anesthésiste'||x.consult.validated)return;consultModele.preparer(x);if(q.cpaInsertion?.annuleeAt)delete q.cpaInsertion;if(!q.cpaInsertion)consultModele.inserer(x);tab='consult';detail()};if($('#cpa-annuler'))$('#cpa-annuler').onclick=()=>{if(role!=='Anesthésiste')return;consultModele.annuler(x);questionnaireReview()}}
+ if($('#importanswers'))$('#importanswers').onclick=()=>{if(role!=='Anesthésiste'||q.reviewed)return;if(x.consult.validated){toast('Ouvrez une révision de la consultation avant de reprendre les réponses.');return}
+  const chosen=lines.map(l=>({...l,checked:isOn(l)})),done=R?R.appliquer(x,chosen,{recu:frDate(String(q.received).slice(0,10)),uuid:()=>crypto.randomUUID()}):[];
+  q.reviewed=true;q.reviewedAt=new Date().toISOString();q.reviewedBy=professionalWorkspace?.getAccess?.()?.profile?.display_name||role;q.importedFields=done;
+  x.task='Consultation à compléter';event(done.length?'Questionnaire patient relu ; consultation préremplie ('+done.map(labelOf).join(', ')+')':'Questionnaire patient relu, rien repris','Questionnaire');questionnaireChoices=null;
+  tab='consult';detail();toast(done.length?done.length+' rubrique'+(done.length>1?'s':'')+' préremplie'+(done.length>1?'s':'')+' : complétez et validez la consultation':'Relecture enregistrée')};
 }
 const baseRender=render;render=function(){ $('#new').hidden=view==='portal'||nurseProfile();$('#stats').hidden=['portal','service','search'].includes(view);baseRender()};
 
@@ -1320,17 +1354,17 @@ consultSections.push({
  fields:[['pedVaccination','Vaccination à jour','select',yesNo],['pedPassiveSmoking','Tabagisme passif','select',yesNo],['pedPrematurity','Prématurité','select',yesNo],['pedWalking','Marche acquise','select',yesNo],['pedRespiratory','Pathologie respiratoire récente','select',yesNo],['pedOrl','Consignes en cas d’infection ORL données','select',yesNo],['pedCoagulation','Doute sur un trouble de la coagulation','select',yesNo],['pedAuthorization','Autorisation parentale','select',['À vérifier','Vérifiée','Non obtenue','Non applicable']],['pedDetails','Précisions et consignes pédiatriques','textarea']]
 });
 const allConsultFields=consultSections.flatMap(s=>s.fields);
-function cfLabel(k){if(k==='questionnaire')return 'Questionnaire patient : revue à confirmer';if(k==='medicationRows')return 'Traitements structurés : vérification et conduite à compléter';return allConsultFields.find(f=>f[0]===k)?.[1]||k}
+function cfLabel(k){if(String(k).startsWith('cpa:'))return consultModele?consultModele.libelle(k.slice(4)):k.slice(4);if(k==='questionnaire')return 'Questionnaire patient : revue à confirmer';if(k==='medicationRows')return 'Traitements structurés : vérification et conduite à compléter';return allConsultFields.find(f=>f[0]===k)?.[1]||k}
 function consultData(){const c=p().consult;c.ext??={};return {...c.ext,asa:c.asa==='Non renseigné'?'':c.asa,history:c.history,allergies:c.allergies==='À vérifier'?'':c.allergies,treatments:c.treatments,plan:c.plan}}
-function consultGaps(){const d=consultData();const missing=requiredConsultFields.filter(k=>!d[k]||(['identityReviewed','treatmentReviewed','infoGiven'].includes(k)&&d[k]!=='Oui')||(k==='airwayConclusion'&&d[k]==='Évaluation incomplète')||(k==='patientAgreement'&&d[k]==='À recueillir')||(k==='technique'&&d[k]==='À déterminer')||(k==='allergyReviewed'&&d[k]==='Statut inconnu')||(['atbStatus','pbmStatus','vteStatus'].includes(k)&&d[k]==='Non évalué')||(k==='postopDestination'&&d[k]==='À déterminer'));for(const [state,plan]of [['atbStatus','atbPlan'],['pbmStatus','pbmPlan'],['vteStatus','vtePlan']])if(d[state]==='Action prévue'&&!d[plan])missing.push(plan);if(d.airwayConclusion==='Difficulté anticipée — stratégie spécifique documentée'&&!d.airwayStrategy)missing.push('airwayStrategy');if(p().questionnaire&&!p().questionnaire.reviewed)missing.push('questionnaire');if((p().consult.medicationRows||[]).some(m=>!m.removed&&(m.decision==='À déterminer'||m.verification==='À clarifier')))missing.push('medicationRows');return missing}
+function consultGaps(){if(consultModele){const x=p(),missing=consultModele.manquants(x).map(k=>'cpa:'+k);if((x.consult.medicationRows||[]).some(m=>!m.removed&&m.verification==='À clarifier'))missing.push('medicationRows');return missing}const d=consultData();const missing=requiredConsultFields.filter(k=>!d[k]||(['identityReviewed','treatmentReviewed','infoGiven'].includes(k)&&d[k]!=='Oui')||(k==='airwayConclusion'&&d[k]==='Évaluation incomplète')||(k==='patientAgreement'&&d[k]==='À recueillir')||(k==='technique'&&d[k]==='À déterminer')||(k==='allergyReviewed'&&d[k]==='Statut inconnu')||(['atbStatus','pbmStatus','vteStatus'].includes(k)&&d[k]==='Non évalué')||(k==='postopDestination'&&d[k]==='À déterminer'));for(const [state,plan]of [['atbStatus','atbPlan'],['pbmStatus','pbmPlan'],['vteStatus','vtePlan']])if(d[state]==='Action prévue'&&!d[plan])missing.push(plan);if(d.airwayConclusion==='Difficulté anticipée — stratégie spécifique documentée'&&!d.airwayStrategy)missing.push('airwayStrategy');if(p().questionnaire&&!p().questionnaire.reviewed)missing.push('questionnaire');if((p().consult.medicationRows||[]).some(m=>!m.removed&&(m.decision==='À déterminer'||m.verification==='À clarifier')))missing.push('medicationRows');return missing}
 function consultField(f,d,read){const[k,label,type='text',options]=f,v=d[k]??'',shared=`name="${k}" ${read?'disabled':''}`;let input='';if(type==='select')input=`<select ${shared}><option value="">Non renseigné</option>${options.map(o=>`<option value="${esc(o)}" ${v===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`;else if(type==='textarea')input=`<textarea ${shared}>${esc(v)}</textarea>`;else input=`<input ${shared} type="${type}" value="${esc(v)}" ${type==='number'?'min="0" step="any"':''}>`;return `<label class="${type==='textarea'?'wide':''}">${esc(label)}${requiredConsultFields.includes(k)?' <span class="required" title="À renseigner avant validation">•</span>':''}${input}</label>`}
-function captureConsult(){if(p().consult.validated||role!=='Anesthésiste')return;const form=$('#completeconsult');if(!form)return;const c=p().consult;for(const [k,v]of new FormData(form)){if(['asa','history','allergies','treatments','plan'].includes(k))c[k]=v;else c.ext[k]=v}c.lastDraftAt=new Date().toLocaleString('fr-FR');if(sharedWorkspace)p().sharedDirty=JSON.stringify(p().sharedSavedConsult,(key,value)=>key==='lastDraftAt'?undefined:value)!==JSON.stringify(c,(key,value)=>key==='lastDraftAt'?undefined:value);integratedNotifyChange()}
+function captureConsult(){if(p().consult.validated||role!=='Anesthésiste')return;if(consultModele?.actif(p())){if(consultModele.capture(p())&&sharedWorkspace)p().sharedDirty=true;return}const form=$('#completeconsult');if(!form)return;const c=p().consult;for(const [k,v]of new FormData(form)){if(['asa','history','allergies','treatments','plan'].includes(k))c[k]=v;else c.ext[k]=v}c.lastDraftAt=new Date().toLocaleString('fr-FR');if(sharedWorkspace)p().sharedDirty=JSON.stringify(p().sharedSavedConsult,(key,value)=>key==='lastDraftAt'?undefined:value)!==JSON.stringify(c,(key,value)=>key==='lastDraftAt'?undefined:value);integratedNotifyChange()}
 function bmiText(){const d=consultData(),w=Number(d.weight),h=Number(d.height);return w>0&&h>0?`IMC calculé : ${(w/(h/100)**2).toFixed(1)} kg/m²`:'IMC : renseigner poids et taille'}
 function summaryHTML(){const d=consultData(),c=p().consult;return `<div class="consult-summary"><h3>Consultation · ${esc(p().id)}</h3><p class="muted">${c.validated?'Validation de scénario : '+esc(c.validation?.at||''):'Brouillon de consultation'} · ${esc(d.author||'Consultant non renseigné')} · ${esc(d.consultDate||'Date non renseignée')}</p><div class="notice">Patients fictifs uniquement. Cette synthèse de démonstration ne vaut pas document médical signé.</div>${consultSections.map(s=>`<section><h3>${s.title}</h3><dl class="answers">${s.fields.filter(f=>d[f[0]]).map(f=>`<div class="answer"><dt>${esc(f[1])}</dt><dd>${esc(d[f[0]])}</dd></div>`).join('')||'<p class="muted">Non renseigné</p>'}</dl></section>`).join('')}${medicationSummary()}<h3>Éléments à compléter avant validation</h3><p>${consultGaps().map(cfLabel).map(esc).join(' · ')||'Éléments de validation renseignés — la responsabilité de l’évaluation reste médicale.'}</p></div>`}
 function vidalTreatmentPanel(){return `<section class="vidal-panel" aria-label="Recherche VIDAL"><div class="row"><div><h3>Rechercher un médicament dans VIDAL</h3><p class="muted">Consulter une spécialité, sa composition et sa monographie, puis renseigner le traitement vérifié ci-dessous.</p></div><span class="pill">Module officiel de recherche</span></div><div class="actions"><button class="secondary" type="button" id="loadvidal">Afficher la recherche VIDAL</button><a href="https://www.vidal.fr/medicaments.html" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Ouvrir VIDAL dans un nouvel onglet</a></div><div id="vidalwidget"></div><p class="muted">La sélection automatique dans le dossier et les contrôles d’interactions ne sont pas connectés. Aucun élément du dossier n’est envoyé automatiquement à VIDAL.</p></section>`}
-function consult(){
+function consultAncienneTrame(){
  const c=p().consult,d=consultData(),read=role!=='Anesthésiste'||c.validated,gaps=consultGaps(),section=consultSections.find(s=>s.id===consultSection)||consultSections[0];
- $('#content').innerHTML=`<div class="consult-heading"><div><span class="eyebrow">CONSULTATION D’ANESTHÉSIE</span><button type="button" class="textbutton" id="openscience">Ouvrir l’aide scientifique V0.22</button><h3>${c.validated?'Consultation validée dans le scénario':'Dossier de consultation'}</h3></div><span class="pill ${c.validated?'good':'warn'}">${c.validated?'Validée':gaps.length+' éléments de validation à compléter'}</span></div>${p().questionnaire?`<div class="notice">Questionnaire patient reçu · ${p().questionnaire.reviewed?'Revu et repris dans le brouillon':'En attente de revue'}. <button class="secondary" id="reviewpatient">Ouvrir les réponses patient</button></div>`:''}<div class="consult-layout"><nav class="consult-nav" aria-label="Rubriques de consultation">${consultSections.map(s=>{const n=s.fields.filter(f=>d[f[0]]).length;return `<button data-consult-section="${s.id}" class="${consultSection===s.id?'active':''}" ${consultSection===s.id?'aria-current="step"':''}><span>${s.title}</span><small>${n} / ${s.fields.length}</small></button>`}).join('')}<button data-consult-section="summary" class="${consultSection==='summary'?'active':''}">Synthèse complète</button></nav><div class="consult-body">${consultSection==='summary'?summaryHTML():`<h3>${section.title}</h3><p class="muted">${section.description}</p>${section.id==='medications'?vidalTreatmentPanel()+'<div id="structuredmeds"></div>':''}<form id="completeconsult"><div class="formgrid">${section.fields.map(f=>consultField(f,d,read)).join('')}</div></form>${section.id==='context'?`<p id="bmi" class="muted">${bmiText()}</p>`:''}${consultReferencePanel(section.id)}${section.id==='plan'?periEvidencePanel():''}`}</div></div><div class="consult-footer"><p id="draftstatus" class="muted">${read?(c.validated?'Lecture seule. Ouvrir une révision pour modifier.':'Lecture seule pour ce profil.'): 'Les éléments marqués • sont vérifiés à la validation. Enregistrez le brouillon pour conserver les modifications.'}</p><div class="actions"><button class="primary" id="savecomplete" ${read?'disabled':''}>Enregistrer le brouillon</button><button class="secondary" id="validatecomplete" ${read?'disabled':''}>Valider la consultation · simulation</button>${c.validated&&role==='Anesthésiste'?'<button class="secondary" id="reopencomplete">Ouvrir une révision</button>':''}<button class="secondary" id="printconsult">Imprimer la synthèse</button></div><div id="consultissues" role="alert"></div></div>`;
+ $('#content').innerHTML=`<div class="consult-heading"><div><span class="eyebrow">CONSULTATION D’ANESTHÉSIE</span><button type="button" class="textbutton" id="openscience">Ouvrir l’aide scientifique V0.22</button><h3>${c.validated?'Consultation validée dans le scénario':'Dossier de consultation'}</h3></div><span class="pill ${c.validated?'good':'warn'}">${c.validated?'Validée':gaps.length+' éléments de validation à compléter'}</span></div>${p().questionnaire?`<div class="notice">Questionnaire patient reçu · ${p().questionnaire.reviewed?'Relu et repris dans la consultation (éléments marqués « Déclaré par le patient »)':'À relire : vous pourrez préremplir cette consultation en un clic'}. <button class="secondary" id="reviewpatient">${p().questionnaire.reviewed?'Voir les réponses':'Relire et préremplir'}</button></div>`:''}<div class="consult-layout"><nav class="consult-nav" aria-label="Rubriques de consultation">${consultSections.map(s=>{const n=s.fields.filter(f=>d[f[0]]).length;return `<button data-consult-section="${s.id}" class="${consultSection===s.id?'active':''}" ${consultSection===s.id?'aria-current="step"':''}><span>${s.title}</span><small>${n} / ${s.fields.length}</small></button>`}).join('')}<button data-consult-section="summary" class="${consultSection==='summary'?'active':''}">Synthèse complète</button></nav><div class="consult-body">${consultSection==='summary'?summaryHTML():`<h3>${section.title}</h3><p class="muted">${section.description}</p>${section.id==='medications'?vidalTreatmentPanel()+'<div id="structuredmeds"></div>':''}<form id="completeconsult"><div class="formgrid">${section.fields.map(f=>consultField(f,d,read)).join('')}</div></form>${section.id==='context'?`<p id="bmi" class="muted">${bmiText()}</p>`:''}${consultReferencePanel(section.id)}${section.id==='plan'?periEvidencePanel():''}`}</div></div><div class="consult-footer"><p id="draftstatus" class="muted">${read?(c.validated?'Lecture seule. Ouvrir une révision pour modifier.':'Lecture seule pour ce profil.'): 'Les éléments marqués • sont vérifiés à la validation. Enregistrez le brouillon pour conserver les modifications.'}</p><div class="actions"><button class="primary" id="savecomplete" ${read?'disabled':''}>Enregistrer le brouillon</button><button class="secondary" id="validatecomplete" ${read?'disabled':''}>Valider la consultation · simulation</button>${c.validated&&role==='Anesthésiste'?'<button class="secondary" id="reopencomplete">Ouvrir une révision</button>':''}<button class="secondary" id="printconsult">Imprimer la synthèse</button></div><div id="consultissues" role="alert"></div></div>`;
  if(nurseProfile()||sharedWorkspace)$('#openscience').hidden=true;else $('#openscience').onclick=()=>{captureConsult();tab='science';detail()};if(section.id==='medications'&&consultSection!=='summary')structuredTreatments(read);
  document.querySelectorAll('[data-consult-section]').forEach(b=>b.onclick=()=>{captureConsult();consultSection=b.dataset.consultSection;consult()});
  if(section.id==='medications'&&consultSection!=='summary')$('#loadvidal').onclick=()=>{$('#vidalwidget').innerHTML='<iframe title="Recherche officielle VIDAL" width="250" height="300" frameborder="0" scrolling="no" src="https://www.vidal.fr/widgets/search/t:1/" referrerpolicy="no-referrer"></iframe><p class="muted">Si le module ne s’affiche pas, utilisez le lien « Ouvrir VIDAL » ci-dessus.</p>';$('#loadvidal').hidden=true};
@@ -1341,6 +1375,39 @@ function consult(){
  if($('#reopencomplete'))$('#reopencomplete').onclick=()=>{if(role!=='Anesthésiste')return;if(sharedWorkspace){saveSharedConsult($('#reopencomplete'),{...c,versions:[...(c.versions||[]),structuredClone(c.validation)],validated:false});return}c.versions??=[];c.versions.push(structuredClone(c.validation));c.validated=false;event('Révision ouverte ; version précédente conservée dans le dossier de démonstration','Consultation');consult()};
  $('#printconsult').onclick=()=>{captureConsult();consultSection='summary';consult();window.print()};
 }
+
+
+/* Consultation d'anesthésie : modèle « Consultation pré-anesthésique simplifiée » (consultation-modele.js). */
+let consultModele=null;
+function consult(){
+ if(!consultModele)return consultAncienneTrame();
+ const x=p(),c=x.consult,read=role!=='Anesthésiste'||c.validated;
+ if(!read)consultModele.preparer(x);
+ const gaps=consultGaps();
+ $('#content').innerHTML=`<div class="cpa-head"><h3>Consultation d’anesthésie</h3><span class="pill ${c.validated?'good':gaps.length?'warn':'good'}" id="cpa-gaps">${c.validated?'Validée'+(c.validation?.at?' le '+esc(c.validation.at):''):gaps.length?gaps.length+' champ'+(gaps.length>1?'s':'')+' à compléter':'Complète'}</span><span id="draftstatus" class="muted">${read?(c.validated?'Lecture seule : ouvrez une révision pour modifier.':'Lecture seule pour ce profil.'):''}</span><div class="actions"><button type="button" class="textbutton" id="openscience">Aide scientifique</button><button class="primary" id="savecomplete" ${read?'disabled':''}>Enregistrer</button><button class="secondary" id="validatecomplete" ${read?'disabled':''}>Valider la consultation</button>${c.validated&&role==='Anesthésiste'?'<button class="secondary" id="reopencomplete">Ouvrir une révision</button>':''}</div><div id="consultissues" role="alert"></div></div>
+ ${consultModele.bandeau(x)}
+ <div id="cpa-zone" class="cpa-zone"></div>${consultModele.ancienneHTML(c)}`;
+ consultModele.monter($('#cpa-zone'),x,read);
+ if(nurseProfile()||sharedWorkspace)$('#openscience').hidden=true;else $('#openscience').onclick=()=>{captureConsult();tab='science';detail()};
+ const majGaps=()=>{if(c.validated)return;const g=consultGaps(),el=$('#cpa-gaps');if(!el)return;el.textContent=g.length?g.length+' champ'+(g.length>1?'s':'')+' à compléter':'Complète';el.className='pill '+(g.length?'warn':'good')};
+ consultChangeHook=majGaps;
+ if($('#cpa-inserer'))$('#cpa-inserer').onclick=()=>{if(read)return;captureConsult();const q=x.questionnaire;if(q?.cpaInsertion?.annuleeAt)delete q.cpaInsertion;const champs=consultModele.inserer(x);consult();toast(champs.length?champs.length+' champ'+(champs.length>1?'s':'')+' rempli'+(champs.length>1?'s':'')+' depuis le questionnaire':'Aucune réponse à insérer : champs déjà renseignés')};
+ if($('#cpa-annuler'))$('#cpa-annuler').onclick=()=>{if(read)return;consultModele.annuler(x);consult();toast('Insertion du questionnaire annulée')};
+ if($('#cpa-voirq'))$('#cpa-voirq').onclick=()=>{captureConsult();tab='questionnaire';detail()};
+ $('#savecomplete').onclick=()=>{if(read)return;captureConsult();if(sharedWorkspace){saveSharedConsult($('#savecomplete'),c);return}event('Consultation d’anesthésie enregistrée','Consultation');$('#draftstatus').textContent='Enregistré le '+new Date().toLocaleString('fr-FR');toast('Consultation enregistrée')};
+ const cible=k=>k.startsWith('cpa:')?k.slice(4):k==='medicationRows'?'ttt_habituel':k==='questionnaire'?'questionnaire':'';
+ const listeBloquants=(missing,titre)=>{$('#consultissues').innerHTML=`<div class="notice warn cpa-issues" style="margin-top:12px"><strong>${titre} : ${missing.length} élément${missing.length>1?'s':''} à compléter</strong> <span class="muted">· cliquez sur un élément pour y aller</span><ul class="cpa-missing">${missing.map(k=>`<li><button type="button" class="textbutton cpa-go" data-cpa-go="${esc(cible(k))}">${esc(cfLabel(k))}</button></li>`).join('')}</ul><p>Ces contrôles de complétude ne remplacent pas l’évaluation clinique.</p></div>`;
+  document.querySelectorAll('[data-cpa-go]').forEach(b=>b.onclick=()=>{const id=b.dataset.cpaGo;if(id==='questionnaire'){const q=document.querySelector('.cpa-qbanner');if(q){q.scrollIntoView({block:'center'});q.classList.remove('cpa-flash');void q.offsetWidth;q.classList.add('cpa-flash')}return}if(!id||!consultModele.aller(id))toast('Élément à compléter hors du formulaire : '+b.textContent)})};
+ const pill=$('#cpa-gaps');if(pill&&!c.validated){pill.classList.add('cpa-pill-go');pill.setAttribute('role','button');pill.tabIndex=0;pill.title='Voir les éléments à compléter et y aller';const ouvrir=()=>{captureConsult();const g=consultGaps();if(g.length)listeBloquants(g,'Avant validation');else $('#consultissues').innerHTML=''};pill.onclick=ouvrir;pill.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();ouvrir()}}}
+ if(consultBloquantsAuto){consultBloquantsAuto=false;const g=consultGaps();if(g.length)listeBloquants(g,'Avant validation')}
+ $('#validatecomplete').onclick=()=>{if(read)return;captureConsult();const missing=consultGaps();if(missing.length){listeBloquants(missing,'Validation non effectuée');return}
+  const validation={at:new Date().toLocaleString('fr-FR'),author:consultData().author,snapshot:{...structuredClone(consultData()),medicationRows:structuredClone(c.medicationRows||[]),cpa:structuredClone(c.cpa||{})}};
+  const q=x.questionnaire;if(q&&!q.reviewed){q.reviewed=true;q.reviewedAt=new Date().toISOString();q.reviewedBy=professionalWorkspace?.getAccess?.()?.profile?.display_name||role;q.importedFields=(q.cpaInsertion&&!q.cpaInsertion.annuleeAt?q.cpaInsertion.champs:[]).map(k=>'cpa:'+k)}
+  if(sharedWorkspace){saveSharedConsult($('#validatecomplete'),{...c,validation,validated:true});return}
+  c.validation=validation;c.validated=true;x.task='Visite préanesthésique à réaliser';x.done=false;event('Consultation d’anesthésie validée, version '+((c.versions?.length||0)+1),'Consultation');stats();list();consult();toast('Consultation validée')};
+ if($('#reopencomplete'))$('#reopencomplete').onclick=()=>{if(role!=='Anesthésiste')return;if(sharedWorkspace){saveSharedConsult($('#reopencomplete'),{...c,versions:[...(c.versions||[]),structuredClone(c.validation)],validated:false});return}c.versions??=[];c.versions.push(structuredClone(c.validation));c.validated=false;event('Révision ouverte ; version précédente conservée dans le dossier','Consultation');consult()};
+}
+let consultChangeHook=null;let consultBloquantsAuto=false;
 
 'use strict';
 const prepStates=['À faire','En cours','En attente','Réalisée','Non retenue'];
@@ -1358,8 +1425,9 @@ function optionHTML(values,current){return values.map(v=>`<option ${v===current?
 function overview(){
  const x=p(),d=consultData(),actions=prepFor(x),open=actions.filter(isOpen),gaps=consultGaps(),meds=(x.consult.medicationRows||[]).filter(m=>!m.removed);
  const card=(title,value,section)=>`<article class="overview-card"><h3>${title}</h3><p>${esc(value||'Non renseigné')}</p><button class="textbutton" data-jump="${section}">Ouvrir la rubrique</button></article>`;
- $('#content').innerHTML=`<div class="overview-title"><div><p class="eyebrow">SYNTHÈSE DU SÉJOUR</p><h3>Ce que l’équipe doit retrouver</h3></div><button class="primary" data-jump="context">${x.consult.validated?'Lire la consultation':'Compléter la consultation'}</button></div><div class="readiness"><div><span>Consultation</span><strong>${x.consult.validated?'Documentée · simulation':'Brouillon'}</strong></div><div><span>Complétude de consultation</span><strong>${gaps.length} élément(s) à compléter</strong></div><div><span>Préparation</span><strong>${open.length} action(s) ouverte(s)</strong></div></div><p class="muted">La validation du dossier et la réalisation des actions sont distinctes. La décision de prise en charge reste médicale.</p><div class="overview-grid">${card('Intervention', [d.operation,d.operationDetails,d.surgeryDate].filter(Boolean).join(' · '),'context')}${card('Allergies',[d.allergyReviewed,d.allergies].filter(Boolean).join('\n'),'history')}${card('Voies aériennes',[d.airwayConclusion,d.airwayStrategy].filter(Boolean).join('\n'),'exam')}${card('Stratégie anesthésique',[d.technique,d.plan,d.postopDestination].filter(Boolean).join('\n'),'plan')}</div><section class="overview-block"><h3>Points majeurs pour le bloc et la SSPI</h3><p class="preserve">${esc(d.criticalPoints||'Aucun point majeur documenté. Cela ne signifie pas une absence de risque.')}</p><div class="actions"><button class="secondary" data-jump="conclusion">Documenter les points majeurs</button><button class="secondary" id="overviewinstructions">Consignes patient</button></div></section><section class="overview-block"><div class="row"><h3>Préparation à poursuivre</h3><button class="secondary" id="overviewprep">Organiser les actions</button></div>${open.length?open.map(a=>`<div class="compact-action"><span><strong>${esc(a.label)}</strong><small>${esc(a.owner)} · ${a.due?esc(a.due):'Échéance à définir'}</small></span><span class="pill ${isLate(a)?'warn':''}">${isLate(a)?'Échéance dépassée':esc(a.state)}</span></div>`).join(''):'<p class="muted">Aucune action ouverte enregistrée. Vérifier aussi les réserves et décisions de la consultation.</p>'}${d.actions?`<p class="preserve muted">Notes de consultation : ${esc(d.actions)}</p>`:''}</section><section class="overview-block"><h3>Traitements structurés · ${meds.length}</h3>${meds.length?meds.map(m=>`<div class="compact-action"><span><strong>${esc(m.name)}</strong><small>${esc(m.dose)} · ${esc(m.frequency)} · ${esc(m.route||'Voie non précisée')}</small><small>Dernière prise : ${esc(m.lastDose||'Non renseignée')}</small></span><span>${esc(m.decision||'Conduite à documenter')}</span></div>`).join(''):'<p class="muted">Aucune ligne structurée saisie. Les traitements en texte libre restent accessibles dans la consultation.</p>'}<button class="secondary" data-jump="medications">Revoir les traitements</button></section><section class="overview-block"><h3>Questionnaire patient</h3><p>${x.questionnaire?(x.questionnaire.reviewed?'Reçu et revu dans le scénario':'Reçu · en attente de revue'):'Non reçu pour ce séjour'}</p><button class="secondary" id="overviewquestionnaire">Ouvrir les réponses patient</button></section>`;
+ $('#content').innerHTML=`<div class="overview-title"><div><p class="eyebrow">SYNTHÈSE DU SÉJOUR</p><h3>Ce que l’équipe doit retrouver</h3></div><button class="primary" data-jump="context">${x.consult.validated?'Lire la consultation':'Compléter la consultation'}</button></div><div class="readiness"><div><span>Consultation</span><strong>${x.consult.validated?'Documentée · simulation':'Brouillon'}</strong></div><div><span>Complétude de consultation</span><strong>${gaps.length&&consultModele&&!x.consult.validated?`<button type="button" class="textbutton cpa-go" id="cpa-gaps-go" title="Ouvrir la consultation et voir où ça bloque">${gaps.length} élément(s) à compléter</button>`:gaps.length+' élément(s) à compléter'}</strong></div><div><span>Préparation</span><strong>${open.length} action(s) ouverte(s)</strong></div></div><p class="muted">La validation du dossier et la réalisation des actions sont distinctes. La décision de prise en charge reste médicale.</p><div class="overview-grid">${card('Intervention', [d.operation,d.operationDetails,d.surgeryDate].filter(Boolean).join(' · '),'context')}${card('Allergies',[d.allergyReviewed,d.allergies].filter(Boolean).join('\n'),'history')}${card('Voies aériennes',[d.airwayConclusion,d.airwayStrategy].filter(Boolean).join('\n'),'exam')}${card('Stratégie anesthésique',[d.technique,d.plan,d.postopDestination].filter(Boolean).join('\n'),'plan')}</div><section class="overview-block"><h3>Points majeurs pour le bloc et la SSPI</h3><p class="preserve">${esc(d.criticalPoints||'Aucun point majeur documenté. Cela ne signifie pas une absence de risque.')}</p><div class="actions"><button class="secondary" data-jump="conclusion">Documenter les points majeurs</button><button class="secondary" id="overviewinstructions">Consignes patient</button></div></section><section class="overview-block"><div class="row"><h3>Préparation à poursuivre</h3><button class="secondary" id="overviewprep">Organiser les actions</button></div>${open.length?open.map(a=>`<div class="compact-action"><span><strong>${esc(a.label)}</strong><small>${esc(a.owner)} · ${a.due?esc(a.due):'Échéance à définir'}</small></span><span class="pill ${isLate(a)?'warn':''}">${isLate(a)?'Échéance dépassée':esc(a.state)}</span></div>`).join(''):'<p class="muted">Aucune action ouverte enregistrée. Vérifier aussi les réserves et décisions de la consultation.</p>'}${d.actions?`<p class="preserve muted">Notes de consultation : ${esc(d.actions)}</p>`:''}</section><section class="overview-block"><h3>Traitements structurés · ${meds.length}</h3>${meds.length?meds.map(m=>`<div class="compact-action"><span><strong>${esc(m.name)}</strong><small>${esc(m.dose)} · ${esc(m.frequency)} · ${esc(m.route||'Voie non précisée')}</small><small>Dernière prise : ${esc(m.lastDose||'Non renseignée')}</small></span><span>${esc(m.decision||'Conduite à documenter')}</span></div>`).join(''):'<p class="muted">Aucune ligne structurée saisie. Les traitements en texte libre restent accessibles dans la consultation.</p>'}<button class="secondary" data-jump="medications">Revoir les traitements</button></section><section class="overview-block"><h3>Questionnaire patient</h3><p>${x.questionnaire?(x.questionnaire.reviewed?'Reçu et revu dans le scénario':'Reçu · en attente de revue'):'Non reçu pour ce séjour'}</p><button class="secondary" id="overviewquestionnaire">Ouvrir les réponses patient</button></section>`;
  document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{tab='consult';consultSection=b.dataset.jump;detail()});
+ const gg=$('#cpa-gaps-go');if(gg)gg.onclick=()=>{tab='consult';consultBloquantsAuto=true;detail()};
  $('#overviewprep').onclick=()=>{tab='preparation';detail()};$('#overviewinstructions').onclick=()=>{tab='instructions';detail()};$('#overviewquestionnaire').onclick=()=>{tab='questionnaire';detail()};
 }
 function prepRow(x,a){return `<article class="prep-row"><div class="row"><div><strong>${esc(a.label)}</strong><p class="muted">${esc(a.category)} · ${esc(x.id)} · ${esc(doctorName(a.doctorId))} · priorité ${esc(a.priority||'Standard')}</p></div><span class="pill ${isLate(a)?'warn':''}">${isLate(a)?'Échéance dépassée':esc(a.state)}</span></div>${a.note?`<p class="preserve">${esc(a.note)}</p>`:''}<div class="prep-meta"><label>Responsable<input value="${esc(a.owner)}" ${nurseProfile()?'disabled':''} data-prep-owner="${a.id}" data-stay="${x.id}"></label><label>Échéance<input type="date" value="${esc(a.due)}" ${nurseProfile()?'disabled':''} data-prep-due="${a.id}" data-stay="${x.id}"></label><label>Statut<select ${nurseProfile()?'disabled':''} data-prep-state="${a.id}" data-stay="${x.id}">${optionHTML(prepStates,a.state)}</select></label></div><div class="actions">${nurseProfile()?'':`<button class="secondary" data-prep-edit="${a.id}" data-stay="${x.id}">Modifier</button>`}<button class="secondary" data-prep-open="${x.id}">Ouvrir le dossier</button></div></article>`}
@@ -1429,7 +1497,93 @@ const priorRender=render;render=function(){
  updatePriorityBadge();if(view==='priorities'){renderPriorities();return}priorRender()};
 const priorStats=stats;stats=function(){priorStats();updatePriorityBadge()};
 if($('#doctor')){$('#doctor').onchange=e=>{if(tab==='consult')captureConsult();activeDoctor=e.target.value;role=activeDoctor==='med-c'?'Chirurgien':'Anesthésiste';$('#role').value=role;if(role==='Chirurgien')tab='surgeryAnnouncement';view=role==='Chirurgien'?'patients':'priorities';render()};view='priorities'}
+(()=>{const signEl=document.querySelector('.i-sign');const tag=()=>{const a=document.querySelector('.nav.active[data-view]');if(a)document.body.dataset.view=a.dataset.view;else delete document.body.dataset.view;if(a&&a.dataset.view!=='priorities')document.body.classList.remove('j-home');const sign=signEl,hero=document.querySelector('.j-hero'),head=document.querySelector('main > header');if(sign){if(hero&&document.body.classList.contains('j-home')){if(sign.parentElement!==hero)hero.append(sign)}else if(head&&sign.nextElementSibling!==head)head.before(sign)}};const w=document.querySelector('#workspace');if(w)new MutationObserver(tag).observe(w,{childList:true});tag();})();
 setInterval(()=>{updatePriorityBadge();if(view==='priorities'&&!document.activeElement?.matches('select'))renderPriorities()},60000);
+// « Ma journée » : page d'accueil du médecin (maquette Scialytique validée).
+// Remplace l'ancienne vue « Mes priorités » ; l'ancienne liste reste accessible par « Toutes mes actions ».
+(function () {
+  'use strict';
+  if (typeof renderPriorities !== 'function' || typeof patients === 'undefined') return;
+  const legacyPriorities = renderPriorities;
+  let showAll = false;
+  const steps = ['Consultation', 'Préopératoire', 'Intervention', 'SSPI', 'Hospitalisation', 'Sortie'];
+  const stepLabels = ['Consultation', 'Préparation', 'Bloc', 'SSPI', 'Hospitalisation', 'Sortie'];
+  const ico = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const who = x => [x.identity?.lastName && x.identity?.firstName ? `${x.identity.lastName} ${x.identity.firstName}` : '', x.specialty, x.mode].filter(Boolean).join(' · ');
+  const fullName = x => x.identity?.lastName ? `${x.identity.firstName || ''} ${x.identity.lastName}`.trim() : x.id;
+  const age = x => { const b = x.identity?.birthDate; if (!b) return ''; const d = new Date(b + 'T12:00:00'), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n < new Date(n.getFullYear(), d.getMonth(), d.getDate())) a--; return Number.isFinite(a) ? a + ' ans' : ''; };
+  const tone = info => info.rank <= 1 ? 'crit' : info.rank <= 3 ? 'warn' : 'info';
+  const toneLabel = { crit: 'Urgent', warn: 'Aujourd’hui', info: 'À venir' };
+  const when = a => { if (!a.due) return 'sans échéance'; const d = new Date(a.due + 'T12:00:00'); const t = dateKey(); return a.due === t ? 'aujourd’hui' : a.due < t ? 'en retard · ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : d.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' }); };
+  const statusTone = x => /sortie/i.test(x.stage) ? 'ok' : /compléter|valider|attendu|vérifier/i.test(x.task || '') ? 'warn' : /cours|disponible/i.test(x.task || '') ? 'acc' : 'mut';
+  const displayName = () => { try { const n = professionalWorkspace?.getAccess?.()?.profile?.display_name; if (n) return n; } catch (e) {} return doctorName(activeDoctor).split(' · ')[0]; };
+
+  function bar(x) {
+    const i = steps.indexOf(x.stage);
+    return `<div class="j-steps" role="img" aria-label="Étape : ${esc(x.stage)} (${i + 1} sur ${steps.length})">${steps.map((s, k) => `<span class="${k < i ? 'done' : k === i ? 'now' : ''}" title="${esc(stepLabels[k])}"></span>`).join('')}</div>`;
+  }
+
+  function renderJournee() {
+    if (showAll) { legacyPriorities(); const head = document.querySelector('.priority-dashboard .panelhead'); if (head && !document.getElementById('j-back')) head.insertAdjacentHTML('afterbegin', '<button type="button" class="secondary j-back" id="j-back">← Ma journée</button>'); const back = document.getElementById('j-back'); if (back) back.onclick = () => { showAll = false; render(); }; return; }
+    const now = new Date(), all = priorityEntries(), open = all.filter(({ a }) => isOpen(a));
+    const mine = open.filter(({ a }) => a.doctorId === activeDoctor), list = (mine.length ? mine : open).slice(0, 6);
+    const urgent = mine.filter(({ info }) => info.rank <= 1).length;
+    const bloc = patients.filter(x => x.stage === 'Intervention'), sspi = patients.filter(x => x.stage === 'SSPI');
+    const toValidate = patients.filter(x => ['Consultation', 'Préopératoire'].includes(x.stage) && !x.consult?.validated);
+    const late = open.filter(({ info }) => info.rank === 1).length;
+    $('#title').textContent = 'Ma journée'; $('#new').hidden = false; $('#stats').hidden = true;
+    document.body.classList.add('j-home');
+    document.querySelectorAll('.nav[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === 'priorities'));
+    const date = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('#workspace').innerHTML = `<section class="j-hero">
+      <p class="j-date">${esc(date.charAt(0).toUpperCase() + date.slice(1))} · ${now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+      <h2 class="j-hello">Bonjour, ${esc(displayName())}.</h2>
+      <p class="j-summary">${patients.length} séjour${patients.length > 1 ? 's' : ''} suivi${patients.length > 1 ? 's' : ''}. ${urgent ? `<strong class="j-urgent">${urgent} action${urgent > 1 ? 's' : ''} urgente${urgent > 1 ? 's' : ''}</strong> à traiter` : 'Aucune action urgente'}${mine.length ? `, ${mine.length} action${mine.length > 1 ? 's' : ''} ouverte${mine.length > 1 ? 's' : ''} à votre nom` : ''}.</p>
+    </section>
+    <section class="j-kpis" aria-label="Indicateurs du jour">
+      <button type="button" class="j-kpi" data-j-view="service"><span>Au bloc maintenant</span><strong>${bloc.length}</strong><small>${bloc.length ? esc(bloc.map(x => x.id).join(' · ')) : 'aucune intervention en cours'}</small></button>
+      <button type="button" class="j-kpi" data-j-view="service"><span>En SSPI</span><strong>${sspi.length}</strong><small>${sspi.length ? esc(sspi.map(x => x.id).join(' · ')) : 'aucun patient'}</small></button>
+      <button type="button" class="j-kpi" data-j-view="patients"><span>Consultations à valider</span><strong>${toValidate.length}</strong><small>avant l’intervention</small></button>
+      <button type="button" class="j-kpi ${late ? 'is-crit' : ''}" data-j-view="tasks"><span>Actions en retard</span><strong>${late}</strong><small>${open.length} action${open.length > 1 ? 's' : ''} ouverte${open.length > 1 ? 's' : ''} dans l’équipe</small></button>
+    </section>
+    <div class="j-grid">
+      <section class="j-card j-todo" aria-labelledby="j-todo-h">
+        <div class="j-card-head"><h3 id="j-todo-h">À faire maintenant</h3><span class="j-hint">Trié par urgence, puis par échéance</span></div>
+        ${list.length ? `<ol class="j-todo-list">${list.map(({ x, a, info }) => { const t = tone(info); return `<li class="j-todo-row">
+          <span class="j-chip j-${t}"><i aria-hidden="true"></i>${toneLabel[t]}</span>
+          <div class="j-todo-main"><strong>${esc(a.label)}</strong><span>${esc(x.id)} · ${esc(who(x))}</span></div>
+          <span class="j-when">${esc(when(a))}</span>
+          <div class="j-todo-actions"><button type="button" class="secondary" data-j-open="${esc(x.id)}" data-j-action="${esc(a.id)}">Ouvrir</button><button type="button" class="j-done" data-j-done="${esc(a.id)}" data-j-stay="${esc(x.id)}" aria-label="Marquer « ${esc(a.label)} » comme réalisée">${ico('<path d="m5 12.5 4.2 4.2L19 7"/>')}</button></div>
+        </li>`; }).join('')}</ol>` : '<p class="j-empty">Rien d’urgent pour le moment.</p>'}
+        <button type="button" class="j-link" id="j-all">Toutes mes actions et rappels</button>
+      </section>
+      <section class="j-card j-live" aria-labelledby="j-live-h">
+        <div class="j-card-head"><h3 id="j-live-h">Bloc en direct</h3><button type="button" class="j-link" data-j-view="regulation">Planning complet</button></div>
+        ${[...bloc, ...sspi].length ? [...bloc, ...sspi].map(x => `<button type="button" class="j-room" data-j-stay="${esc(x.id)}"><span class="j-room-top"><strong>${esc(x.id)}</strong><span>${esc(x.specialty)}</span><em class="j-chip ${x.stage === 'SSPI' ? 'j-info' : 'j-ok'}">${x.stage === 'SSPI' ? 'SSPI' : 'Au bloc'}</em></span>${bar(x)}<small>${esc(fullName(x))} · ${esc(x.task || '')}</small></button>`).join('') : '<p class="j-empty">Aucun patient au bloc ni en SSPI.</p>'}
+        <div class="j-sspi"><strong>${sspi.length}</strong><span>patient${sspi.length > 1 ? 's' : ''} en SSPI · ${bloc.length} au bloc</span></div>
+      </section>
+    </div>
+    <section class="j-card j-journey" aria-labelledby="j-journey-h">
+      <div class="j-card-head"><h3 id="j-journey-h">Le parcours de mes patients</h3><span class="j-hint">${stepLabels.join(' · ')}</span></div>
+      <div class="j-journey-list">${patients.map(x => `<button type="button" class="j-journey-row" data-j-stay="${esc(x.id)}">
+        <span class="j-who"><strong>${esc(fullName(x))}</strong><small>${esc([x.id, age(x), x.consult?.asa && x.consult.asa !== 'Non renseigné' ? 'ASA ' + x.consult.asa : ''].filter(Boolean).join(' · '))}</small></span>
+        <span class="j-what"><span>${esc(x.specialty)}</span><small>${esc(x.mode)}</small></span>
+        ${bar(x)}
+        <span class="j-status j-t-${statusTone(x)}">${esc(x.task || x.stage)}</span>
+      </button>`).join('')}</div>
+    </section>`;
+    document.querySelectorAll('[data-j-open]').forEach(b => b.onclick = () => { selected = b.dataset.jOpen; prepEditing = b.dataset.jAction; view = 'patients'; tab = 'preparation'; render(); });
+    document.querySelectorAll('[data-j-done]').forEach(b => b.onclick = () => { const x = patients.find(x => x.id === b.dataset.jStay), a = prepFor(x).find(a => a.id === b.dataset.jDone); a.state = 'Réalisée'; traceFor(x, 'Action « ' + a.label + ' » : Réalisée par ' + doctorName(activeDoctor), 'Rappel'); updatePriorityBadge(); render(); toast('Action réalisée'); });
+    document.querySelectorAll('button[data-j-stay]').forEach(b => b.onclick = () => { selected = b.dataset.jStay; view = 'patients'; render(); });
+    document.querySelectorAll('[data-j-view]').forEach(b => b.onclick = () => { view = b.dataset.jView; render(); });
+    $('#j-all').onclick = () => { showAll = true; render(); };
+  }
+
+  renderPriorities = renderJournee;
+  const before = render;
+  render = function () { document.body.classList.remove('j-home'); if (view !== 'priorities') showAll = false; before(); };
+})();
+
 
 // Feuille peropératoire : données de simulation propres à chaque séjour.
 const periVitals=[['sbp','PAS','mmHg'],['dbp','PAD','mmHg'],['map','PAM mesurée','mmHg'],['hr','FC','/min'],['spo2','SpO₂','%'],['etco2','EtCO₂','mmHg'],['temp','Température','°C'],['fio2','FiO₂','%'],['rr','FR','/min'],['vt','Volume courant','mL'],['peep','PEEP','cmH₂O'],['pip','Pression de crête','cmH₂O'],['halogenEnd','Fraction expirée de l’halogéné','%']];
@@ -1582,7 +1736,7 @@ function periSheet(records,c,links,read){
  <p class="peri-sheet-key"><span>▼ PAS · ▲ PAD · ■ PAM</span><span>● FC</span><span>◆ T°</span></p>
  <p class="muted peri-sheet-source">Trame d’après l’annexe 4.b du Dossier anesthésique SFAR (2002). Les colonnes regroupent les saisies par tranches de 10 min. Les horaires exacts, les détails et les valeurs hors échelle figurent dans les relevés et le journal.</p></section>`;
 }
-function periTable(records){const rows=periSorted(records.filter(r=>r.kind==='Surveillance'&&!r.voided));return rows.length?`<div class="peri-scroll"><table class="peri-table"><caption>Relevés de surveillance · saisie manuelle</caption><thead><tr><th>Date / heure</th><th>Halogéné</th>${periVitals.map(([,l,u])=>`<th>${l}<small>${u}</small></th>`).join('')}<th>Clinique</th></tr></thead><tbody>${rows.map(r=>`<tr><th>${esc(periTime(r.at))}</th><td>${esc(r.values.halogenAgent||'—')}</td>${periVitals.map(([k])=>`<td>${esc(r.values[k]??'—').replace(/^$/,'—')}</td>`).join('')}<td>${esc(r.values.clinical||'—')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Aucun relevé enregistré. Une case vide signifie « non renseigné ».</p>'}
+function periTable(records){const rows=periSorted(records.filter(r=>r.kind==='Surveillance'&&!r.voided));return rows.length?`<div class="peri-scroll"><table class="peri-table"><caption>Relevés de surveillance</caption><thead><tr><th>Date / heure</th><th>Halogéné</th>${periVitals.map(([,l,u])=>`<th>${l}<small>${u}</small></th>`).join('')}<th>Clinique</th><th>Source</th></tr></thead><tbody>${rows.map(r=>`<tr><th>${esc(periTime(r.at))}</th><td>${esc(r.values.halogenAgent||'—')}</td>${periVitals.map(([k])=>`<td>${esc(r.values[k]??'—').replace(/^$/,'—')}</td>`).join('')}<td>${esc(r.values.clinical||'—')}</td><td>${esc(r.photo?'Photo · '+(r.photo.validatedBy||r.author):r.values.source||'Saisie manuelle')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Aucun relevé enregistré. Une case vide signifie « non renseigné ».</p>'}
 let periPane='Surveillance';
 const periDrugEvidence=[
  ['Kétamine','Analgésie IV chez l’adulte sous AG, pour chirurgie très douloureuse ou patient vulnérable à la douleur.','SFAR 2016 (R3.8) / RCP : après induction, dose initiale maximale de 0,5 mg/kg ; si perfusion retenue, 0,125 à 0,25 mg/kg/h selon le référentiel. Vérifier le RCP de la spécialité et le protocole local.','La revue Cochrane retrouve une diminution de la douleur et de la consommation d’opioïdes en postopératoire.',['RFE SFAR','https://sfar.org/reactualisation-de-la-recommandation-sur-la-douleur-postoperatoire/'],['RCP','https://base-donnees-publique.medicaments.gouv.fr/medicament/67132571/extrait'],['Cochrane 2018','https://www.cochrane.org/evidence/CD012033_ketamine-venous-injection-acute-pain-after-operation-adults']],
@@ -1666,7 +1820,7 @@ function perop(){
  document.querySelectorAll('[data-peri-void]').forEach(b=>b.onclick=()=>{const r=d.records.find(record=>record.id===b.dataset.periVoid);if(!r||!periCanVoid(r)||r.voided)return;const reason=window.prompt('Motif obligatoire de l’annulation (la ligne reste visible) :');if(!reason?.trim())return;r.voided={reason:reason.trim(),by:role,at:new Date().toISOString()};event('Saisie peropératoire annulée : '+r.kind+' · '+reason.trim(),'Peropératoire');perop()});
 }
 function periValidate(kind,v){if(!v.at||!Number.isFinite(new Date(v.at).getTime())||!v.author?.trim())return 'Date, heure et auteur sont obligatoires.';if(kind==='Surveillance'&&!periVitals.some(([k])=>v[k]!==''&&v[k]!==undefined)&&!v.halogenAgent?.trim()&&!v.clinical?.trim())return 'Renseignez au moins une constante ou une observation clinique.';if(kind==='Surveillance')for(const[k]of periVitals){if(v[k]!==''&&v[k]!==undefined&&(!Number.isFinite(Number(v[k]))||Number(v[k])<0||(['spo2','fio2','halogenEnd'].includes(k)&&Number(v[k])>100)))return 'Valeur ou unité à vérifier : '+k}if(kind==='Médicament'){if(!v.drug?.trim()||!v.route?.trim())return 'Médicament et voie obligatoires.';if(v.mode!=='Arrêt de perfusion'&&(!v.unit||!Number.isFinite(Number(v.amount))||Number(v.amount)<=0))return 'Précisez une dose ou un débit strictement positif et son unité.'}return ''}
-function periDescription(r){const v=r.values;if(r.kind==='Surveillance')return periVitals.filter(([k])=>v[k]!==''&&v[k]!==undefined).map(([k,l,u])=>l+' '+v[k]+' '+u).concat(v.halogenAgent?['Halogéné '+v.halogenAgent]:[],v.clinical||[]).join(' · ');if(r.kind==='Médicament')return [v.drug,v.drugCis?'CIS '+v.drugCis:'',v.mode,v.amount!==''?[v.amount,v.unit].join(' '):'',v.route,v.concentration,v.note].filter(Boolean).join(' · ');if(r.kind==='Événement')return v.event+' · '+v.note;return [v.fluid,v.volume+' mL',v.product,v.note].filter(Boolean).join(' · ')}
+function periDescription(r){const v=r.values;if(r.kind==='Surveillance')return periVitals.filter(([k])=>v[k]!==''&&v[k]!==undefined).map(([k,l,u])=>l+' '+v[k]+' '+u).concat(v.halogenAgent?['Halogéné '+v.halogenAgent]:[],v.clinical||[],r.photo?['Source : photo ('+(r.photo.type==='tendances'?'tendances imprimées':'écran du moniteur')+'), validée par '+(r.photo.validatedBy||r.author)]:[]).join(' · ');if(r.kind==='Médicament')return [v.drug,v.drugCis?'CIS '+v.drugCis:'',v.mode,v.amount!==''?[v.amount,v.unit].join(' '):'',v.route,v.concentration,v.note].filter(Boolean).join(' · ');if(r.kind==='Événement')return v.event+' · '+v.note;return [v.fluid,v.volume+' mL',v.product,v.note].filter(Boolean).join(' · ')}
 
 
 const scienceModules=[['general','Parcours & conduite à tenir'],['abx','Antibioprophylaxie'],['pbm','Hémoglobine / fer'],['vte','Thromboprophylaxie'],['anticoag','Anticoagulants'],['has','HAS / SFAR'],['hem','Hémostase · HEMSTOP'],['perop','Repères peropératoires'],['iv','Médicaments IV'],['board','Actions & cohérence']];
@@ -1676,7 +1830,7 @@ let scienceBridge=null;
 function scienceSend(type,extra={}){if(scienceBridge)$('#scienceframe')?.contentWindow?.postMessage({channel:'parcours-science',token:scienceBridge.token,type,...extra},'*')}
 function science(){
  const x=p();x.science??={state:{},summaries:[]};const token='SCI-'+Date.now()+'-'+Math.random().toString(36).slice(2);scienceBridge={stay:x.id,token};
- $('#content').innerHTML=`<section class="science-shell"><div class="consult-heading"><div><p class="eyebrow">APPLICATION INITIALE RESTAURÉE</p><h3>Aide scientifique · V0.22</h3></div><span class="pill">${esc(x.id)}</span></div><p>Les dix modules, formulaires, algorithmes et références de l’application initiale sont réunis ici. La feuille peropératoire et le dossier clinique restent accessibles dans les autres onglets.</p><div class="notice">Règles et sources d’origine récupérées, sans revalidation clinique complète. Les résultats restent des propositions à relire. La saisie scientifique appartient à ce séjour et disparaît au rechargement, comme les autres données de démonstration.</div><div class="science-toolbar"><label>Accès direct à un module<select id="sciencemodule">${scienceModules.map(([id,name])=>`<option value="${id}">${name}</option>`).join('')}</select></label><button class="secondary" id="scienceprefill">Reprendre les données chiffrées de consultation</button><button class="secondary" id="scienceexport">Préparer une synthèse pour le dossier</button></div><p id="sciencestatus" class="muted" role="status">Chargement de l’application initiale…</p><iframe id="scienceframe" title="Application initiale Parcours Anesthésie V0.22, séjour ${esc(x.id)}" src="scientifique-v022.html#bridge=${token}" sandbox="allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe><details class="science-exports"><summary>Synthèses relues rattachées au séjour (${x.science.summaries.length})</summary>${x.science.summaries.map(s=>`<article class="rx"><strong>${esc(s.at)} · ${esc(s.author)}</strong><p class="preserve">${esc(s.text)}</p></article>`).join('')||'<p>Aucune synthèse rattachée.</p>'}</details><div id="sciencereview"></div><details><summary>Traçabilité de la récupération</summary><p>Source : Parcours_Anesthesie_V0.22_Collegues.html, version du 8 octobre 2026. Le code clinique d’origine est conservé. Aucun score ni résultat n’est enregistré comme prescription ou administration.</p><a href="scientifique-v022-original.html" target="_blank" rel="noopener">Ouvrir la version originale intégrale</a></details></section>`;
+ $('#content').innerHTML=`<section class="science-shell"><div class="consult-heading"><div><p class="eyebrow">APPLICATION INITIALE RESTAURÉE</p><h3>Aide scientifique · V0.22</h3></div><span class="pill">${esc(x.id)}</span></div><p>Les dix modules, formulaires, algorithmes et références de l’application initiale sont réunis ici. La feuille peropératoire et le dossier clinique restent accessibles dans les autres onglets.</p><div class="notice">Règles et sources d’origine récupérées, sans revalidation clinique complète. Les résultats restent des propositions à relire. La saisie scientifique appartient à ce séjour et disparaît au rechargement, comme les autres données de démonstration.</div><div class="science-toolbar"><label>Accès direct à un module<select id="sciencemodule">${scienceModules.map(([id,name])=>`<option value="${id}">${name}</option>`).join('')}</select></label><button class="secondary" id="scienceprefill">Reprendre les données chiffrées de consultation</button><button class="secondary" id="scienceexport">Préparer une synthèse pour le dossier</button></div><p id="sciencestatus" class="muted" role="status">Chargement de l’application initiale…</p><iframe id="scienceframe" title="Application initiale Parcours Anesthésie V0.22, séjour ${esc(x.id)}" src="scientifique-v022.html#bridge=${token}&theme=${document.documentElement.dataset.theme==='dark'?'dark':'light'}" sandbox="allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe><details class="science-exports"><summary>Synthèses relues rattachées au séjour (${x.science.summaries.length})</summary>${x.science.summaries.map(s=>`<article class="rx"><strong>${esc(s.at)} · ${esc(s.author)}</strong><p class="preserve">${esc(s.text)}</p></article>`).join('')||'<p>Aucune synthèse rattachée.</p>'}</details><div id="sciencereview"></div><details><summary>Traçabilité de la récupération</summary><p>Source : Parcours_Anesthesie_V0.22_Collegues.html, version du 8 octobre 2026. Le code clinique d’origine est conservé. Aucun score ni résultat n’est enregistré comme prescription ou administration.</p><a href="scientifique-v022-original.html" target="_blank" rel="noopener">Ouvrir la version originale intégrale</a></details></section>`;
  $('#sciencemodule').onchange=e=>scienceSend('module',{module:e.target.value});
  $('#scienceprefill').onclick=()=>{const d=consultData();scienceSend('prefill',{values:{age:d.age,weight:d.weight,height:d.height,hb:d.hb,egfr:d.egfr,asa:({I:'1',II:'2',III:'3',IV:'4',V:'5'})[d.asa]}})};
  $('#scienceexport').onclick=()=>scienceSend('export');
@@ -1719,7 +1873,7 @@ function integratedOpen(){
  captureConsult();$('#integratedtools').hidden=false;$('#integratedopen').hidden=true;
  if($('#scienceframe')){scienceSend('module',{module:integratedModule});return}
  const x=p();x.science??={state:{},summaries:[]};const token='INT-'+Date.now()+'-'+Math.random().toString(36).slice(2);scienceBridge={stay:x.id,token,integrated:true};
- $('#integratedframehost').innerHTML=`<iframe id="scienceframe" class="integrated-frame" title="Aide scientifique intégrée au séjour ${esc(x.id)}" src="scientifique-v022.html#bridge=${token}&integrated=1" sandbox="allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>`;
+ $('#integratedframehost').innerHTML=`<iframe id="scienceframe" class="integrated-frame" title="Aide scientifique intégrée au séjour ${esc(x.id)}" src="scientifique-v022.html#bridge=${token}&integrated=1&theme=${document.documentElement.dataset.theme==='dark'?'dark':'light'}" sandbox="allow-scripts allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>`;
  $('#sciencestatus').textContent='Chargement des outils de cette rubrique…';
  integratedSharedDisplay();
 }
@@ -1939,6 +2093,50 @@ detail=function(){detailBeforeIdentity();const stay=p();const nursingActive=view
   if(print)print.disabled=true;
  }
 };
+ // Feuille d'anesthésie : tableau de bord « bloc » en tête (maquette Scialytique, format tablette).
+ const detailBeforeCockpit=detail;
+ detail=function(){
+  detailBeforeCockpit();
+  if(tab!=='perop')return;const content=$('#content'),x=p();if(!content||!x||content.querySelector('.ck'))return;
+  const records=periSorted((x.perop?.records||[]).filter(r=>!r.voided)),vit=records.filter(r=>r.kind==='Surveillance'),meds=records.filter(r=>r.kind==='Médicament');
+  const last=key=>{for(let i=vit.length-1;i>=0;i--){const v=vit[i].values?.[key];if(v!==''&&v!==undefined&&v!==null)return {v:Number(String(v).replace(',','.')),at:vit[i].at}}return null};
+  const fmt=n=>n==null||!Number.isFinite(n.v)?null:String(n.v).replace('.',',');
+  const card=(label,key,unit,range,lo,hi,extra='')=>{const m=last(key),val=fmt(m),out=m&&Number.isFinite(m.v)&&((lo!=null&&m.v<lo)||(hi!=null&&m.v>hi));return `<div class="ck-card${out?' is-out':''}"><div class="ck-card-top"><span>${label}</span><small>${range}</small></div><strong>${val??'—'}${val?`<small>${unit}</small>`:''}</strong>${extra}${m?`<em>${esc(periTime(m.at).slice(-5))}</em>`:'<em>aucune mesure</em>'}</div>`};
+  const sbp=last('sbp'),dbp=last('dbp'),map=last('map');
+  const pa=`<div class="ck-card ck-pa${sbp&&(sbp.v<90||sbp.v>160)?' is-out':''}"><div class="ck-card-top"><span>PA</span><small>90–160</small></div><strong>${sbp?fmt(sbp):'—'}${dbp?'/'+fmt(dbp):''}${map?`<small>PAM ${fmt(map)}</small>`:''}</strong>${sbp?`<em>${esc(periTime(sbp.at).slice(-5))}</em>`:'<em>aucune mesure</em>'}</div>`;
+  const allergy=String(x.consult?.allergies||'').trim(),known=allergy&&!/^(aucune?|néant|non|à vérifier)/i.test(allergy);
+  const start=records[0]?.at?new Date(records[0].at):null,mins=start?Math.max(0,Math.round((Date.now()-start)/60000)):null,dur=mins==null?'—':String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+  const name=x.identity?.lastName?`${String(x.identity.lastName).toUpperCase()} ${x.identity.firstName||''}`:x.id;
+  content.insertAdjacentHTML('afterbegin',`<section class="ck" aria-label="Tableau de bord de la feuille d’anesthésie">
+   <div class="ck-strip"><div class="ck-who"><strong>${esc(name)}</strong><span>${esc(x.id)} · ${esc(x.specialty)}${x.consult?.asa&&x.consult.asa!=='Non renseigné'?' · ASA '+esc(x.consult.asa):''}</span></div>${known?`<span class="ck-allergy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20Z"/><path d="M12 10v4m0 3h.01"/></svg>${esc(allergy.slice(0,30).toUpperCase())}</span>`:''}
+    <dl class="ck-clocks"><div><dt>Début</dt><dd>${start?esc(periTime(records[0].at).slice(-5)):'—'}</dd></div><div><dt>Durée</dt><dd>${dur}</dd></div><div><dt>Heure</dt><dd class="ck-now">${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</dd></div></dl></div>
+   <div class="ck-grid"><div class="ck-vitals">${pa}${card('FC','hr','/min','45–110',45,110)}${card('SpO₂','spo2','%','≥ 94',94,null)}${card('EtCO₂','etco2','mmHg','30–45',30,45)}${card('Température','temp','°C','≥ 36',36,null)}${card('Halogéné expiré','halogenEnd','%','',null,null)}</div>
+   <div class="ck-meds"><h4>Dernières administrations</h4>${meds.length?`<ol>${meds.slice(-5).reverse().map(r=>`<li><span class="ck-t">${esc(periTime(r.at).slice(-5))}</span><span>${esc(r.values?.drug||'Médicament')}</span><b>${esc([r.values?.amount,r.values?.unit].filter(v=>v!==''&&v!=null).join(' '))}</b></li>`).join('')}</ol>`:'<p>Aucune administration tracée.</p>'}</div></div>
+  </section>`);
+ };
+ // Bandeau patient et parcours en étapes (maquette Scialytique « Dossier patient »).
+ const detailBeforeBanner=detail;
+ detail=function(){
+  detailBeforeBanner();
+  const x=p(),head=document.querySelector('#detail .detailhead');if(!x||!head||head.querySelector('.pb-banner'))return;
+  const c=x.consult||{},ext=c.ext||{},id=x.identity||{};
+  const num=v=>{const n=parseFloat(String(v??'').replace(',','.'));return Number.isFinite(n)&&n>0?n:null};
+  const w=num(ext.weight),h=num(ext.height),bmi=w&&h?(w/((h/100)**2)).toFixed(1).replace('.',','):null;
+  const birth=id.birthDate?new Date(id.birthDate+'T12:00:00'):null;
+  const age=birth?Math.floor((Date.now()-birth)/31557600000):null;
+  const initials=((id.lastName||'')[0]||'')+((id.firstName||'')[0]||'');
+  const name=id.lastName?`<strong>${esc(String(id.lastName).toUpperCase())}</strong> ${esc(id.firstName||'')}`:`<strong>${esc(x.id)}</strong>`;
+  const allergy=String(c.allergies||'').trim(),noAllergy=/^(aucune?|néant|non|ras|pas d.allergie)/i.test(allergy),unknown=!allergy||/à vérifier|non renseign/i.test(allergy);
+  const anticoag=String(c.treatments||'').match(/apixaban|rivaroxaban|dabigatran|edoxaban|warfarine|fluindione|acénocoumarol|héparine|enoxaparine|tinzaparine|AVK|AOD/i);
+  const vital=(label,value,unit='')=>`<div class="pb-vital"><dt>${label}</dt><dd>${value==null||value===''?'<span class="pb-na">—</span>':esc(value)+(unit?`<small> ${unit}</small>`:'')}</dd></div>`;
+  const asa=c.asa&&c.asa!=='Non renseigné'?c.asa:null,group=String(ext.bloodGroup||'').match(/\b(AB|A|B|O)\s*[+-]/i)?.[0]?.replace(/\s/g,'');
+  const chips=[unknown?'<span class="pb-chip pb-warn">Allergies à vérifier</span>':noAllergy?'<span class="pb-chip pb-ok">Pas d’allergie connue</span>':`<span class="pb-chip pb-crit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20Z"/><path d="M12 10v4m0 3h.01"/></svg>Allergie : ${esc(allergy.slice(0,48))}${allergy.length>48?'…':''}</span>`,anticoag?`<span class="pb-chip pb-warn">${esc(anticoag[0][0].toUpperCase()+anticoag[0].slice(1))} · anticoagulant</span>`:''].join('');
+  const i=stages.indexOf(x.stage),labels={Consultation:'Consultation',Préopératoire:'Préparation',Intervention:'Bloc',SSPI:'SSPI',Hospitalisation:'Hospitalisation',Sortie:'Sortie'};
+  head.insertAdjacentHTML('afterbegin',`<div class="pb-banner"><span class="pb-avatar" aria-hidden="true">${esc(initials.toUpperCase()||'?')}</span><div class="pb-id"><h2 class="pb-name">${name}</h2><p>${birth?`Né(e) le <span class="pb-mono">${esc(birth.toLocaleDateString('fr-FR'))}</span> (${age} ans) · `:''}Séjour <span class="pb-mono">${esc(x.id)}</span></p></div><dl class="pb-vitals">${vital('Poids',w,'kg')}${vital('Taille',h,'cm')}${vital('IMC',bmi)}${vital('ASA',asa)}${vital('Groupe',group)}</dl><div class="pb-chips">${chips}</div></div>
+  <section class="pb-journey" aria-label="Parcours du séjour"><div class="pb-journey-head"><strong>${esc(x.specialty)} · ${esc(x.mode)}</strong><span>${esc(x.task||'')}</span></div><ol class="pb-steps">${stages.map((s,k)=>`<li class="${k<i?'done':k===i?'now':''}"${k===i?' aria-current="step"':''}><span class="pb-bar"></span><b>${esc(labels[s]||s)}</b><small>${k<i?'terminé':k===i?'en cours':'à venir'}</small></li>`).join('')}</ol></section>`);
+  const actions=head.querySelector(':scope > .row .actions');if(actions)head.querySelector('.pb-banner').append(actions);
+  head.classList.add('pb-on');
+ };
 const newBeforeIdentity=$('#new').onclick;$('#new').onclick=()=>{$('#new-identity-warning')?.remove();newBeforeIdentity()};
 const createBeforeIdentity=$('#newform').onsubmit;
 $('#newform').onsubmit=e=>{
@@ -1962,6 +2160,56 @@ render=function(){if(view==='professionalAccess'){professionalWorkspace.render()
 const clinicManagement=window.createClinicManagement({access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.canWrite(({regulation:'management/reservations',pharmacy:'management/lots',activity:'management/acts',pmsi:'management/pmsi',billing:'management/invoices'})[key]),$,esc,patients,sectors:serviceSectors,toast,filters:{},role:()=>role,stats:()=>stats(),open:(id,nextTab)=>{selected=id;tab=nextTab;view='patients';render()}});
 const renderBeforeManagement=render;
 render=function(){$('#open-nursing-record')?.classList.remove('active');if(view==='questionnaireSend'){questionnaireSender.render();return}if(view==='professionalAccess'){professionalWorkspace.render();return}if(!patients.length&&!patientStandalone){$('#title').textContent='Dossiers autorisés';$('#stats').hidden=true;$('#new').hidden=!['anesthesiste','chirurgien','secretariat'].includes(accessJob);$('#workspace').innerHTML='<section class="panel"><div class="content"><h2>Aucun dossier dans votre périmètre</h2><p>Créez un séjour avec le bouton Nouveau séjour, ou vérifiez vos équipes dans Accès professionnels.</p></div></section>';return}if(view==='identity'){closeCroDictation();identityWorkspace.render();return}if(clinicManagement.has(view)){closeCroDictation();clinicManagement.render(view);return}renderBeforeManagement()};
+
+// Photo des constantes (dist/constantes-photo.js) : lecture locale, relecture et validation valeur par valeur, source tracée.
+const constantesPhoto=window.createConstantesPhoto?.({esc,toast,canWrite:()=>periCanWrite('Surveillance'),role:()=>role,
+ author:()=>{const a=professionalWorkspace.getAccess?.();return a?.profile?.display_name||a?.profile?.name||''},
+ stayLabel:()=>{const x=p();return x?.identity?.lastName?String(x.identity.lastName).toUpperCase()+' '+(x.identity.firstName||''):x?.id||''},
+ records:()=>p()?.perop?.records||[],
+ add:(records,info)=>{const d=periData();d.records.push(...records);event('Constantes importées depuis une photo ('+(info.mode==='tendances'?'tendances imprimées':'écran du moniteur')+') : '+records.length+' mesure(s), '+info.values+' valeur(s) relues et validées'+(info.hash?' · empreinte '+info.hash.slice(0,12):''),'Peropératoire');if(tab==='perop')detail()}});
+if(constantesPhoto){
+ const camera='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.5" r="3.6"/></svg>';
+ const detailBeforePhoto=detail;
+ detail=function(){
+  detailBeforePhoto();
+  if(tab!=='perop'||!p()||!periCanWrite('Surveillance'))return;
+  const strip=document.querySelector('.ck-strip');
+  if(strip&&!strip.querySelector('.ck-photo')){strip.insertAdjacentHTML('beforeend',`<button type="button" class="ck-photo no-print" data-photo-constantes>${camera}Photo des constantes</button>`)}
+  const entry=document.querySelector('#perientry');
+  if(entry&&(nurseProfile()||periPane==='Surveillance')&&!document.querySelector('.peri-photo-entry'))entry.insertAdjacentHTML('beforebegin',`<div class="peri-photo-entry no-print"><span>Moniteur ou tendances sous les yeux ? Prenez-les en photo : les valeurs sont proposées, vous les validez une à une.</span><button type="button" class="ck-photo" data-photo-constantes>${camera}Photo des constantes</button></div>`);
+  document.querySelectorAll('[data-photo-constantes]').forEach(b=>b.onclick=()=>constantesPhoto.open());
+  // Repère « source : photo » sur les cartes du tableau de bord alimentées par une photo.
+  const vit=periSorted((p().perop?.records||[]).filter(r=>!r.voided&&r.kind==='Surveillance'));
+  const cards=[...document.querySelectorAll('.ck-vitals .ck-card')],keys=['sbp','hr','spo2','etco2','temp','halogenEnd'];
+  cards.forEach((card,i)=>{const k=keys[i];let last=null;for(let j=vit.length-1;j>=0;j--){const v=vit[j].values?.[k];if(v!==''&&v!==undefined&&v!==null){last=vit[j];break}}if(last?.photo&&!card.querySelector('.ck-src'))card.insertAdjacentHTML('beforeend',`<span class="ck-src" title="Valeur lue sur photo, relue et validée par ${esc(last.photo.validatedBy||last.author)}">${camera}photo validée</span>`)});
+ };
+}
+
+// Fonctionnalités issues de la veille marché (dist/veille.js, dist/veille-regles.js).
+veilleModule=window.createVeille?.({$,esc,toast,patients,stages,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,identityStatus:stay=>identityWorkspace.status(stay),open:(id,nextTab)=>{selected=id;tab=nextTab||'consult';view='patients';render()},goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},setView:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}})||null;
+if(veilleModule){const detailBeforeVeille=detail;detail=function(){detailBeforeVeille();veilleModule.detail(tab)};const renderBeforeVeille=render;render=function(){if(veilleModule.render(view))return;renderBeforeVeille()}}
+
+// Améliorations 1.1 (dist/ameliorations.js) : recherche Ctrl K, verrouillage, allergies, antibioprophylaxie, étiquettes, import E-med, export, relève, NEWS2.
+const ameliorations=window.createAmeliorations?.({$,esc,toast,patients,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,teams:()=>careTeams,management:()=>clinicManagement.exportState(),view:()=>view,tab:()=>tab,open:(id,nextTab)=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();selected=id;tab=nextTab||(nurseProfile()?'follow':'consult');view='patients';filter='Tous';query='';render()},setView:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}})||null;
+if(ameliorations){const renderBeforeAmeliorations=render;render=function(){if(ameliorations.render(view))return;renderBeforeAmeliorations()}}
+
+// Prescriptions préopératoires de la consultation (dist/prescriptions-preop.js) : bilans, prémédication, consignes, envoi au patient.
+consultModele=window.IaseloCpa&&window.createConsultationModele?window.createConsultationModele({$,esc,toast,event,frDate,sejour:id=>patients.find(x=>x.id===id),role:()=>role,medecin:()=>professionalWorkspace?.getAccess?.()?.profile?.display_name||'',onChange:()=>{consultChangeHook?.();integratedNotifyChange?.()}}):null;
+const prescriptionsPreop=window.createPrescriptionsPreop?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,shared:()=>!!durableWorkspace,flush:()=>durableWorkspace?.flush()})||null;
+if(prescriptionsPreop&&veilleModule){const panelBeforePreop=veilleModule.panel;veilleModule.panel=t=>prescriptionsPreop.panel(t)||panelBeforePreop(t)}
+
+// Documents transmis par le patient et consentement d'anesthésie (dist/documents-consentement.js, espace patient).
+const documentsConsentement=window.createDocumentsConsentement?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),tab:()=>tab,goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},shared:()=>!!durableWorkspace,flush:()=>durableWorkspace?.flush(),refresh:()=>durableWorkspace?.refresh?.()||Promise.resolve()})||null;
+if(documentsConsentement&&veilleModule){const panelBeforeDocs=veilleModule.panel;veilleModule.panel=t=>documentsConsentement.panel(t)||panelBeforeDocs(t);const detailBeforeDocs=detail;detail=function(){detailBeforeDocs();documentsConsentement.detail(tab)}}
+
+// Visite pré-anesthésique (dist/vpa.js) : étape dédiée entre la consultation et le peropératoire.
+const vpaModule=window.createVpa?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,identityStatus:stay=>identityWorkspace.status(stay),goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},flush:()=>durableWorkspace?.flush(),refreshHeader:()=>detail()})||null;
+// Compte rendu opératoire : dictée transcrite sur le poste, import audio ou document, relecture et signature (cro.js).
+croModule=window.createCro?.({$,esc,toast,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,
+ authorName:()=>activeDoctor==='med-c'?doctorName(activeDoctor):'Chirurgien · profil simulé',event:(text,kind)=>event(text,kind),download:file=>file&&downloadCroFile(file),flush:()=>durableWorkspace?.flush(),refresh:()=>detail(),
+ defaults:stay=>({operation:publishedSurgery(stay)?.fields?.procedure||consultData().operation||'',date:(stay.perop?.records||[]).filter(r=>r.kind==='Événement'&&!r.voided&&r.values.event==='Fin de chirurgie').map(r=>r.at.slice(0,10)).sort().at(-1)||dateKey()})})||null;
+if(croModule){const detailBeforeCro=detail;detail=function(){detailBeforeCro();croModule.detail(tab)}}
+if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule.panel=t=>vpaModule.panel(t)||panelBeforeVpa(t);const detailBeforeVpa=detail;detail=function(){detailBeforeVpa();vpaModule.detail(tab)}}
 
 // Accès direct au plan de soins du séjour sélectionné.
 if($('#open-nursing-record'))$('#open-nursing-record').onclick=()=>{

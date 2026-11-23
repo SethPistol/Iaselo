@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Les référentiels publics (BDPM, CCAM) sont téléchargés sur Clever Cloud ; la CI teste leur lecture sur des fichiers de test.
+      IASELO_REFERENTIELS: 'off'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # Aucune donnée réelle ni secret : les tests utilisent PGlite, SQLite et un S3 local fictifs.
+      - run: npm ci
+      - run: npm run build
+      - run: npm test

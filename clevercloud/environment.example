@@ -4,3 +4,9 @@ CC_RUN_COMMAND=npm start
 CC_HEALTH_CHECK_PATH=/healthz
 NODE_ENV=production
 ENABLE_DEMO_SEED=false
+# Envoi SMS / e-mail aux patients via Brevo : UNE seule variable, à saisir une fois dans
+# Clever Cloud > application > Variables d'environnement (jamais ici ni dans le chat) :
+# BREVO_API_KEY=
+# Le reste est automatique (adresse validée dans Brevo, nom SMS déduit de l'établissement).
+# Facultatif : BREVO_SENDER_EMAIL, BREVO_SENDER_NAME, BREVO_SMS_SENDER, ETABLISSEMENT_NOM,
+# MESSAGING_ALLOWED_RECIPIENTS (restreint les envois à une liste).

@@ -1,0 +1,73 @@
+/* IASELO · compte rendu opératoire (cro.js). Jetons --i-* (iaselo.css). */
+.cro-wrap { display: flex; flex-direction: column; gap: 18px; container-type: inline-size; }
+.cro-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cro-head h3 { margin: 0; }
+.cro-form { display: flex; flex-direction: column; gap: 18px; }
+.cro-grid { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 12px 16px; }
+.cro-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--i-mut); }
+.cro-grid input { font-weight: 400; }
+@container (max-width: 640px) { .cro-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.cro-sources { padding: 16px 18px; border-radius: var(--i-r-m, 12px); background: var(--i-s2); border: 1px solid var(--i-line); display: flex; flex-direction: column; gap: 8px; }
+.cro-source-actions { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.cro-rec { display: inline-flex; align-items: center; gap: 8px; }
+.cro-mic { width: 10px; height: 10px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
+.cro-import { position: relative; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--i-line-strong); border-radius: 5px; cursor: pointer; font-size: 13px; }
+.cro-import input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.cro-import:focus-within { outline: 3px solid var(--i-halo, #a5c6ce); outline-offset: 2px; }
+.cro-import.is-disabled { opacity: .5; pointer-events: none; }
+.cro-auto { margin: 0 0 0 auto; font-size: 13px; }
+.cro-aide, .cro-rgpd { margin: 0; font-size: 12.5px; line-height: 1.5; }
+.cro-rgpd { color: var(--i-ok); }
+.cro-msg { margin: 0; font-size: 13.5px; color: var(--i-acc-ink); }
+.cro-msg:empty { display: none; }
+.cro-msg.is-err { color: var(--i-crit); }
+#cro-undo[hidden] { display: none; }
+
+.cro-live { padding: 12px 14px; border-radius: var(--i-r-s, 8px); background: var(--i-s1); border: 1px solid var(--i-line); display: flex; flex-direction: column; gap: 6px; }
+.cro-live.is-err { color: var(--i-crit); background: var(--i-crit-soft); }
+.cro-live p { margin: 0; font-size: 13px; }
+.cro-live-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cro-live-etat { font-size: 14px !important; display: inline-flex; align-items: center; gap: 8px; }
+.cro-rec-dot { width: 11px; height: 11px; border-radius: 50%; background: var(--i-crit); animation: cro-pulse 1.2s ease-in-out infinite; }
+@keyframes cro-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .cro-rec-dot { animation: none; } }
+.cro-meter { width: 120px; height: 8px; border-radius: 4px; background: var(--i-s3); overflow: hidden; }
+.cro-meter span { display: block; height: 100%; width: 0; background: var(--i-ok); transition: width .15s; }
+.cro-bar { height: 6px; border-radius: 3px; background: var(--i-s3); overflow: hidden; }
+.cro-bar span { display: block; height: 100%; background: var(--i-acc); transition: width .3s; }
+.cro-apercu { font-size: 13.5px !important; line-height: 1.5; color: var(--i-ink); max-height: 9em; overflow: auto; white-space: pre-wrap; border-left: 3px solid var(--i-line-strong); padding-left: 10px; }
+
+.cro-sections { display: flex; flex-direction: column; gap: 12px; }
+.cro-sec { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: var(--i-r-s, 8px); border: 1px solid transparent; }
+.cro-sec label { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 650; color: var(--i-ink); text-transform: uppercase; letter-spacing: .04em; }
+.cro-sec textarea { width: 100%; resize: vertical; font: inherit; font-size: 14.5px; line-height: 1.5; min-height: 2.6em; }
+.cro-sec.is-relire { background: var(--i-warn-soft); border-color: color-mix(in srgb, var(--i-warn) 40%, transparent); }
+.cro-sec.is-autre { border-style: dashed; border-color: var(--i-line-strong); }
+.cro-badge { font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: none; padding: 2px 8px; border-radius: 10px; background: var(--i-warn); color: #fff; }
+.cro-lu { align-self: flex-start; font-size: 12.5px; }
+
+.cro-attach { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: var(--i-r-s, 8px); background: var(--i-acc-soft); font-size: 13.5px; overflow-wrap: anywhere; }
+.cro-validate { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; border-top: 1px solid var(--i-line); }
+.cro-validate .check { font-size: 14px; line-height: 1.45; }
+.cro-err { color: var(--i-crit); font-size: 13.5px; }
+.cro-err:empty { display: none; }
+.cro-err p { margin: 0 0 4px; font-weight: 600; }
+.cro-err ul { margin: 0; padding-left: 18px; }
+.cro-err .textbutton { color: var(--i-crit); text-decoration: underline; padding: 2px 0; min-height: 0; }
+
+.cro-doc { display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; border: 1px solid var(--i-line); border-radius: var(--i-r-m, 12px); background: var(--i-s1); }
+.cro-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 8px 18px; margin: 0; }
+.cro-meta dt { font-size: 12px; font-weight: 600; color: var(--i-mut); text-transform: uppercase; letter-spacing: .04em; }
+.cro-meta dd { margin: 2px 0 0; font-size: 14.5px; }
+.cro-doc-sec h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--i-acc-ink); }
+.cro-p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; font-size: 14.5px; }
+.cro-sign { font-size: 13px; line-height: 1.6; padding-top: 10px; border-top: 1px solid var(--i-line); }
+.cro-sign code { font-family: var(--i-mono, monospace); font-size: 12px; }
+.cro-hist summary, .cro-current summary { cursor: pointer; font-size: 13.5px; font-weight: 600; }
+.cro-hist-item { padding: 10px 0; border-top: 1px dashed var(--i-line); }
+.cro-current .cro-doc { margin-top: 10px; }
+@media print {
+ .cro-sources, .cro-validate, .cro-hist, .cro-current { display: none !important; }
+ .cro-doc { border: 0; padding: 0; }
+}

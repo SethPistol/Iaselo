@@ -1,4 +1,8 @@
-# Parcours Anesthésie — déploiement autonome Clever Cloud
+# IASELO — parcours patient périopératoire (Clever Cloud)
+
+Version 1.0.0 : voir [`docs/notes-de-version.md`](docs/notes-de-version.md) pour le contenu, ce qui reste en simulation et les prérequis avant toute donnée réelle.
+
+## Origine : Parcours Anesthésie — déploiement autonome Clever Cloud
 
 Export du 20 novembre 2026. Source initiale et adaptations : `SOURCE_VERSION.txt`.
 
@@ -97,6 +101,11 @@ Clever Cloud déploie un dépôt Git ; le ZIP est le paquet source à décompres
 
 Après le premier démarrage réussi, retirer les trois variables `BOOTSTRAP_ADMIN_*` de l’environnement de l’application : le compte est conservé dans PostgreSQL. Elles ne remplacent jamais un compte déjà créé. Si la base est vide et qu’elles sont absentes, le démarrage échoue ; personne ne peut s’attribuer le rôle de propriétaire en étant le premier visiteur.
 
+
+## Serveur de recette (test, données fictives)
+
+Pour un serveur de test séparé de la production, sans aucune manipulation technique : créer une **autre** application Node.js 24 avec ses propres add-ons PostgreSQL et Cellar, puis ajouter la seule variable `IASELO_RECETTE=true`. Le serveur déduit alors son adresse `https://app-….cleverapps.io` de `APP_ID`, tire un secret de session à chaque démarrage (les sessions sont perdues au redémarrage), active les patients fictifs, crée son bucket privé `iaselo-recette-…` et un compte de test affiché sur la page de connexion. Ne jamais activer ce mode sur l’application de production ni y saisir de données réelles. `BASE_URL`, `SESSION_SECRET`, `S3_BUCKET` restent prioritaires s’ils sont renseignés. Si l’add-on PostgreSQL présente un certificat auto-signé (`DEPTH_ZERO_SELF_SIGNED_CERT`), ajouter `PGSSL=require` : la connexion reste chiffrée mais le certificat n’est pas vérifié. Cette valeur est refusée hors mode recette ; en production, fournir le certificat via `PGSSL_CA`.
+
 ## 4. Comptes et habilitations
 
 Les sessions professionnelles sont gérées par le serveur, avec mot de passe scrypt, cookie HttpOnly/SameSite/Secure en HTTPS, expiration et limitation des tentatives. Les en-têtes d’identité entrants de l’ancien hébergeur sont supprimés. Les droits métier et les équipes de soins restent contrôlés côté serveur.
@@ -121,7 +130,7 @@ Aucun mot de passe générique ni compte préconfiguré n’est fourni. Aucune i
 
 L’OCR de la capture est réalisé dans le navigateur, avec les ressources Tesseract locales. L’image n’est pas transmise au serveur par cette fonctionnalité. Les champs doivent être relus et les coordonnées confirmées avant la création de l’invitation.
 
-Le serveur prépare un lien `https://votre-domaine/patient.html#invitation=…`, valable 48 heures, révocable par remplacement et utilisable une fois pour l’envoi. Le patient n’a pas besoin d’un compte professionnel. Le jeton brut n’est pas conservé en base ; seule son empreinte l’est. Les réponses validées sont rattachées au séjour invité et soumises à la relecture clinique.
+Le serveur prépare un lien `https://votre-domaine/patient.html#invitation=…`, valable 48 heures, révocable par remplacement et utilisable une fois pour l’envoi. Le patient n’a pas besoin d’un compte professionnel. La page patient (`dist/patient.html`) ne charge que `patient-portal.js` : aucun code du dossier professionnel n’est transmis au patient. Elle vérifie le lien à l’ouverture, retire le jeton de la barre d’adresse et affiche un message clair si le lien est absent, expiré ou déjà utilisé. Les questions sont reprises de `parcours-v8.js` : toute modification du questionnaire doit être faite aux deux endroits. Le jeton brut n’est pas conservé en base ; seule son empreinte l’est. Les réponses validées sont rattachées au séjour invité et soumises à la relecture clinique.
 
 **Aucun fournisseur SMS/e-mail n’est intégré.** L’application prépare le message et propose de le copier ou de l’ouvrir dans le logiciel de messagerie de l’utilisateur. Un déploiement du serveur ne réalise pas à lui seul l’envoi automatique. Ne pas activer de journalisation des corps de requêtes, cookies ou liens patient.
 
@@ -172,10 +181,12 @@ Si des données doivent être reprises du site antérieur, réaliser un export a
 | `.env.example` | Paramètres à compléter, sans secrets |
 | `clevercloud/environment.example` | Paramètres runtime à saisir dans la console ; fichier informatif |
 | `tests/` | Tests métier, droits et intégration PostgreSQL/S3 |
-| `docs/`, `drizzle/`, `demo-server/` | Documentation et sources historiques conservées pour référence ; pas le runtime Clever Cloud |
+| `docs/` | Documentation de conception du prototype, conservée pour référence |
+| `drizzle/`, `worker/sqlite-adapter.mjs`, `scripts/restore-backup.mjs` | Schéma SQLite historique, utilisé uniquement par les tests métier ; pas le runtime Clever Cloud |
+| `.github/workflows/ci.yml` | Intégration continue : build et tests à chaque modification |
 | `VALIDATION.md` | Résultats et limites des vérifications réalisées pour l’archive |
 
-L’interface comporte des fichiers JavaScript maintenus directement dans `dist` ; ils sont fournis intégralement. `npm run build` vérifie les sources et ressources, sans dépendre d’un compilateur privé. Les anciens scripts `build-durable.mjs`, `build-static.mjs` et `dev-durable.mjs` restent historiques ; utiliser exclusivement les commandes principales de ce README pour cette distribution. Le bundle généré spécifique Cloudflare et ses métadonnées de publication ne sont pas nécessaires et ne sont pas inclus.
+L’interface est maintenue directement dans `dist`, sans compilateur. Le dossier clinique principal est `dist/parcours-v8.js` (et `parcours-v8.css`) : c’est le fichier source à modifier. Les anciennes couches `parcours-v5` à `v7`, leurs sources `app.js`, `patient.js`, `consultation.js`, `workflow.js` et le script `build-static.mjs`, qui aurait écrasé `parcours-v8.js` avec ces sources périmées, ont été retirés. `npm run build` vérifie les sources, les ressources et l’absence de ces fichiers retirés. Les anciens scripts Cloudflare (`build-durable.mjs`, `dev-durable.mjs`) et le serveur de démonstration `demo-server/` ont également été retirés ; ils restent consultables dans l’historique Git.
 
 Cette version conserve le statut de **prototype à données fictives** et ses limites fonctionnelles. Elle n’est pas présentée comme un DPI certifié ou un dispositif médical validé. Avant des données réelles : vérifier le périmètre HDS des services et du contrat souscrit, la conformité et les procédures de la clinique, la sécurité des accès et la validation clinique du logiciel. Le choix de Clever Cloud seul ne réalise pas ces validations.
 

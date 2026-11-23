@@ -1,0 +1,30 @@
+/* IASELO · consultation d'anesthésie sur le modèle (cadre consultation-modele.html) */
+.cpa-heading{margin-bottom:10px}
+.cpa-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin:0 0 12px;padding:10px 0;border-top:0}
+.cpa-footer #draftstatus{margin:0;flex:1 1 280px}
+.cpa-footer #consultissues{flex-basis:100%}
+.cpa-zone{border:1px solid var(--line,#d3dde1);border-radius:8px;overflow:hidden;background:var(--bg,#eef3f4)}
+.cpa-frame{display:block;width:100%;height:max(620px,calc(100vh - 150px));border:0;background:transparent}
+html body #workspace .notice.cpa-qbanner,html body #workspace .notice.cpa-issues{display:block;margin:0 0 12px}
+.cpa-qbanner .actions{margin:8px 0}
+.cpa-qbanner p{margin:0 0 6px}
+.cpa-pt{display:inline-block;padding:0 6px;border-radius:3px;background:#FFF1B8;color:#8A6A00;font-size:.78em;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+:root[data-theme="dark"] .cpa-pt{background:#3A3110;color:#F2D98A}
+.cpa-missing{columns:2 260px;margin:8px 0}
+.cpa-missing li{break-inside:avoid}
+.cpa-ancienne{margin-top:14px}
+.cpa-ancienne summary{cursor:pointer;font-weight:600}
+@media (max-width:700px){.cpa-frame{height:calc(100vh - 110px)}}
+/* En-tête compact : un seul titre, état et actions sur une ligne */
+.cpa-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 10px}
+.cpa-head h3{margin:0;font-size:1.15rem}
+.cpa-head #draftstatus{font-size:13px;flex:1 1 auto}
+html body #workspace .cpa-head .actions{margin:0 0 0 auto;display:flex;flex:0 0 auto;width:auto;flex-wrap:wrap;gap:8px;align-items:center}
+.cpa-head #consultissues{flex-basis:100%}
+.cpa-head #consultissues:empty{display:none}
+/* Éléments bloquants : cliquables, amènent au champ */
+.cpa-pill-go{cursor:pointer}
+.cpa-pill-go:hover,.cpa-pill-go:focus-visible{text-decoration:underline;outline:2px solid currentColor;outline-offset:2px}
+.cpa-issues .cpa-go{text-align:left;padding:2px 0;text-decoration:underline;text-underline-offset:2px}
+@keyframes cpaFlash{0%,60%{box-shadow:0 0 0 3px #C77700}100%{box-shadow:0 0 0 0 transparent}}
+.cpa-flash{animation:cpaFlash 2.4s ease-out}

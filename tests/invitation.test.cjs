@@ -10,3 +10,40 @@ test('OCR : champs sur deux lignes, plusieurs coordonnées et dates impossibles 
 test('une identité divergente et des coordonnées absentes empêchent la préparation',()=>{
  const a={firstName:'Camille',lastName:'MARTIN',birthDate:'1985-06-14',email:'camille@example.test',phone:''};assert.equal(C.contactError(a),'');assert.equal(C.matchesIdentity(a,{...a,lastName:'DUPONT'}),false);assert.match(C.contactError({...a,email:''}),/nécessaire/);assert.equal(C.phone('0033 6 12 34 56 78'),'+33612345678');
 });
+test('captures Doctolib lues par OCR : en-tête, « née », formulaires en colonnes, application patient',()=>{
+ const fiche=C.parseProfile('Agenda\ncm Mme Camille MARTIN\nNée DUPONT : 14/06/1985 (41 ans)\nTéléphone                 06 12 34 56 78\nMédecin traitant           Dr Paul LEFEBVRE');
+ assert.deepEqual([fiche.firstName,fiche.lastName,fiche.usedName,fiche.birthDate],['Camille','DUPONT','MARTIN','1985-06-14']);
+ const form=C.parseProfile("Civilité *\nMadame\nNom de naissance *                          Prénom(s) de naissance *\nDUPONT                                          Marie-Hélène Anne\nNom d'usage                            Prénom utilisé\nLEROY-DUPONT                     Marie-Hélène\nDate de naissance *                  Lieu de naissance\n03/09/1958                             Lyon");
+ assert.deepEqual([form.firstName,form.lastName,form.usedName,form.birthDate],['Marie-Hélène','DUPONT','LEROY-DUPONT','1958-09-03']);
+ const app=C.parseProfile("Informations personnelles\nPrénom\nÉloïse\nNom\nN'GUYEN\nDate de nalssance\n21/12/1999");
+ assert.deepEqual([app.firstName,app.lastName,app.birthDate],['Éloïse',"N'GUYEN",'1999-12-21']);
+ const table=C.parseProfile('M. Jean-Pierre DE LA FONTAINE\nNom de naissance                    DE LA FONTAINE\nPremier prénom de naissance       Jean-Pierre\nDate de naissance                    02/02/1947');
+ assert.deepEqual([table.firstName,table.lastName,table.usedName],['Jean-Pierre','DE LA FONTAINE','']);
+ const plain=C.parseProfile('Léa BÉRANGER-ÉTIENNE\nNée le 05/11/1972 (54 ans) - 06 20 30 40 50');
+ assert.deepEqual([plain.firstName,plain.lastName,plain.birthDate],['Léa','BÉRANGER-ÉTIENNE','1972-11-05']);
+ const inverse=C.parseProfile("Madame MARTIN Camille\nNé(e) le 14 juin 1985");
+ assert.deepEqual([inverse.firstName,inverse.lastName,inverse.birthDate],['Camille','MARTIN','1985-06-14']);
+});
+test('OCR : le nom du médecin et les libellés voisins ne deviennent jamais l’identité du patient',()=>{
+ const c=C.parseProfile('Médecin traitant   Dr Paul LEFEBVRE\nRendez-vous avec Dr Romain B.\nNom de naissance * Prénom *\n');
+ assert.equal(c.firstName,'');assert.equal(c.lastName,'');
+ const d=C.parseProfile('Mme Dr Sophie MARTIN');assert.equal(d.lastName,'');
+});
+test('photos dégradées : libellés illisibles, nom sans civilité, repli manuel ligne par ligne',()=>{
+ const c=C.parseProfile('Léa BERANGER-ETIENNE\n\nLB\nlea.be@example.test');assert.deepEqual([c.firstName,c.lastName],['Léa','BERANGER-ETIENNE']);
+ const t=C.parseProfile('M. Jean-Pierre DE LA FONTAINE\nDE LA FONTAINE\nJean-Pierre\n02/02/1947\n06 55 44 33 22');assert.equal(t.birthDate,'1947-02-02');
+ const rdv=C.parseProfile('Mme Camille MARTIN\nLun. 30 nov. 2026 · 09:30 · Consultation\n12/01/2026 10:30 Rendez-vous');assert.equal(rdv.birthDate,'');
+ const two=C.parseProfile('Mme Camille MARTIN\n14/06/1985\n02/02/1990');assert.equal(two.birthDate,'');
+ assert.equal(C.fieldFromLine('lastName','Nom de naissance *   dupont'),'DUPONT');assert.equal(C.fieldFromLine('firstName','Marie-Hélène'),'Marie-Hélène');assert.equal(C.fieldFromLine('birthDate','Née le 05/11/1972 (54 ans)'),'1972-11-05');assert.equal(C.fieldFromLine('birthDate','Téléphone 06 12'),'');
+ const m=C.mergeProfiles([{lastName:'MARTIN',firstName:'Camille'},{lastName:'DUPONT',firstName:'Camille',birthDate:'1985-06-14'},{lastName:'DUPONT'}]);assert.deepEqual([m.lastName,m.firstName,m.birthDate],['DUPONT','Camille','1985-06-14']);
+});
+const AGE=(()=>{const n=new Date();let a=n.getFullYear()-1979;if(n.getMonth()+1<3||(n.getMonth()+1===3&&n.getDate()<14))a--;return a})();
+test('fiche Doctolib « Coordonnées » : nom de naissance vide, nom utilisé repris et signalé, libellés repliés, date collée à l’âge',()=>{
+ const p=C.parseProfile("Patient > Coordonnées\nMatricule INS\nCivilité   OM ©Mme   © inconnu\nSexe   O Homme   O Femme\nNom de naissance\n1er prénom de\nnaissance   Claire\nNom utilisé   Vasseur\nPrénom utilisé\nPrénom(s) de\nnaissance\nDate de naissance   14/03/197"+AGE+" ans)\nTéléphone   +33 6 11 22 33 44");
+ assert.deepEqual([p.firstName,p.lastName,p.lastNameSource,p.birthDate],['Claire','VASSEUR','usage','1979-03-14']);
+ const q=C.parseProfile("“ler. prénom de       Claire\nNom dehnaissance  !\nNomutilisé |. Vasseur.\nDate denaissance | 14/03/1944"+AGE+" ans)");
+ assert.deepEqual([q.firstName,q.lastName,q.birthDate,q.birthDateUnreadable],['Claire','VASSEUR','',true]);
+ // L'âge contrôle l'année : une année mal lue qui ne correspond pas à l'âge est rejetée, jamais devinée.
+ assert.equal(C.birthDate('14/03/1979 ('+AGE+' ans)'),'1979-03-14');assert.equal(C.birthDate('14/03/1949 ('+AGE+' ans)'),'');assert.equal(C.birthDate('14/03/197('+AGE+' ans)'),'1979-03-14');assert.equal(C.birthDate('14/03/19'+AGE+' ans)'),'');
+ const r=C.parseProfile('Nom de naissance\n;     LT\nNom utilisé   Vasseur');assert.equal(r.lastName,'VASSEUR');
+});

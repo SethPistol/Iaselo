@@ -1,0 +1,28 @@
+/* Aide scientifique : direction « Scialytique » (typographie Geist, cartes, onglets, focus).
+   Les couleurs historiques sont recolorées par science-couleurs.css (généré) ; cette feuille,
+   chargée en dernier, fixe la typographie et les éléments structurants dans les deux thèmes. */
+@font-face { font-family: Geist; font-weight: 100 900; font-display: swap; src: url(assets/fonts/geist-latin-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: Geist; font-weight: 100 900; font-display: swap; src: url(assets/fonts/geist-latin-ext-wght-normal.woff2) format('woff2-variations'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+:root { --s-bg: #F3F5F8; --s-s1: #FFFFFF; --s-s2: #EDF1F5; --s-line: #DAE1E8; --s-strong: #C3CDD6; --s-ink: #0C1A25; --s-mut: #4C5D6C; --s-acc: #0F4D5C; --s-acc-soft: #E1EFF1; --s-on-acc: #FFFFFF;
+  --s-halo: radial-gradient(120% 160% at 100% 0%, #1C6B7D 0%, #0F4D5C 45%, #0A3843 100%); --s-font: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+:root[data-theme=dark] { --s-bg: #0A1016; --s-s1: #111A22; --s-s2: #17222C; --s-line: #26343F; --s-strong: #344654; --s-ink: #E6EDF3; --s-mut: #9BACBA; --s-acc: #7FCAD8; --s-acc-soft: #12313A; --s-on-acc: #06141A;
+  --s-halo: radial-gradient(120% 160% at 100% 0%, #1B4A57 0%, #10303A 45%, #0B1E25 100%); color-scheme: dark; }
+html body { font-family: var(--s-font); font-size: 15px; line-height: 1.55; background: var(--s-bg); color: var(--s-ink); -webkit-font-smoothing: antialiased; }
+html body :is(button, input, select, textarea) { font-family: var(--s-font); }
+html body :is(h1, h2, h3, h4, .card > h2, header h1) { font-family: var(--s-font); font-style: normal; }
+html body header h1 { font-size: 26px; font-weight: 640; letter-spacing: -.03em; color: #fff; }
+html body .card > h2 { font-size: 20px; font-weight: 620; letter-spacing: -.02em; color: var(--s-ink); background: var(--s-s2); border-bottom: 1px solid var(--s-line); }
+html body h3 { font-size: 17px; font-weight: 600; letter-spacing: -.012em; color: var(--s-ink); }
+html body header { background: var(--s-halo); color: #fff; }
+html body .card { background: var(--s-s1); border: 1px solid var(--s-line); border-radius: 16px; box-shadow: 0 1px 2px rgba(12, 26, 37, .05), 0 10px 30px rgba(12, 26, 37, .05); overflow: hidden; }
+html body :is(input, select, textarea) { border-radius: 10px; border: 1px solid var(--s-strong); background: var(--s-s1); color: var(--s-ink); }
+html body :is(input, select, textarea):focus { outline: 3px solid color-mix(in srgb, var(--s-acc) 35%, transparent); outline-offset: 1px; border-color: var(--s-acc); }
+html body label { color: var(--s-mut); font-weight: 560; }
+html body .check { border-radius: 10px; background: var(--s-s2); border-color: var(--s-line); color: var(--s-ink); }
+html body .check input { accent-color: var(--s-acc); }
+html body .tabs .tab { border-radius: 999px; font-weight: 560; }
+html body .tabs .tab.active, html body .tabs .tab.active * { background: #fff; color: #0B3D49; border-color: #fff; }
+html body .tabs .tab.active * { background: transparent; }
+html body :is(.primary, .abx-action) { background: var(--s-acc); color: var(--s-on-acc); border-radius: 10px; font-weight: 600; }
+html body :is(button, summary, a):focus-visible { outline: 3px solid var(--s-acc); outline-offset: 3px; }
+@media print { html body { background: #fff; } }

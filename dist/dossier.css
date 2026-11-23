@@ -1,0 +1,97 @@
+/* Dossier patient : bandeau, parcours en étapes et onglets (maquette Scialytique). */
+html body .detailhead.pb-on { padding: 0; background: transparent; border: 0; display: flex; flex-direction: column; gap: 18px; }
+html body .detailhead.pb-on > .row { display: none; }
+.pb-banner { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 18px 22px; border-radius: var(--i-r-l); background: var(--i-s1); border: 1px solid var(--i-line); box-shadow: var(--i-shadow); }
+.pb-avatar { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--i-acc-soft); color: var(--i-acc-ink); font-weight: 700; font-size: 18px; flex: 0 0 auto; }
+.pb-id { display: flex; flex-direction: column; gap: 3px; min-width: 200px; flex: 1 1 220px; }
+html body .pb-name { margin: 0; font-size: 26px; line-height: 1.1; font-weight: 560; letter-spacing: -.025em; color: var(--i-ink); }
+html body .pb-name strong { font-weight: 680; }
+.pb-id p { margin: 0; font-size: 14px; color: var(--i-mut); }
+.pb-mono { font-family: var(--i-mono); font-variant-numeric: tabular-nums; }
+.pb-vitals { display: flex; gap: 22px; margin: 0; flex-wrap: wrap; }
+.pb-vital { display: flex; flex-direction: column; gap: 2px; }
+.pb-vital dt { font-size: 12px; color: var(--i-mut); }
+.pb-vital dd { margin: 0; font: 600 16px/1.2 var(--i-mono); color: var(--i-ink); font-variant-numeric: tabular-nums; }
+.pb-vital small { font: 500 12px var(--i-font); color: var(--i-mut); }
+.pb-na { color: var(--i-mut); font-weight: 400; }
+.pb-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.pb-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+.pb-chip svg { width: 17px; height: 17px; }
+.pb-crit { background: var(--i-crit); color: var(--i-on-crit); }
+.pb-warn { background: var(--i-warn-soft); color: var(--i-warn); }
+.pb-ok { background: var(--i-ok-soft); color: var(--i-ok); }
+.pb-banner .actions { display: flex; gap: 8px; align-items: center; }
+
+.pb-journey { padding: 20px 24px; border-radius: var(--i-r-l); background: var(--i-s1); border: 1px solid var(--i-line); box-shadow: var(--i-shadow); }
+.pb-journey-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.pb-journey-head strong { font-size: 17px; font-weight: 620; letter-spacing: -.015em; }
+.pb-journey-head span { font-size: 14px; color: var(--i-mut); }
+.pb-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.pb-steps li { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pb-bar { height: 6px; border-radius: 3px; background: var(--i-line); margin-bottom: 8px; }
+.pb-steps li.done .pb-bar { background: var(--i-acc); }
+.pb-steps li.now .pb-bar { background: var(--i-acc); opacity: .5; }
+.pb-steps b { font-size: 14px; font-weight: 600; color: var(--i-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1280px) { .pb-steps b { font-size: 12.5px; } .pb-steps { gap: 6px; } }
+.pb-steps li.done b, .pb-steps li.now b { color: var(--i-ink); }
+.pb-steps small { font: 500 12px var(--i-mono); color: var(--i-mut); }
+.pb-steps li.now small { color: var(--i-acc); }
+
+/* La barre étape/secteur et l'identitovigilance, sous le parcours */
+html body .detailhead.pb-on .dossier-status { padding: 0 4px; }
+html body .detailhead.pb-on .identity-banner { margin: 0; border-radius: var(--i-r-m); }
+
+/* Onglets du dossier : pastilles simples, comme la maquette */
+html body #detail .dossier-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 0 14px; margin: 22px 0 8px; background: transparent; border: 0; border-bottom: 1px solid var(--i-line); border-radius: 0; box-shadow: none; }
+html body #detail .dossier-tabs > button { flex: 0 0 auto; min-height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: transparent; box-shadow: none; color: var(--i-mut); display: inline-flex; align-items: center; gap: 0; }
+html body #detail .dossier-tabs > button:hover { background: var(--i-s2); color: var(--i-ink); }
+html body #detail .dossier-tabs > button.active { background: var(--i-acc-soft); color: var(--i-acc-ink); }
+html body #detail .dossier-tabs .dossier-tab-number { display: none; }
+html body #detail .dossier-tabs .dossier-tab-text { display: flex; flex-direction: column; align-items: flex-start; }
+html body #detail .dossier-tabs .dossier-tab-text > :first-child { font-size: 15px; font-weight: 600; color: inherit; }
+html body #detail .dossier-tabs .dossier-tab-text > :not(:first-child) { display: none; }
+
+@media (max-width: 1100px) { .pb-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; } }
+@media (max-width: 900px) { .pb-chips { margin-left: 0; } }
+/* Le dossier n'est plus une carte dans une carte : le bandeau et le parcours portent leurs propres cartes. */
+html body #detail.panel:has(.pb-on) { background: transparent; border: 0; box-shadow: none; padding: 0; overflow: visible; }
+html body #detail:has(.pb-on) #dossier-panel { background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-l); box-shadow: var(--i-shadow); overflow: hidden; }
+html body .detailhead.pb-on .dossier-status > .pill { display: none; }
+html body .detailhead.pb-on .dossier-status { justify-content: flex-start; gap: 24px; }
+
+/* Feuille d'anesthésie : tableau de bord en tête (format tablette, gros chiffres lisibles à distance) */
+.ck { display: flex; flex-direction: column; gap: 16px; margin: 0 0 24px; }
+.ck-strip { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 14px 18px; border-radius: var(--i-r-l); background: var(--i-s2); }
+.ck-who { display: flex; flex-direction: column; gap: 2px; flex: 1 1 220px; }
+.ck-who strong { font-size: 19px; font-weight: 650; letter-spacing: -.015em; }
+.ck-who span { font-size: 14px; color: var(--i-mut); }
+.ck-allergy { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; background: var(--i-crit); color: var(--i-on-crit); font-weight: 700; letter-spacing: .04em; }
+.ck-allergy svg { width: 18px; height: 18px; }
+.ck-clocks { display: flex; gap: 22px; margin: 0; }
+.ck-clocks div { display: flex; flex-direction: column; align-items: flex-end; }
+.ck-clocks dt { font-size: 12px; color: var(--i-mut); }
+.ck-clocks dd { margin: 0; font: 650 24px/1.1 var(--i-mono); font-variant-numeric: tabular-nums; }
+.ck-clocks .ck-now { color: var(--i-acc); }
+.ck-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 16px; }
+.ck-vitals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ck-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: var(--i-r-l); background: var(--i-s1); border: 1px solid var(--i-line); }
+.ck-card-top { display: flex; justify-content: space-between; gap: 8px; }
+.ck-card-top span { font-size: 14px; font-weight: 600; color: var(--i-acc); }
+.ck-card-top small { font: 500 12px var(--i-mono); color: var(--i-mut); }
+.ck-card strong { font: 650 34px/1.05 var(--i-mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--i-ink); display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.ck-card strong small { font: 500 13px var(--i-font); letter-spacing: 0; color: var(--i-mut); }
+.ck-card em { font: normal 500 12px var(--i-mono); color: var(--i-mut); }
+.ck-card.is-out { border-color: var(--i-warn); background: var(--i-warn-soft); }
+.ck-card.is-out .ck-card-top span, .ck-card.is-out strong { color: var(--i-warn); }
+.ck-meds { padding: 16px 18px; border-radius: var(--i-r-l); background: var(--i-s1); border: 1px solid var(--i-line); }
+html body .ck-meds h4 { margin: 0 0 10px; font-size: 16px; font-weight: 620; }
+.ck-meds ol { list-style: none; margin: 0; padding: 0; }
+.ck-meds li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; padding: 9px 0; border-top: 1px solid var(--i-line); font-size: 14.5px; }
+.ck-meds li:first-child { border-top: 0; }
+.ck-t { font-family: var(--i-mono); color: var(--i-mut); }
+.ck-meds b { font-family: var(--i-mono); font-weight: 600; }
+.ck-meds p { margin: 0; color: var(--i-mut); font-size: 14px; }
+@media (max-width: 1100px) { .ck-grid { grid-template-columns: 1fr; } .ck-vitals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* La feuille elle-même : grille plus douce, en-têtes lisibles */
+html body .peri-sheet-window { border-color: var(--i-line); border-radius: var(--i-r-m); overflow: hidden; }
+html body .peri-sheet-window h4 { background: var(--i-s2); border-bottom-color: var(--i-line); font-family: var(--i-mono); }
