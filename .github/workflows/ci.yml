@@ -12,6 +12,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Les référentiels publics (BDPM, CCAM) sont téléchargés sur Clever Cloud ; la CI teste leur lecture sur des fichiers de test.
+      IASELO_REFERENTIELS: 'off'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -70,6 +70,14 @@ export async function veilleApi(request,env,acl){
   return json({opened:true,until},201);
  }
  if(path==='/api/workspace/interop/status'&&request.method==='GET')return json({connecteurs:interopStatus(env.INTEROP_ENV||{})});
+ // Vérification de joignabilité de Pro Santé Connect : lecture du document de découverte public (aucune donnée envoyée).
+ if(path==='/api/workspace/interop/verifier-psc'&&request.method==='POST'){
+  const {pscConfig,PSC_DISCOVERY}=await import('../server/interop/psc.mjs'),cfg=pscConfig(env.INTEROP_ENV||{}),url=cfg.discoveryUrl||PSC_DISCOVERY.test;
+  try{const r=await (env.FETCH||fetch)(url,{signal:AbortSignal.timeout(10000),headers:{Accept:'application/json'}});if(!r.ok)throw Error('HTTP '+r.status);
+   const d=await r.json();if(!d.issuer||!d.authorization_endpoint||!d.token_endpoint)throw Error('document de découverte incomplet');
+   return json({ok:true,environnement:url===PSC_DISCOVERY.production?'production':'bac à sable',issuer:String(d.issuer).slice(0,200),configure:!cfg.missing.length&&cfg.mode!=='simulation',mode:cfg.mode});
+  }catch(e){return json({ok:false,error:'Pro Santé Connect injoignable : '+String(e.message||e).slice(0,150)},502)}
+ }
  if(path==='/api/workspace/interop/insi'){
   if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
   const d=await body(request),stay=String(d.stay||''),key='stay/'+stay+'/core';

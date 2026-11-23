@@ -10,3 +10,5 @@ coverage/
 *.log
 *.zip
 /modeles/
+dist/assets/ccam.json
+dist/assets/referentiels.json

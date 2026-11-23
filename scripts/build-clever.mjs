@@ -6,4 +6,6 @@ for(const dir of ['server','worker'])for(const file of fs.readdirSync(dir))if(fi
 // Module de transcription du compte rendu opératoire : source officielle Hugging Face vérifiée par empreintes, repli sur la copie npm.
 {const {installerModele}=await import('./modele-whisper.mjs');const source=await installerModele();
  if(source==='npm'&&!fs.existsSync('node_modules/sts-whisper-small/models/Xenova/whisper-small/onnx/encoder_model_quantized.onnx')&&!process.env.IASELO_MODELES_DIR)console.warn('Attention : module de transcription vocale absent. La dictée du compte rendu opératoire sera indisponible.');}
+// Référentiels publics (BDPM, CCAM) : téléchargés depuis les sites officiels, jamais bloquants (voir scripts/referentiels.mjs).
+if(process.env.IASELO_REFERENTIELS!=='off'){try{const {majReferentiels}=await import('./referentiels.mjs');await majReferentiels()}catch(e){console.warn('Référentiels publics non mis à jour : '+e.message)}}
 console.log('Sources autonomes, ressources et migrations vérifiées. Démarrage : npm start (port 8080).');
