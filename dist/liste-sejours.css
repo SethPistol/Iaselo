@@ -1,0 +1,22 @@
+/* IASELO · Patients & séjours : liste des séjours compacte, plus de place pour le dossier.
+   Garde le nom, l'identifiant, la spécialité, l'étape (pastille) et la prochaine action. */
+html body .layout:has(#patientlist){grid-template-columns:184px minmax(0,1fr);gap:16px}
+html body .layout>.panel:has(#patientlist){overflow:hidden}
+html body .layout>.panel:has(#patientlist)>.panelhead{padding:12px 12px 10px}
+html body .layout>.panel:has(#patientlist)>.panelhead h3{font-size:15px;margin:0 0 8px}
+html body .layout>.panel:has(#patientlist) .filters{display:flex;flex-direction:column;gap:6px;margin:0}
+html body .layout>.panel:has(#patientlist) .filters input,html body .layout>.panel:has(#patientlist) .filters select{width:100%;min-height:34px;height:34px;padding:4px 9px;font-size:13px}
+html body #patientlist .patient{padding:8px 10px 8px 12px;min-height:0;gap:3px}
+html body #patientlist .patient .ui-patient{gap:8px;align-items:center}
+html body #patientlist .patient .ui-patient>:first-child:not(.ui-who){width:28px;height:28px;min-width:28px;font-size:11px;border-radius:7px}
+html body #patientlist .patient .ui-who strong{font-size:13.5px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+html body #patientlist .patient .ui-who span{font-size:11.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+html body #patientlist .patient .ui-who{min-width:0}
+html body #patientlist .patient .row{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin:2px 0 0}
+html body #patientlist .patient .row .pill{font-size:11px;padding:1px 7px;min-height:0;line-height:1.6}
+html body #patientlist .patient .row small{font-size:11.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+@media (min-width:1500px){html body .layout:has(#patientlist){grid-template-columns:204px minmax(0,1fr)}}
+@media (max-width:1250px){html body .layout:has(#patientlist){grid-template-columns:168px minmax(0,1fr);gap:14px}html body #patientlist .patient .ui-patient>:first-child:not(.ui-who){display:none}}
+/* Tablette étroite et téléphone : la liste passe au-dessus, en grille compacte (règle existante) */
+@media (max-width:1000px){html body .layout:has(#patientlist){grid-template-columns:1fr}html body #patientlist .patient .ui-patient>:first-child:not(.ui-who){display:flex}}
+html body.dossier-focus .layout:has(#patientlist){grid-template-columns:minmax(0,1fr)}
