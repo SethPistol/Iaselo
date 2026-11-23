@@ -128,7 +128,7 @@ window.createDocumentsConsentement=function(ctx){
   const done=()=>{document.body.classList.remove('dc-printing');host.remove();window.removeEventListener('afterprint',done)};
   window.addEventListener('afterprint',done);setTimeout(()=>{try{window.print()}finally{setTimeout(done,500)}},50);
  }
- function timeline(c,lk,auto){
+ function timeline(c,lk,auto,rappels){
   const st=R.statut(c),items=[];
   if(c?.envoi)items.push(['ok',I.send,(c.envoi.automatique?'Envoyé automatiquement le ':'Envoyé le ')+fmt(c.envoi.at),(c.envoi.automatique?'à la validation de la consultation par ':'par ')+c.envoi.by+' · '+c.envoi.channels.map(x=>x==='sms'?'SMS':'e-mail').join(' + ')]);
   for(const r of c?.relances||[])items.push(['ok',I.clock,'Relancé le '+fmt(r.at),'par '+r.by+' · '+r.channels.map(x=>x==='sms'?'SMS':'e-mail').join(' + ')]);
@@ -138,6 +138,7 @@ window.createDocumentsConsentement=function(ctx){
   if(c?.verification&&c.recu)items.push([c.verification.conforme?'ok':'crit',I.check,(c.verification.conforme?'Vérifié conforme':'Non conforme')+' le '+fmt(c.verification.at),c.verification.by+(c.verification.note?' · '+c.verification.note:'')]);
   if(c?.contreSigne)items.push(['ok',I.check,'Contresigné le '+fmt(c.contreSigne.at),c.contreSigne.by]);
   if(c?.annule&&!c.recu)items.push(['crit',I.lock,'Lien désactivé le '+fmt(c.annule.at),c.annule.by]);
+  for(const e of rappels||[])if(/^consentement-/.test(e.kind)&&!e.ok&&!st.recu)items.push(['crit',I.alert,'Rappel automatique '+(e.kind==='consentement-j-2'?'J-2':'J-1')+' non envoyé',e.raison||'']);
   if(auto?.ok&&auto.partiel?.length&&c?.envoi?.automatique&&!st.recu)items.push(['warn',I.alert,'Envoi automatique partiel',auto.partiel.join(' · ')]);
   if(!st.recu&&c?.envoi&&!c.annule&&lk&&!lk.active)items.push(['crit',I.lock,lk.locked?'Lien fermé après 5 erreurs de date de naissance':'Lien expiré','Relancez pour envoyer un nouveau lien']);
   return items.length?`<ol class="dc-time">${items.map(([k,ic,t,sub])=>`<li class="is-${k}">${ic}<span><b>${esc(t)}</b>${sub?`<small>${esc(sub)}</small>`:''}</span></li>`).join('')}</ol>`:'';
@@ -176,7 +177,7 @@ window.createDocumentsConsentement=function(ctx){
     <div class="pp-side">
      <section class="v-card pp-actions">
       <div id="dc-server"></div>
-      ${timeline(c,lk,sp.consentementAuto)}
+      ${timeline(c,lk,sp.consentementAuto,sp.rappelsAuto)}${!st.recu&&sent?'<p class="pp-rgpd">'+I.clock+' Sans signature, rappel automatique par SMS à J-2 puis à J-1 (10 h), avec un nouveau lien.</p>':''}
       ${rel.conseillee?`<p class="dc-relance">${I.clock}<span><b>Relance conseillée</b> ${esc(rel.raison)}</span></p>`:''}
       <div class="v-actions">
        ${isAnesth()&&!sent&&!st.recu?'':''}
@@ -255,7 +256,8 @@ window.createDocumentsConsentement=function(ctx){
   const nouveaux=(sp.documents||[]).filter(d=>d.source==='patient'&&!d.vu&&!d.ecarte).length;
   if(chips&&!chips.querySelector('.dc-chip')){
    const autoKo=autoEchec(sp),showCons=autoKo||al.bloquant&&(al.niveau==='crit'||al.statut.code!=='aucun')||al.statut.aRevoir;
-   chips.insertAdjacentHTML('beforeend',`${showCons?`<button type="button" class="pb-chip dc-chip ${autoKo||al.niveau==='crit'?'pb-crit':'pb-warn'}" data-dc-goto="${TAB_CONS}">${I.pen}${esc(autoKo?'Consentement non envoyé : à compléter':al.statut.aRevoir?'Consentement à revoir':al.statut.code==='aucun'?'Consentement non envoyé':al.statut.code==='depose'?'Consentement à vérifier':'Consentement non reçu')}</button>`:''}${nouveaux?`<button type="button" class="pb-chip dc-chip pb-info" data-dc-goto="${TAB_DOCS}">${I.file}${nouveaux} document${nouveaux>1?'s':''} du patient</button>`:''}`);
+   const dp=R.datePrevueSejour(s),ko=(sp.rappelsAuto||[]).filter(e=>!e.ok&&e.date===dp&&(e.kind==='suivi-j+1'||!al.statut.recu));
+   chips.insertAdjacentHTML('beforeend',`${ko.map(e=>`<button type="button" class="pb-chip dc-chip pb-crit" data-dc-goto="${e.kind==='suivi-j+1'?'suiviJ1':TAB_CONS}" title="${esc(e.raison||'')}">${I.alert}${esc(e.kind==='suivi-j+1'?'SMS J+1 non envoyé':'Rappel SMS du consentement non envoyé')}</button>`).join('')}${showCons?`<button type="button" class="pb-chip dc-chip ${autoKo||al.niveau==='crit'?'pb-crit':'pb-warn'}" data-dc-goto="${TAB_CONS}">${I.pen}${esc(autoKo?'Consentement non envoyé : à compléter':al.statut.aRevoir?'Consentement à revoir':al.statut.code==='aucun'?'Consentement non envoyé':al.statut.code==='depose'?'Consentement à vérifier':'Consentement non reçu')}</button>`:''}${nouveaux?`<button type="button" class="pb-chip dc-chip pb-info" data-dc-goto="${TAB_DOCS}">${I.file}${nouveaux} document${nouveaux>1?'s':''} du patient</button>`:''}`);
    chips.querySelectorAll('[data-dc-goto]').forEach(b=>b.onclick=()=>ctx.goTab?.(b.dataset.dcGoto));
   }
   // Feuille d'anesthésie : rappel visible avant l'induction.
