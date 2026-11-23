@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {workspaceApi} from '../worker/workspace.mjs';import {sqliteBinding} from '../worker/sqlite-adapter.mjs';import {brevoMessaging,normalizeRecipient} from '../server/brevo.mjs';import {invitationMessages} from '../worker/questionnaire.mjs';
+import {workspaceApi} from '../worker/workspace.mjs';import {sqliteBinding} from '../worker/sqlite-adapter.mjs';import {brevoMessaging,normalizeRecipient,brevoError} from '../server/brevo.mjs';import {invitationMessages} from '../worker/questionnaire.mjs';
 const origin='https://prototype.test',now='2020-01-01T00:00:00.000Z';
 function fake(){const calls=[];return {calls,fetch:async(url,init)=>{calls.push({url,headers:init.headers,body:JSON.parse(init.body)});return new Response(JSON.stringify({messageId:'m-'+calls.length}),{status:201})}}}
 test('Brevo : clé lue dans l’environnement, bons points d’accès, SMS transactionnel sans +',async()=>{
@@ -11,11 +11,21 @@ test('Brevo : clé lue dans l’environnement, bons points d’accès, SMS trans
  assert.equal(f.calls[1].url,'https://api.brevo.com/v3/smtp/email');assert.equal(f.calls[1].body.sender.email,'no-reply@clinique.test');
  assert.deepEqual(brevoMessaging({},f.fetch).channels,{email:false,sms:false});
 });
-test('Brevo : en recette, seuls les destinataires de test autorisés reçoivent un message',async()=>{
- const f=fake(),env={BREVO_API_KEY:'k',BREVO_SMS_SENDER:'IASELO',IASELO_RECETTE:'true'};
- await assert.rejects(brevoMessaging(env,f.fetch).sms({to:'+33612345678',content:'x'}),/recette/);
- const m=brevoMessaging({...env,MESSAGING_ALLOWED_RECIPIENTS:'+33 6 00 00 00 01'},f.fetch);
- await assert.rejects(m.sms({to:'+33612345678',content:'x'}),/liste de test/);await m.sms({to:'+33600000001',content:'x'});assert.equal(f.calls.length,1);
+test('Brevo : une seule variable (la clé) ; expéditeur e-mail trouvé dans Brevo ; recette marquée [TEST]',async()=>{
+ const calls=[],fetch=async(url,init)=>{calls.push({url,method:init.method,body:init.body&&JSON.parse(init.body)});if(url.endsWith('/senders'))return new Response(JSON.stringify({senders:[{email:'inactif@c.test',active:false},{email:'valide@c.test',active:true}]}),{status:200});if(url.endsWith('/account'))return new Response(JSON.stringify({plan:[{type:'payAsYouGo',credits:300},{type:'sms',credits:42}]}),{status:200});return new Response('{"messageId":"1"}',{status:201})};
+ const m=brevoMessaging({BREVO_API_KEY:'k',IASELO_RECETTE:'true'},fetch);
+ assert.deepEqual(m.channels,{email:true,sms:true});
+ await m.email({to:'patient@exemple.test',subject:'Sujet',text:'t',html:'h'});await m.sms({to:'+33600000042',content:'Bonjour'});
+ const mail=calls.find(c=>c.url.endsWith('/smtp/email')).body,sms=calls.find(c=>c.url.endsWith('/transactionalSMS/send')).body;
+ assert.equal(mail.sender.email,'valide@c.test');assert.equal(mail.subject,'[TEST] Sujet');assert.equal(sms.content,'[TEST] Bonjour');assert.equal(sms.sender,'TROCADERO');
+ const st=await m.status();assert.equal(st.ready,true);assert.equal(st.sms.credits,42);assert.equal(st.email.from,'valide@c.test');assert.ok(!JSON.stringify(st).includes('"k"'));
+ assert.equal((await brevoMessaging({}).status()).ready,false);
+ const noSender=brevoMessaging({BREVO_API_KEY:'k'},async url=>new Response(JSON.stringify(url.endsWith('/senders')?{senders:[]}:{plan:[]}),{status:200}));
+ const s2=await noSender.status();assert.equal(s2.ready,false);assert.match(s2.email.error,/Expéditeurs/);assert.match(s2.sms.error,/crédit/);
+});
+test('Brevo : erreurs traduites en consignes (IP bloquée, crédits, expéditeur)',()=>{
+ assert.match(brevoError(401,{message:'We have detected you are using an unrecognised IP address 1.2.3.4'}),/adresses IP/);
+ assert.match(brevoError(400,{code:'not_enough_credits'}),/crédits/);assert.match(brevoError(400,{message:'sender is invalid'}),/Expéditeur/);
 });
 test('Brevo : erreur de clé traduite sans divulguer la clé',async()=>{
  const m=brevoMessaging({BREVO_API_KEY:'secret-cle',BREVO_SMS_SENDER:'IASELO'},async()=>new Response(JSON.stringify({code:'unauthorized'}),{status:401}));
@@ -43,7 +53,8 @@ test('envoi du lien : destinataire vérifié côté serveur, lien actif requis, 
   const sent=await f.call('owner','/questionnaire/send',{stay:'A',token,channels:['sms','email'],to:'pirate@evil.test'});
   assert.equal(sent.status,200);assert.ok(sent.data.results.every(r=>r.sent));
   assert.equal(f0.calls[0].body.recipient,'33612345678');assert.equal(f0.calls[1].body.to[0].email,'camille@example.test');assert.ok(f0.calls[0].body.content.includes(token));
-  const logs=f.DB.raw.prepare("SELECT * FROM professional_access_log WHERE action='questionnaire-envoi'").all();assert.equal(logs.length,2);
+  const auto=await f.call('owner','/questionnaire/send',{stay:'A',token});assert.deepEqual(auto.data.results.map(r=>r.channel),['sms','email']);
+  const logs=f.DB.raw.prepare("SELECT * FROM professional_access_log WHERE action='questionnaire-envoi'").all();assert.equal(logs.length,4);
   assert.ok(!JSON.stringify(logs).includes('612345678')&&!JSON.stringify(logs).includes('camille@'),'coordonnées masquées dans le journal');assert.ok(!JSON.stringify(logs).includes(token));
  }finally{f.close()}
 });
@@ -52,5 +63,5 @@ test('liste de test : e-mails avec points, 06/0033/+33, espaces, guillemets et p
  const f=fake(),m=brevoMessaging({BREVO_API_KEY:'k',BREVO_SENDER_EMAIL:'a@b.test',BREVO_SMS_SENDER:'IASELO',IASELO_RECETTE:'true',MESSAGING_ALLOWED_RECIPIENTS:' "06 00 00 00 42" ; Prenom.Nom@Example.COM '},f.fetch);
  await m.sms({to:'+33600000042',content:'x'});await m.email({to:'prenom.nom@example.com',subject:'s',text:'t',html:'h'});assert.equal(f.calls.length,2);
  for(const v of ['0600000042','0033 6 00 00 00 42','+33 (0)6 00 00 00 42','33600000042','+33.6.00.00.00.42'])assert.equal(normalizeRecipient(v),'+33600000042',v);
- await assert.rejects(m.email({to:'autre@example.com',subject:'s',text:'t',html:'h'}),/2 destinataires/);
+ await assert.rejects(m.email({to:'autre@example.com',subject:'s',text:'t',html:'h'}),/MESSAGING_ALLOWED_RECIPIENTS/);
 });
