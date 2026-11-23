@@ -29,3 +29,11 @@ test('OCR : le nom du médecin et les libellés voisins ne deviennent jamais l�
  assert.equal(c.firstName,'');assert.equal(c.lastName,'');
  const d=C.parseProfile('Mme Dr Sophie MARTIN');assert.equal(d.lastName,'');
 });
+test('photos dégradées : libellés illisibles, nom sans civilité, repli manuel ligne par ligne',()=>{
+ const c=C.parseProfile('Léa BERANGER-ETIENNE\n\nLB\nlea.be@example.test');assert.deepEqual([c.firstName,c.lastName],['Léa','BERANGER-ETIENNE']);
+ const t=C.parseProfile('M. Jean-Pierre DE LA FONTAINE\nDE LA FONTAINE\nJean-Pierre\n02/02/1947\n06 55 44 33 22');assert.equal(t.birthDate,'1947-02-02');
+ const rdv=C.parseProfile('Mme Camille MARTIN\nLun. 30 nov. 2026 · 09:30 · Consultation\n12/01/2026 10:30 Rendez-vous');assert.equal(rdv.birthDate,'');
+ const two=C.parseProfile('Mme Camille MARTIN\n14/06/1985\n02/02/1990');assert.equal(two.birthDate,'');
+ assert.equal(C.fieldFromLine('lastName','Nom de naissance *   dupont'),'DUPONT');assert.equal(C.fieldFromLine('firstName','Marie-Hélène'),'Marie-Hélène');assert.equal(C.fieldFromLine('birthDate','Née le 05/11/1972 (54 ans)'),'1972-11-05');assert.equal(C.fieldFromLine('birthDate','Téléphone 06 12'),'');
+ const m=C.mergeProfiles([{lastName:'MARTIN',firstName:'Camille'},{lastName:'DUPONT',firstName:'Camille',birthDate:'1985-06-14'},{lastName:'DUPONT'}]);assert.deepEqual([m.lastName,m.firstName,m.birthDate],['DUPONT','Camille','1985-06-14']);
+});

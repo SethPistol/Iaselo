@@ -20,6 +20,22 @@ Règles : le nom de naissance alimente l'identité (Doctolib affiche le nom d'us
 
 OCR : petites captures agrandies (×2 à ×2,5), niveaux de gris, fond sombre inversé, espaces conservés pour retrouver les colonnes (`InvitationCore.prepareCanvas`, `OCR_PARAMS`). Sur 7 captures fictives de test, le nom et le prénom étaient lus sur 1 avant le correctif et sur 7 après.
 
+## Photos prises au téléphone (23/11/2026, après-midi)
+
+Romain signalait des lectures encore ratées sur de vraies photos. Banc d'essai : 7 fiches fictives × 5 dégradations combinées (photo d'écran au téléphone avec moiré, reflet fort, inclinaison et perspective, basse résolution, très dégradée), plus 6 défauts isolés. Le banc complet reste hors du dépôt (images générées) ; les règles sont couvertes par `tests/invitation.test.cjs`.
+
+Chaîne de lecture (`InvitationCore.readProfile`, tout dans le navigateur) :
+
+1. orientation EXIF respectée, recadrage automatique sur l'écran photographié, agrandissement des petits textes ;
+2. niveaux de gris, étirement du contraste, inversion des fonds sombres ;
+3. redressement automatique de −15° à +15° (profil de projection des lignes) ;
+4. seuil adaptatif de Sauvola dans Tesseract (`thresholding_method=2`) : résiste aux reflets et à l'éclairage inégal ;
+5. jusqu'à quatre lectures (image accentuée, gris foncés par gamma, zones isolées, image redressée) ; arrêt dès que nom, prénom et naissance sont trouvés après au moins deux lectures ; fusion des valeurs par vote, le nom de naissance (« née … », libellé) l'emportant sur le nom de l'en-tête.
+
+Analyse du texte : libellés abîmés par l'OCR reconnus (« Nom de naissar »), nom « Prénom NOM » sans civilité, date de naissance seule hors rendez-vous, valeurs d'une lettre rejetées.
+
+Repli manuel : la liste « Texte lu » s'ouvre quand un champ manque ; chaque ligne a des boutons Nom / Prénom / Naissance qui remplissent le champ (la case de vérification est alors décochée). Si le nom ne vient que de l'en-tête de la fiche, un avertissement rappelle qu'il peut s'agir du nom d'usage.
+
 ## Envoi par SMS et e-mail (Brevo)
 
 Quand Brevo est configuré (voir `clevercloud/environment.example`), l’écran affiche « Envoyer par SMS », « Envoyer par e-mail » et « Envoyer les deux » après la préparation du lien. Sinon, les anciens boutons de brouillon (mailto/sms) restent affichés.
