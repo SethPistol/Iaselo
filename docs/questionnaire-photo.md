@@ -34,7 +34,7 @@ Chaîne de lecture (`InvitationCore.readProfile`, tout dans le navigateur) :
 
 Analyse du texte : libellés abîmés par l'OCR reconnus (« Nom de naissar »), nom « Prénom NOM » sans civilité, date de naissance seule hors rendez-vous, valeurs d'une lettre rejetées.
 
-Repli manuel : la liste « Texte lu » s'ouvre quand un champ manque ; chaque ligne a des boutons Nom / Prénom / Naissance qui remplissent le champ (la case de vérification est alors décochée). Si le nom ne vient que de l'en-tête de la fiche, un avertissement rappelle qu'il peut s'agir du nom d'usage.
+Repli manuel : la liste « Texte lu » à toucher ligne par ligne a été retirée à la demande de Romain (23/11) ; les champs se corrigent directement dans le formulaire. Si le nom ne vient que de l'en-tête de la fiche, un avertissement rappelle qu'il peut s'agir du nom d'usage.
 
 ## Fiche « Coordonnées » de Doctolib (photo réelle de Romain, 23/11/2026)
 
