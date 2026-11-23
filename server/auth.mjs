@@ -77,7 +77,7 @@ export function loginPage(message='',test=recette(),psc=false){return `<!doctype
 body{font:16px/1.55 Geist,system-ui,-apple-system,'Segoe UI',sans-serif;color:#0C1A25;background:#F3F5F8;-webkit-font-smoothing:antialiased;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(380px,1fr);min-height:100vh}
 .marque{position:relative;overflow:hidden;color:#EAF5F7;background:radial-gradient(120% 140% at 100% 0%,#1C6B7D 0%,#0F4D5C 42%,#0A3843 100%);padding:48px clamp(28px,5vw,72px);display:flex;flex-direction:column;justify-content:space-between;gap:40px}
 .marque svg.halo{position:absolute;right:-220px;top:-220px;width:760px;height:760px;opacity:.5;pointer-events:none}
-.marque img{height:46px;width:auto;position:relative;align-self:flex-start}
+.marque img{height:72px;width:auto;position:relative;align-self:flex-start}
 .marque h1{position:relative;margin:0;font-size:clamp(34px,4vw,56px);line-height:1.04;letter-spacing:-.035em;font-weight:640;max-width:14ch;color:#fff}
 .marque p{position:relative;margin:18px 0 0;font-size:18px;color:#BFE0E6;max-width:44ch}
 .etapes{position:relative;display:flex;flex-wrap:wrap;gap:8px;margin-top:28px;padding:0;list-style:none}
@@ -85,7 +85,7 @@ body{font:16px/1.55 Geist,system-ui,-apple-system,'Segoe UI',sans-serif;color:#0
 .pied{position:relative;font-size:13px;color:#A9D3DB}
 .acces{display:flex;align-items:center;justify-content:center;padding:40px 24px}
 main{width:100%;max-width:420px;display:flex;flex-direction:column;gap:22px}
-.etab{height:68px;width:auto;align-self:flex-start}
+.etab{height:112px;width:auto;align-self:flex-start}
 h2{margin:6px 0 0;font-size:30px;font-weight:640;letter-spacing:-.03em;line-height:1.1}
 .sous{margin:0;color:#4C5D6C}
 .recette{margin:0;padding:12px 14px;border-radius:12px;background:#FFF4E5;border:1px solid #E8B36A;color:#5C3300;font-size:14px}.recette code{font:600 13px/1.4 ui-monospace,monospace}
@@ -98,7 +98,9 @@ button:hover{background:#0B3D49}button:focus-visible{outline:3px solid #0F4D5C;o
 .error{margin:0;padding:12px 14px;border-radius:12px;background:#FDEBEC;color:#B21F2A;font-weight:550}.error:empty{display:none}
 .psc{display:flex;align-items:center;justify-content:center;min-height:52px;border:1px solid #0F4D5C;border-radius:13px;color:#0F4D5C;font-weight:600;text-decoration:none}.psc:hover{background:#E1EFF1}
 .note{margin:0;font-size:13.5px;color:#4C5D6C;border-top:1px solid #DAE1E8;padding-top:18px}
-@media (max-width:860px){body{grid-template-columns:1fr}.marque{padding:28px 24px;gap:24px}.marque svg.halo{width:480px;height:480px;right:-180px;top:-200px}.marque h1{font-size:32px}.etapes,.pied{display:none}.acces{padding:28px 20px 40px}}
+@media (max-width:860px){body{grid-template-columns:1fr}.marque{padding:28px 24px;gap:24px}.marque svg.halo{width:480px;height:480px;right:-180px;top:-200px}.marque h1{font-size:32px}
+.marque img{height:56px}
+.etab{height:84px}.etapes,.pied{display:none}.acces{padding:28px 20px 40px}}
 </style></head><body>
 <section class="marque" aria-label="IASELO"><svg class="halo" viewBox="0 0 760 760" fill="none" aria-hidden="true"><g stroke="#fff"><circle cx="380" cy="380" r="370" stroke-opacity=".10"/><circle cx="380" cy="380" r="300" stroke-opacity=".13"/><circle cx="380" cy="380" r="230" stroke-opacity=".17"/><circle cx="380" cy="380" r="160" stroke-opacity=".22"/><circle cx="380" cy="380" r="90" stroke-opacity=".3"/></g><circle cx="380" cy="380" r="40" fill="#fff" fill-opacity=".12"/></svg>
 <img src="/assets/marque/iaselo-sombre.webp" alt="iaselo" width="495" height="160">
