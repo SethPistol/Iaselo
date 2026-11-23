@@ -82,7 +82,7 @@ window.createConsultationModele=function({$,esc,toast,event,role,medecin,onChang
  function monter(zone,stay,read){
   preparer(stay);
   frame=document.createElement('iframe');frameStay=stay.id;frameRead=read;frameReady=false;const ce=frame;
-  frame.className='cpa-frame';frame.title='Consultation pré-anesthésique';frame.src='consultation-modele.html?v=1';
+  frame.className='cpa-frame';frame.title='Consultation pré-anesthésique';frame.src='consultation-modele.html?v=2';
   frame.addEventListener('load',()=>{
    const w=win();if(!w||frame!==ce||frameStay!==stay.id)return;stay=sejour?.(stay.id)||stay;const c=stay.consult;
    w.CPA.theme(document.documentElement.dataset.theme||null);
@@ -119,6 +119,7 @@ window.createConsultationModele=function({$,esc,toast,event,role,medecin,onChang
  }
  function manquants(stay){return R.manquants(stay?.consult?.cpa||{})}
  function actif(stay){return !!win()&&frameReady&&frameStay===stay?.id&&document.body.contains(frame)}
- function aller(id){win()?.CPA.aller(id)}
+ // Amène au champ bloquant : cadre visible, rubrique ouverte, défilement, focus et mise en évidence.
+ function aller(id){const w=win();if(!w)return false;frame.scrollIntoView({block:'start'});return w.CPA.aller(id)!==false}
  return {preparer,inserer,annuler,bandeau,ancienneHTML,monter,capture,deriver,manquants,actif,aller,libelle:id=>R.libelle(id)};
 };

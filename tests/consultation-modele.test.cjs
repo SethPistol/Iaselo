@@ -73,3 +73,11 @@ test('la trame intégrée garde le pont IASELO et charge jsPDF localement',()=>{
  // Les champs du module de règles sont ceux de la trame.
  for(const id of Object.keys(C.TYPES))assert.ok(html.includes(`id:'${id}'`),id);
 });
+
+test('les éléments bloquants mènent au champ concerné',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../dist/consultation-modele.html'),'utf8');
+ assert.match(html,/function aller\(id\)\{[\s\S]*?closest\('details'\)[\s\S]*?scrollIntoView[\s\S]*?focus[\s\S]*?cpa-flash/);
+ const js=fs.readFileSync(path.join(__dirname,'../dist/parcours-v8.js'),'utf8');
+ assert.match(js,/data-cpa-go=/);assert.match(js,/k==='medicationRows'\?'ttt_habituel'/);assert.match(js,/#cpa-gaps-go/);
+ for(const id of C.manquants({}))assert.ok(html.includes(`id:'${id}'`),id);
+});

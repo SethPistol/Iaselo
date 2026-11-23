@@ -646,6 +646,8 @@ form.ro .chip span,form.ro input,form.ro textarea,form.ro select{opacity:.9}
 :root{--pt:#8A6A00;--pt-line:#C9A000;--pt-soft:#FFF1B8}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--pt:#F2D98A;--pt-line:#C9A227;--pt-soft:#3A3110}}
 :root[data-theme="dark"]{--pt:#F2D98A;--pt-line:#C9A227;--pt-soft:#3A3110}
+@keyframes cpaFlash{0%,60%{box-shadow:0 0 0 3px var(--warn),0 0 0 7px color-mix(in srgb,var(--warn) 25%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+.cpa-flash{animation:cpaFlash 2.4s ease-out;border-radius:4px}
 </style>
 </head>
 <body>
@@ -2018,7 +2020,7 @@ document.getElementById('btnPdf').onclick=()=>{
   generate();
 };
 document.getElementById('missingList').addEventListener('click',e=>{const a=e.target.closest('a[data-go]');if(!a)return;e.preventDefault();
-  const el=form.querySelector(`[data-f="${a.dataset.go}"]`);el.scrollIntoView({block:'center'});const i=el.querySelector('input,textarea,select');if(i)i.focus({preventScroll:true})});
+  aller(a.dataset.go)});
 document.getElementById('btnFix').onclick=()=>{const first=form.querySelector('.fld.miss');if(first){first.scrollIntoView({block:'center'});const i=first.querySelector('input,textarea,select');if(i)i.focus({preventScroll:true})}};
 document.getElementById('btnForce').onclick=()=>{document.getElementById('missing').hidden=true;generate()};
 const bT=document.getElementById('btnTpl'),bC=document.getElementById('btnTplClear');
@@ -2295,6 +2297,16 @@ function marquer(m,info){
     if(Array.isArray(x)){x.forEach(o=>{const i=[...form.querySelectorAll(`input[name="${id}"]`)].find(i=>i.value===o);if(i)i.closest('.chip').classList.add('pt-decl')});return}
     el.classList.add('pt-decl');const lab=el.querySelector('.lab');if(lab){const b=document.createElement('span');b.className='ptb';b.textContent='Patient';b.title=info||'Déclaré par le patient dans le questionnaire';lab.appendChild(b)}});
 }
+
+function aller(id){
+  const el=form.querySelector(`[data-f="${id}"]`)||document.getElementById('s-'+id);if(!el)return false;
+  for(let d=el.closest('details');d;d=d.parentElement&&d.parentElement.closest('details'))d.open=true;
+  if(el.matches('details'))el.open=true;
+  el.scrollIntoView({block:'center'});
+  const i=el.querySelector('input:not([type=hidden]):not([disabled]),textarea,select,summary');if(i)try{i.focus({preventScroll:true})}catch(e){}
+  el.classList.remove('cpa-flash');void el.offsetWidth;el.classList.add('cpa-flash');setTimeout(()=>el.classList.remove('cpa-flash'),2600);
+  return true;
+}
 window.CPA={
   FIELDS,SCHEMA,
   etat(){const v=collect();v.__syn={last:lastSyn,off:synOff};return v},
@@ -2311,7 +2323,7 @@ window.CPA={
   dire:(t,cls)=>say(t,cls),
   surChangement(cb){onChange=cb},
   theme(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme},
-  aller(id){const el=form.querySelector(`[data-f="${id}"]`)||document.getElementById('s-'+id);if(el)el.scrollIntoView({block:'center'})}
+  aller(id){return aller(id)}
 };
 if(window.parent!==window)document.documentElement.classList.add('iaselo');
 try{window.parent.postMessage({type:'cpa-pret'},location.origin)}catch(e){}
