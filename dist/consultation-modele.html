@@ -625,7 +625,7 @@ button.primary{background:linear-gradient(120deg,var(--brand1),var(--brand2));bo
 
 /* ===== Intégration IASELO ===== */
 html.iaselo body{padding-block:14px 110px}
-html.iaselo header.top{margin-bottom:14px}
+html.iaselo header.top{display:none} /* IASELO : titre et logo déjà dans le dossier ; le PDF garde le logo */
 @media (min-width:640px) and (max-width:860px){
  html.iaselo .layout{grid-template-columns:205px minmax(0,1fr);gap:16px}
  html.iaselo aside{position:sticky;top:12px;max-height:calc(100vh - 110px);overflow-y:auto}
