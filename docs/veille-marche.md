@@ -41,8 +41,8 @@ et `dist/acces-professionnels.js`.
 
 ## Non repris à ce stade
 
-Mode dégradé hors ligne de la feuille d'anesthésie, base médicamenteuse agréée (Vidal/BCB), codage CCAM à la source,
-bris de glace, journal d'accès consultable par le patient : prochaines étapes.
+Faits depuis : mode hors ligne (saisie rapide au bloc), bris de glace, journal d'accès, base publique des médicaments (BDPM)
+et codage CCAM à la source (voir `docs/referentiels.md`). Reste : base médicamenteuse agréée Vidal/BCB (contrat éditeur).
 
 ## Phase 2 : tout le reste de la veille (P2 et P3)
 

@@ -41,4 +41,13 @@ Les certificats et secrets vont dans les variables Clever Cloud, jamais dans le 
 - **INSi** : espaces de noms et en-têtes exacts du WSDL du package INSi (constantes `INSI_SPEC`).
 - **DMP** : signature XML du VIHF et enveloppe ITI-41 du package DMP (interface `signer`) ; identifiants de modèles CDA (`CDA_SPEC`) à passer au validateur CI-SIS. Sans `signer`, l'envoi réel est refusé.
 - **MSSanté** : modalités de l'opérateur choisi (port, authentification, API LPS éventuelle) ; pièce jointe IHE XDM si exigée.
-- **Écrans** : bouton « Rechercher dans l'INSi » et production du PDF de la lettre de liaison côté interface (la route exige `pdfBase64` pour un envoi réel).
+
+
+## Fait depuis (23/11/2026)
+
+- Écran **Droits & traçabilité › Raccordements nationaux** : mode de chaque connecteur, variables manquantes, certificats déposés
+  (lisibilité, mot de passe, titulaire, date d'expiration, émetteur IGC-Santé), test de joignabilité de Pro Santé Connect
+  (`POST /api/workspace/interop/verifier-psc`, lecture du document de découverte public).
+- Écran **Identité & INS** : bouton « Rechercher l'INS dans l'INSi » (`POST /api/workspace/interop/insi`), résultat tracé ;
+  l'identité n'est qualifiée que si le justificatif a été contrôlé et que les traits concordent.
+- La lettre de liaison produit son PDF côté serveur (`server/pdf-texte.mjs`) pour le DMP et MSSanté.

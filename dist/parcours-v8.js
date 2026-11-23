@@ -419,7 +419,9 @@ function bindCroDictation(editor){
   closeCroDictation=()=>{};
  };
 }
+let croModule=null;
 function operativeReport(){
+ if(croModule){croModule.render();return}
  const stay=p(),saved=stay.cro,write=role==='Chirurgien';
  const announced=publishedSurgery(stay)?.fields;
  const defaultOperation=announced?.procedure||consultData().operation||'';
@@ -2202,6 +2204,11 @@ if(documentsConsentement&&veilleModule){const panelBeforeDocs=veilleModule.panel
 
 // Visite pré-anesthésique (dist/vpa.js) : étape dédiée entre la consultation et le peropératoire.
 const vpaModule=window.createVpa?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,identityStatus:stay=>identityWorkspace.status(stay),goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},flush:()=>durableWorkspace?.flush(),refreshHeader:()=>detail()})||null;
+// Compte rendu opératoire : dictée transcrite sur le poste, import audio ou document, relecture et signature (cro.js).
+croModule=window.createCro?.({$,esc,toast,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,
+ authorName:()=>activeDoctor==='med-c'?doctorName(activeDoctor):'Chirurgien · profil simulé',event:(text,kind)=>event(text,kind),download:file=>file&&downloadCroFile(file),flush:()=>durableWorkspace?.flush(),refresh:()=>detail(),
+ defaults:stay=>({operation:publishedSurgery(stay)?.fields?.procedure||consultData().operation||'',date:(stay.perop?.records||[]).filter(r=>r.kind==='Événement'&&!r.voided&&r.values.event==='Fin de chirurgie').map(r=>r.at.slice(0,10)).sort().at(-1)||dateKey()})})||null;
+if(croModule){const detailBeforeCro=detail;detail=function(){detailBeforeCro();croModule.detail(tab)}}
 if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule.panel=t=>vpaModule.panel(t)||panelBeforeVpa(t);const detailBeforeVpa=detail;detail=function(){detailBeforeVpa();vpaModule.detail(tab)}}
 
 // Accès direct au plan de soins du séjour sélectionné.

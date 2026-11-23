@@ -8,7 +8,7 @@
   let catalogueRequest;
 
   function loadCatalogue() {
-    catalogueRequest ??= fetch('assets/medicaments-bdpm.json?v=2026-01-08')
+    catalogueRequest ??= fetch('assets/medicaments-bdpm.json', { cache: 'no-cache' })
       .then(response => {
         if (!response.ok) throw new Error('Catalogue indisponible');
         return response.json();
@@ -136,5 +136,12 @@
     refresh();
   }
 
-  window.ParcoursBdpm = { mount };
+  // Recherche partagée (prescriptions préopératoires, traitements du dossier) : mêmes données BDPM officielles.
+  async function rechercher(terme, max = 12) {
+    const data = await loadCatalogue();
+    const q = fold(terme);
+    return q.length < 2 ? [] : search(data.specialties, q, false).slice(0, max);
+  }
+
+  window.ParcoursBdpm = { mount, rechercher, charger: loadCatalogue };
 })();
