@@ -41,11 +41,11 @@ root.createBlocPlanner=function(ctx){
  });}
  function render(){
  const day=ctx.filters.date||ctx.today(),at=ctx.filters.at?.slice(0,10)===day?ctx.filters.at:day+'T10:00';
- const tabs=[['planning','Planning par salle'],['booking','Programmer un séjour'],['vacations','Vacations'],['capacity','SSPI & lits'],['resources','Ressources']];
+ const tabs=[['planning','Planning par salle'],['booking','Programmer un séjour'],['vacations','Vacations'],['capacity','SSPI & lits'],['resources','Ressources'],['convocations','Convocations SMS']];
  document.querySelector('.management')?.classList.toggle('is-plan',pane==='planning');$('#management-body').innerHTML=`<p class="bl-intro">Programme partagé · capacités et durées de démonstration, à paramétrer selon la clinique. Disponibilité prévisionnelle et occupation déclarée sont affichées séparément. Cliquez sur Actualiser pour charger les dernières données serveur.</p><div class="tabs planning-tabs" aria-label="Régulation du bloc et des lits">${tabs.map(([k,l])=>`<button data-plan-pane="${k}" aria-pressed="${pane===k}" class="${pane===k?'active':''}">${l}</button>`).join('')}</div><div class="management-toolbar bl-dates">${input('planning-day','Date du programme','date',day)}${input('planning-at','Disponibilité à cet horaire','datetime-local',at)}</div><div id="planning-content"></div>`;
  document.querySelectorAll('[data-plan-pane]').forEach(b=>b.onclick=()=>{pane=b.dataset.planPane;render()});
  $('input[name="planning-day"]').onchange=e=>{ctx.filters.date=e.target.value;render()};$('input[name="planning-at"]').onchange=e=>{ctx.filters.at=e.target.value;ctx.filters.date=e.target.value.slice(0,10);render()};
- ({planning:()=>planning(day,at),booking:()=>booking(day),vacations:()=>sessions(day),capacity:()=>capacity(at),resources:configuration})[pane]();bindActions();document.querySelectorAll('[data-management-dossier]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.managementDossier,b.dataset.tab||'consult'));
+ ({planning:()=>planning(day,at),booking:()=>booking(day),vacations:()=>sessions(day),capacity:()=>capacity(at),resources:configuration,convocations:()=>convocations(day)})[pane]();bindActions();document.querySelectorAll('[data-management-dossier]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.managementDossier,b.dataset.tab||'consult'));
  }
  function roomName(r){const unit=String(r.label||'').split(' · ').pop();return ({'bloc-chir':'Chirurgie','bloc-endo':'Endoscopie'}[r.sector]||'')+(r.sector in {'bloc-chir':1,'bloc-endo':1}?' · ':'')+unit}
  function who(id){const s=patients.find(p=>p.id===id),n=s?.identity;return n?.lastName?[n.firstName,String(n.lastName).toUpperCase()].filter(Boolean).join(' '):id||'Autre équipe'}
@@ -77,6 +77,23 @@ root.createBlocPlanner=function(ctx){
   add('DÉMO-005',v2,'Résection endoscopique de prostate',H-1,-30+60,120,'Occupée',{phase:'primary',actualStart:t(H-1,30),recoveryResource:'sspi-chir-2',recoveryMinutes:60,bedResource:'etage-2-1'});
   add('DÉMO-004',v3,'Hystéroscopie opératoire',H-2,0,45,'Occupée',{phase:'recovery',actualStart:t(H-2,0),recoveryResource:'sspi-endo-1',recoveryMinutes:120,bedResource:'ambulatoire-1'});
   if(patients.some(p=>p.id==='DÉMO-002'))reservations.push({id:'RES-'+crypto.randomUUID(),planningVersion:1,patient:'DÉMO-002',resource:'etage-1-2',procedure:'Hospitalisation après cholécystectomie',start:day+'T07:00',end:day+'T23:00',duration:960,staffIds:[],equipmentIds:[],note:'Programme de démonstration',state:'Occupée',phase:'primary',actualStart:day+'T07:00'});
+ }
+ // Convocations SMS : heure d'arrivée = passage au bloc − décalage réglable ; envoi automatique la veille (serveur).
+ async function convocations(day){
+  const host=$('#planning-content');host.innerHTML='<p>Chargement des convocations…</p>';
+  const hm=v=>v?v.slice(11,13)+' h '+v.slice(14,16):'';
+  const nom=id=>{const x=patients.find(p=>p.id===id),i=x?.identity||{};return i.lastName?String(i.lastName).toUpperCase()+' '+(i.firstName||''):id};
+  let d;try{const r=await fetch('/api/workspace/convocations?date='+encodeURIComponent(day),{cache:'no-store'});d=await r.json();if(!r.ok)throw new Error(d.error||'Serveur indisponible')}
+  catch(e){host.innerHTML=`<p class="notice warn">Convocations indisponibles : ${esc(e.message)}. Elles nécessitent le dossier partagé sur le serveur.</p>`;return}
+  const g=d.reglages,etat=e=>!e?`<span class="pill warn">Partira la veille à partir de ${g.heureEnvoi} h</span>`:e.ok?`<span class="pill good">${e.rectificatif?'Rectificatif envoyé':'Envoyé'} le ${esc(new Date(e.at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))}</span>${e.heure&&e.heure.slice(0,16)!==undefined?`<small>Arrivée annoncée : ${esc(hm(e.heure))}</small>`:''}`:`<span class="pill bad">Non envoyé</span><small>${esc(e.raison||'')}</small>`;
+  host.innerHTML=`<h3>Convocations par SMS</h3><p>Calculées à partir du programme de bloc : heure d’arrivée = heure de passage au bloc moins le décalage ci-dessous. Le SMS part automatiquement la veille ; si l’heure change ensuite, un SMS rectificatif part. Sans numéro de portable vérifié, une alerte apparaît dans le dossier.</p>
+   <form id="conv-reglages" class="formgrid"><label>Arriver avant le bloc (minutes)<input name="decalageMinutes" type="number" min="15" max="240" step="5" value="${esc(g.decalageMinutes)}" required></label><label>Envoi la veille à partir de (heure)<input name="heureEnvoi" type="number" min="8" max="20" value="${esc(g.heureEnvoi)}" required></label><label class="wide">Lieu d’accueil indiqué au patient<input name="lieu" maxlength="120" value="${esc(g.lieu)}" required></label><div class="actions wide"><button class="primary">Enregistrer les réglages</button>${g.modifieLe?`<small class="muted">Modifié par ${esc(g.modifiePar)} le ${esc(new Date(g.modifieLe).toLocaleString('fr-FR'))}</small>`:''}</div></form>
+   <h4>Patients du ${esc(new Date(d.date+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}))}</h4>
+   ${d.convocations.length?`<table class="table"><thead><tr><th>Patient</th><th>Passage au bloc</th><th>Convocation</th><th>SMS</th></tr></thead><tbody>${d.convocations.map(c=>`<tr><td><button type="button" class="textbutton" data-management-dossier="${esc(c.stay)}">${esc(nom(c.stay))}</button></td><td>${esc(hm(c.bloc))}</td><td><strong>${esc(hm(c.convocation))}</strong></td><td>${etat(c.envoi)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Aucun passage au bloc programmé ce jour.</p>'}
+   <p class="muted">Message : « ${esc('Clinique : vous êtes attendu(e) le [jour] à [heure] à '+g.lieu+'. Restez à jeun selon les consignes remises en consultation. En cas d’empêchement, appelez la clinique.')} »</p>`;
+  host.querySelectorAll('[data-management-dossier]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.managementDossier,'consult'));
+  $('#conv-reglages').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));
+   try{const r=await fetch('/api/workspace/convocations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decalageMinutes:Number(f.decalageMinutes),heureEnvoi:Number(f.heureEnvoi),lieu:f.lieu})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Serveur indisponible');toast('Réglages des convocations enregistrés');convocations(day)}catch(err){toast(err.message)}};
  }
  function planning(day,at){
  const daily=reservations.filter(r=>r.start.slice(0,10)===day&&r.state!=='Annulée');

@@ -10,8 +10,9 @@ import R from '../dist/espace-patient-regles.js';
 import {envoyer,updateSpace} from './espace-patient.mjs';
 import {suiviMessages} from './veille.mjs';
 import {creerLienJ1} from './suivi-j1.mjs';
+import {tourneeConvocations} from './convocations.mjs';
 export const ACTEUR='iaselo-automatique',NOM='Envoi automatique IASELO',HEURE_DEBUT=10,HEURE_FIN=20;
-export const LIBELLES={'consentement-j-2':'Rappel du consentement à J-2','consentement-j-1':'Rappel du consentement à J-1','suivi-j+1':'SMS de suivi à J+1'};
+export const LIBELLES={'convocation':'Convocation','consentement-j-2':'Rappel du consentement à J-2','consentement-j-1':'Rappel du consentement à J-1','suivi-j+1':'SMS de suivi à J+1'};
 const mask=v=>{v=String(v||'');return v.length>4?v.slice(0,3)+'*'.repeat(v.length-5)+v.slice(-2):'***'};
 async function docData(env,key){const row=await env.DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(key).first();return row?JSON.parse(row.data):null}
 export function heureParis(now=new Date()){
@@ -78,12 +79,14 @@ async function suiviJ1(env,acl,stay,date,origin){
 let enCours=null;
 export function tourneeRappels(env,opts={}){if(!enCours)enCours=tournee(env,opts).finally(()=>{enCours=null});return enCours}
 async function tournee(env,{now=new Date(),origin=''}={}){
- const {jour,heure}=heureParis(now);
- if(heure<HEURE_DEBUT||heure>=HEURE_FIN)return {hors:true,resultats:[]};
+ const {jour,heure}=heureParis(now),acl=systeme(env);
+ // Convocations : plage propre (la veille dès l'heure réglée, le jour même dès 6 h).
+ const convocations=await tourneeConvocations(env,acl,{now,origin}).catch(e=>{console.error('convocations',e?.message||e);return []});
+ if(heure<HEURE_DEBUT||heure>=HEURE_FIN)return {hors:true,jour,resultats:convocations};
  const rows=(await env.DB.prepare("SELECT key,data FROM workspace_documents WHERE key LIKE 'stay/%/consult' OR key LIKE 'stay/%/surgicalAnnouncement'").all()).results||[];
  const sejours=new Map();
  for(const r of rows){const m=/^stay\/([^/]{1,80})\/(consult|surgicalAnnouncement)$/.exec(r.key);if(!m)continue;if(!sejours.has(m[1]))sejours.set(m[1],{});try{sejours.get(m[1])[m[2]]=JSON.parse(r.data)}catch{}}
- const acl=systeme(env),resultats=[];
+ const resultats=[...convocations];
  for(const [stay,d] of sejours){
   const date=R.datePrevueSejour(d);if(!date)continue;
   try{

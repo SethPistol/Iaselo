@@ -20,3 +20,10 @@ Le serveur IASELO repasse toutes les 10 minutes et envoie entre 10 h et 20 h (he
 - **Alerte** (seuils par défaut demandés par l'équipe médicale, à relire) : « Oui » à nausées/vomissements, saignement, difficulté à uriner, essoufflement/douleur thoracique, mollet ; « Non » à « en sécurité à la maison » ; douleur > 4/10 ; température < 36 °C ou > 38 °C (`alertesJ1`, `dist/veille-regles.js`).
 - **Notification dans IASELO** : encadré rouge en tête de « Ma journée » (patient, réponses en cause, anesthésiste et chirurgien du séjour), tour de contrôle, pastille « Alerte J+1 » du dossier ; actualisé chaque minute (`GET /api/workspace/suivi-j1/alertes`). Le médecin la marque « traitée » avec l'action réalisée (journal).
 - Aucun envoi externe au médecin pour l'instant (pas de donnée de santé hors MSSanté).
+
+## Convocation selon le programme de bloc
+- Heure d'arrivée = heure de passage au bloc (premier passage du séjour dans le programme, réservations annulées ou terminées exclues) moins le décalage réglé (60 min par défaut).
+- Envoi la veille à partir de l'heure réglée (16 h par défaut) jusqu'à 21 h ; programme fait trop tard : le jour même dès 6 h, si l'heure d'arrivée n'est pas passée.
+- Si l'heure ou la date change après l'envoi : SMS « MODIFICATION de votre convocation ». Jamais deux fois le même message.
+- Message : « [Établissement] : vous êtes attendu(e) le [jour] à [heure] à [lieu]. Restez à jeun selon les consignes remises en consultation. En cas d'empêchement, appelez la clinique. »
+- Réglages dans l'application : Bloc & lits › Convocations SMS (décalage, heure d'envoi, lieu ; anesthésiste, secrétariat ou administrateur), avec la liste des patients du jour choisi et l'état de chaque SMS. Sans numéro vérifié : alerte au dossier. Code `worker/convocations.mjs`, test `tests/clever/convocations.test.mjs`.
