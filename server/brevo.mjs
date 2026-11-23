@@ -9,12 +9,29 @@
 // MESSAGING_ALLOWED_RECIPIENTS (facultatif) : si renseignée, seuls ces destinataires reçoivent.
 // Serveur de recette : les messages sont préfixés « [TEST] ».
 const API='https://api.brevo.com/v3';
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const clean=s=>String(s||'').trim();
 // Comparaison tolérante : guillemets, espaces, casse, 06… / 0033… / +33…
 export function normalizeRecipient(value){
  const v=clean(value).replace(/^["'«\s]+|["'»\s]+$/g,'').toLowerCase();if(!v)return '';
  if(v.includes('@'))return v.replace(/\s/g,'');
  let n=v.replace(/[^\d+]/g,'');if(n.startsWith('00'))n='+'+n.slice(2);if(/^0\d{9}$/.test(n))n='+33'+n.slice(1);if(n.startsWith('+330'))n='+33'+n.slice(4);if(/^33\d{9}$/.test(n))n='+'+n;return n;
+}
+// Un SMS ne peut partir que vers un mobile : en France, +336 ou +337 suivi de 8 chiffres.
+export function smsRecipientError(to){
+ const n=normalizeRecipient(to);
+ if(!/^\+\d{8,15}$/.test(n))return 'Numéro de téléphone invalide.';
+ if(n.startsWith('+33')&&!/^\+33[67]\d{8}$/.test(n))return 'Ce numéro n’est pas un mobile (06 ou 07) : un SMS ne peut pas y être envoyé.';
+ return '';
+}
+const smsFailed={hardBounces:'numéro inexistant ou hors service',softBounces:'téléphone injoignable (éteint, hors réseau ou saturé)',bounces:'non délivré par l’opérateur',blocked:'numéro bloqué par Brevo (désinscrit ou liste noire)',rejected:'refusé par l’opérateur',skipped:'non envoyé par Brevo',unsubscription:'le destinataire a demandé à ne plus recevoir de SMS'};
+const mailFailed={hardBounces:'adresse inexistante',softBounces:'boîte pleine ou serveur indisponible',bounces:'non délivré',invalid:'adresse invalide',blocked:'adresse bloquée par Brevo',error:'erreur d’envoi chez Brevo'};
+export function deliveryState(channel,events=[]){
+ const failed=channel==='sms'?smsFailed:mailFailed,names=events.map(e=>e.event);
+ const bad=events.find(e=>failed[e.event]);
+ if(names.some(n=>n==='delivered'||n==='opened'||n==='clicks'||n==='loadedByProxy'))return {state:'delivered'};
+ if(bad)return {state:'failed',reason:failed[bad.event]+(bad.reason?' ('+String(bad.reason).slice(0,80)+')':'')};
+ return {state:'pending'};
 }
 export function smsSenderFrom(name){
  const words=clean(name).normalize('NFD').replace(/[̀-ͯ]/g,'').split(/[^A-Za-z0-9]+/).filter(Boolean);
@@ -42,14 +59,16 @@ export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
   if(allowList.length&&!allowList.includes(normalizeRecipient(to)))return 'Destinataire hors de la liste MESSAGING_ALLOWED_RECIPIENTS.';
   return '';
  }
- async function call(method,path,payload){
+ // Un nouvel essai si Brevo est saturé ou momentanément injoignable (jamais après un délai
+ // dépassé : le message a pu partir, on évite le doublon).
+ async function call(method,path,payload,attempt=1){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
   try{
    const r=await fetchImpl(API+path,{method,headers:{'api-key':key,Accept:'application/json',...(payload?{'Content-Type':'application/json'}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:controller.signal});
    let data={};try{data=await r.json()}catch{}
-   if(!r.ok){const error=Error(brevoError(r.status,data));error.provider=true;throw error}
+   if(!r.ok){if(attempt===1&&[429,502,503,504].includes(r.status)){clearTimeout(timer);await pause(1500);return call(method,path,payload,2)}const error=Error(brevoError(r.status,data));error.provider=true;throw error}
    return data;
-  }catch(e){if(e.provider)throw e;const error=Error(e.name==='AbortError'?'Brevo ne répond pas. Réessayez dans un instant.':'Brevo injoignable depuis le serveur. Réessayez dans un instant.');error.provider=true;throw error}
+  }catch(e){if(e.provider)throw e;if(attempt===1&&e.name!=='AbortError'){clearTimeout(timer);await pause(1500);return call(method,path,payload,2)}const error=Error(e.name==='AbortError'?'Brevo ne répond pas. Réessayez dans un instant.':'Brevo injoignable depuis le serveur. Réessayez dans un instant.');error.provider=true;throw error}
   finally{clearTimeout(timer)}
  }
  async function activeSenders(){const data=await call('GET','/senders');return (data.senders||[]).filter(s=>s.active!==false&&s.email)}
@@ -68,9 +87,17 @@ export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
    return String(data.messageId||data.messageIds?.[0]||'');
   },
   async sms({to,content,tag='iaselo-questionnaire'}){
-   if(!channels.sms)throw Error('Envoi non configuré : clé Brevo absente (BREVO_API_KEY).');const no=refusal(to);if(no)throw Error(no);
+   if(!channels.sms)throw Error('Envoi non configuré : clé Brevo absente (BREVO_API_KEY).');const no=refusal(to)||smsRecipientError(to);if(no)throw Error(no);to=normalizeRecipient(to);
    const data=await call('POST','/transactionalSMS/send',{sender:smsSender,recipient:String(to).replace(/^\+/,''),content:tagged(content),type:'transactional',tag});
    return String(data.messageId||'');
+  },
+  // Statut de délivrance d’un message déjà envoyé (référence Brevo).
+  async delivery({channel,ref,to}){
+   if(!key||!ref)return {state:'unknown'};
+   const ev=channel==='sms'
+    ?(await call('GET','/transactionalSMS/statistics/events?days=2&limit=100&sort=desc&phoneNumber='+encodeURIComponent(normalizeRecipient(to).replace(/^\+/,'')))).events||[]
+    :(await call('GET','/smtp/statistics/events?days=2&limit=50&messageId='+encodeURIComponent(ref))).events||[];
+   return deliveryState(channel,ev.filter(e=>String(e.messageId)===String(ref)));
   },
   // État lisible de la configuration, affiché dans l’application (aucun secret renvoyé).
   async status(){

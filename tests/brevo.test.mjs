@@ -65,3 +65,24 @@ test('liste de test : e-mails avec points, 06/0033/+33, espaces, guillemets et p
  for(const v of ['0600000042','0033 6 00 00 00 42','+33 (0)6 00 00 00 42','33600000042','+33.6.00.00.00.42'])assert.equal(normalizeRecipient(v),'+33600000042',v);
  await assert.rejects(m.email({to:'autre@example.com',subject:'s',text:'t',html:'h'}),/MESSAGING_ALLOWED_RECIPIENTS/);
 });
+import {smsRecipientError,deliveryState} from '../server/brevo.mjs';
+test('SMS : mobiles uniquement, numéros normalisés avant envoi',async()=>{
+ assert.equal(smsRecipientError('06 00 00 00 42'),'');assert.equal(smsRecipientError('+44 7700 900123'),'');
+ assert.match(smsRecipientError('01 45 00 00 00'),/pas un mobile/);assert.match(smsRecipientError('12'),/invalide/);
+ const f=fake(),m=brevoMessaging({BREVO_API_KEY:'k'},f.fetch);await m.sms({to:'06.00.00.00.42',content:'x'});assert.equal(f.calls[0].body.recipient,'33600000042');
+ await assert.rejects(m.sms({to:'+33145000000',content:'x'}),/pas un mobile/);assert.equal(f.calls.length,1);
+});
+test('Brevo : un nouvel essai si saturé, pas de doublon après délai dépassé',async()=>{
+ let n=0;const m=brevoMessaging({BREVO_API_KEY:'k'},async()=>++n===1?new Response('{}',{status:503}):new Response('{"messageId":7}',{status:201}));
+ assert.equal(await m.sms({to:'+33600000042',content:'x'}),'7');assert.equal(n,2);
+ let k=0;const m2=brevoMessaging({BREVO_API_KEY:'k'},async()=>{k++;return new Response('{"code":"invalid_parameter","message":"bad"}',{status:400})});
+ await assert.rejects(m2.sms({to:'+33600000042',content:'x'}));assert.equal(k,1);
+});
+test('statut de délivrance : livré, échec expliqué, en attente',async()=>{
+ assert.equal(deliveryState('sms',[{event:'sent'},{event:'delivered'}]).state,'delivered');
+ const bad=deliveryState('sms',[{event:'sent'},{event:'hardBounces',reason:'Unknown subscriber'}]);assert.equal(bad.state,'failed');assert.match(bad.reason,/inexistant/);
+ assert.equal(deliveryState('email',[{event:'requests'}]).state,'pending');
+ const calls=[],m=brevoMessaging({BREVO_API_KEY:'k'},async url=>{calls.push(url);return new Response(JSON.stringify({events:[{messageId:'99',event:'delivered'},{messageId:'12',event:'hardBounces'}]}),{status:200})});
+ assert.equal((await m.delivery({channel:'sms',ref:'99',to:'06 00 00 00 42'})).state,'delivered');assert.match(calls[0],/phoneNumber=33600000042/);
+ assert.equal((await m.delivery({channel:'sms',ref:'12',to:'+33600000042'})).state,'failed');
+});

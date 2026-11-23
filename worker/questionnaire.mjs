@@ -68,7 +68,7 @@ async function sendInvitation(request,env,acl,url){
   try{
    const id=channel==='sms'?await messaging.sms({to,content:text.sms}):await messaging.email({to,subject:text.subject,text:text.text,html:text.html});
    await acl.log('questionnaire-envoi',key,'allowed',label+' envoyé via Brevo','Destinataire '+mask[channel](to)+(id?' · réf. Brevo '+id:''));
-   results.push({channel,sent:true,to:mask[channel](to),at:new Date().toISOString()});
+   results.push({channel,sent:true,to:mask[channel](to),at:new Date().toISOString(),ref:id||''});
   }catch(e){
    const error=String(e.message||'Envoi impossible.').slice(0,200);
    await acl.log('questionnaire-envoi',key,'denied',label+' non envoyé','Destinataire '+mask[channel](to)+' · '+error);
@@ -80,6 +80,15 @@ async function sendInvitation(request,env,acl,url){
 export async function staffQuestionnaireApi(request,env,acl){
  const url=new URL(request.url);
  if(url.pathname==='/api/workspace/questionnaire/send')return sendInvitation(request,env,acl,url);
+ if(url.pathname==='/api/workspace/messaging/delivery'){
+  if(request.method!=='GET')return invitationJson({error:'Méthode refusée.'},405);
+  const stay=url.searchParams.get('stay')||'',channel=url.searchParams.get('channel'),ref=url.searchParams.get('ref')||'',key='stay/'+stay+'/invitationContact';
+  if(!['sms','email'].includes(channel)||!/^[\w.<>@+-]{1,200}$/.test(ref))return invitationJson({error:'Paramètres invalides.'},400);
+  if(!acl.canRead(key))return invitationJson({error:'Hors habilitation.'},403);
+  const saved=await env.DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(key).first(),contact=saved?JSON.parse(saved.data).contact:null;
+  if(!contact||!env.MESSAGING?.delivery)return invitationJson({state:'unknown'});
+  try{return invitationJson(await env.MESSAGING.delivery({channel,ref,to:channel==='sms'?contact.phone:contact.email}))}catch(e){return invitationJson({state:'unknown',error:String(e.message).slice(0,200)})}
+ }
  if(url.pathname==='/api/workspace/messaging/status'){
   if(request.method!=='GET')return invitationJson({error:'Méthode refusée.'},405);
   if(!env.MESSAGING?.status)return invitationJson({ready:false,message:'Envoi Brevo indisponible sur ce serveur.'});
