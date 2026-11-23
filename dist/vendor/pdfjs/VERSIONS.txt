@@ -1,0 +1,1 @@
+pdf.min.mjs / pdf.worker.min.mjs : pdfjs-dist 5.6.205 (build legacy, npm), licence Apache-2.0

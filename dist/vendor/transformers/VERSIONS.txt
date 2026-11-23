@@ -1,0 +1,3 @@
+transformers.min.js : @huggingface/transformers 4.3.2 (npm), licence Apache-2.0
+ort-wasm-simd-threaded.asyncify.* : onnxruntime-web 1.31.0-dev.20260914-8d85527a0 (version exigée par transformers 4.3.2), licence MIT
+Fichiers servis par IASELO : aucun appel à un CDN, aucun envoi de données.
