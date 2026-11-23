@@ -115,3 +115,14 @@ test('une invitation remplacée ou expirée est refusée, sans divulguer le doss
   f.DB.raw.exec("UPDATE questionnaire_invitations SET expires_at='2000-01-01T00:00:00Z'");assert.equal((await resolve(token(second.data.link))).status,410);
  }finally{f.close()}
 });
+test('visite pré-anesthésique : l’infirmier saisit le recueil, seul l’anesthésiste conclut et signe',async()=>{const f=fixture();try{
+ const draft={jeune:{solides:'2026-11-23T20:00'},conclusion:{decision:''}},vpa={draft,signed:null,history:[]};
+ {const r0=await f.call('nurse','PUT','/document',change('stay/A/vpa',vpa,0));assert.equal(r0.status,200,JSON.stringify(r0.data));}
+ assert.equal((await f.call('nurse','PUT','/document',change('stay/A/vpa',{...vpa,draft:{...draft,examen:{pas:130}}},1))).status,200);
+ assert.equal((await f.call('nurse','PUT','/document',change('stay/A/vpa',{...vpa,draft:{...draft,conclusion:{decision:'apte'}}},2))).status,403);
+ assert.equal((await f.call('nurse','PUT','/document',change('stay/A/vpa',{...vpa,signed:{name:'nurse',decision:'apte'}},2))).status,403);
+ assert.equal((await f.call('surgeon','PUT','/document',change('stay/A/vpa',vpa,2))).status,403);
+ const signed={...vpa,draft:{...draft,conclusion:{decision:'apte'}},signed:{name:'owner',decision:'apte',hash:'x'}};
+ assert.equal((await f.call('owner','PUT','/document',change('stay/A/vpa',signed,2))).status,200);
+ assert.equal((await f.call('nurse','PUT','/document',change('stay/A/vpa',{...signed,signed:null},3))).status,403);
+}finally{f.close()}});

@@ -1,3 +1,7 @@
+# IASELO · visite pré-anesthésique (23 novembre 2026)
+
+Nouvelle étape du dossier « Visite pré-anesthésique » : rappel de la consultation, évolution, jeûne calculé à l’heure prévue, consignes sur les traitements, constantes du jour, résultats et RAI, préparation, consentement, conclusion (apte / plan modifié / report) signée par l’anesthésiste, pastille dans le bandeau et élément de complétude bloquant le jour J. Détail : docs/visite-pre-anesthesique.md.
+
 # IASELO 1.1.0 — dix améliorations (22 novembre 2026)
 
 Recherche rapide Ctrl K, verrouillage automatique du poste (côté serveur), contrôle allergies ↔ médicaments, réinjection d’antibioprophylaxie au bloc, étiquettes et bracelet avec code-barres, import du programme opératoire depuis E-med (CSV), bionettoyage partagé entre postes, export du dossier pour le droit d’accès, feuille de relève de service, score NEWS2 en surveillance postopératoire. Détail : docs/ameliorations-1-1.md. La limite « bionettoyage propre à chaque poste » est levée.

@@ -33,7 +33,7 @@ window.createVeillePlus=function(ctx,util){
 
  const TABS={
   preadmission:['consultation','Préadmission & pièces',0],
-  bilansVpa:['consultation','Bilans guidés & VPA',3],
+  bilansVpa:['consultation','Bilans guidés & téléconsultation',3],
   blocRapide:['peroperatoire','Saisie rapide, doses & DMI',1],
   sspi:['peroperatoire','SSPI · score d’Aldrete',3],
   soinsPlus:['postoperatoire','Conciliation, protocoles & échelles',2],
@@ -70,7 +70,7 @@ window.createVeillePlus=function(ctx,util){
 
  /* ---------------- Bilans guidés & VPA ---------------- */
  function panelBilans(){
-  const stay=current(),d=obj(stay,'periopPlus'),vpa=obj(d,'vpa'),edit=can('periopPlus')&&job()!=='infirmier';
+  const stay=current(),d=obj(stay,'periopPlus'),edit=can('periopPlus')&&job()!=='infirmier';
   const b=P.bilansGuides(stay),ori=R.orientation(stay,stay.aideCpa?.inputs||{});
   const since=(stay.events||[]).filter(e=>stay.consult?.validation?.at?true:true).slice(0,5);
   const teleOk=ori.proposition.level==='ok';
@@ -78,24 +78,13 @@ window.createVeillePlus=function(ctx,util){
   ${card('Examens proposés',esc(b.ref),b.none?'<p class="v-ok-t">'+I.check+' Aucun examen préopératoire justifié par les données actuelles.</p>':`<table class="v-table"><thead><tr><th>Examen</th><th>Motif</th><th>Décision</th></tr></thead><tbody>${b.list.map(x=>{const dec=(d.bilans||{})[x.exam];return `<tr><td><b>${esc(x.exam)}</b></td><td>${esc(x.why)}</td><td>${edit?seg('bilan:'+x.exam,[['Prescrit','Prescrire'],['Non retenu','Non retenu']],dec):esc(dec||'À décider')}</td></tr>`}).join('')}</tbody></table>`)}
   <div class="v-two">
   ${card('Téléconsultation d’anesthésie',teleOk?'Éligible d’après le questionnaire (ASA 1–2 probable, aucun drapeau).':'Non proposée : '+esc(ori.proposition.label.toLowerCase())+'.',`<p class="v-foot">Réservée aux patients à faible risque, si la clinique l’autorise. L’examen des voies aériennes reste à faire en présentiel (VPA).</p>`,`<span class="v-level ${teleOk?'v-ok':'v-warn'}">${teleOk?I.check+'Éligible':I.alert+'Présentiel'}</span>`)}
-  ${card('Visite préanesthésique (VPA)','Ce qui a changé depuis la consultation, jeûne, consentement, résultats.',`<div class="v-form">
-   <fieldset><legend>Changement depuis la consultation</legend>${seg('vpa:changement',[['Non','Aucun'],['Oui','Oui']],vpa.changement,!edit)}</fieldset>
-   <fieldset><legend>Consentement / accord confirmé</legend>${seg('vpa:consentement',[['Oui','Oui'],['Non','Non']],vpa.consentement,!edit)}</fieldset>
-   <label><span>Dernière prise solide</span><input type="datetime-local" data-vpa="solides" value="${esc(vpa.solides||'')}" ${edit?'':'disabled'}></label>
-   <label><span>Dernière prise liquide clair</span><input type="datetime-local" data-vpa="liquides" value="${esc(vpa.liquides||'')}" ${edit?'':'disabled'}></label>
-   <fieldset><legend>Traitements du matin conformes aux consignes</legend>${seg('vpa:traitements',[['Oui','Oui'],['Non','Non']],vpa.traitements,!edit)}</fieldset>
-   <fieldset><legend>Résultats attendus reçus</legend>${seg('vpa:resultats',[['Oui','Oui'],['Non','Non'],['Sans objet','Sans objet']],vpa.resultats,!edit)}</fieldset>
-   <label class="v-wide"><span>Commentaire</span><textarea data-vpa="note" rows="2" ${edit?'':'disabled'}>${esc(vpa.note||'')}</textarea></label></div>
-   ${vpaJeune(vpa)}${vpa.signedBy?`<p class="v-ok-t">${I.check} VPA signée par ${esc(vpa.signedBy)} · ${esc(fmtDT(vpa.signedAt))}</p>`:edit?'<div class="v-actions"><button type="button" class="primary" id="vp-vpa">Signer la VPA</button></div>':''}`)}
+  ${card('Visite pré-anesthésique (VPA)','Elle a désormais son étape dans le dossier : rappel de la consultation, jeûne, traitements, constantes, résultats, conclusion et signature.',(()=>{const st=window.IaseloVpa?window.IaseloVpa.etat(stay.vpa,surgeryDate(stay)):null;return `${st&&!st.na?`<p class="${st.ok?'v-ok-t':'v-crit-t'}">${st.ok?I.check:I.alert} ${esc(st.label)} · ${esc(st.detail)}</p>`:'<p class="v-foot">À réaliser dans les heures précédant l’intervention.</p>'}<div class="v-actions"><button type="button" class="secondary" id="vp-vpa-open">Ouvrir la visite pré-anesthésique</button></div>`})())}
   </div>
   ${card('Derniers événements du dossier','Pour repérer ce qui a changé depuis la consultation.',`<ul class="v-log">${since.map(e=>`<li class="is-na">${I.dot}<span>${esc(e.at)} · ${esc(e.text)}</span></li>`).join('')||'<li class="is-na">Aucun événement.</li>'}</ul>`)}</div>`;
+  const ov=$('#vp-vpa-open');if(ov)ov.onclick=()=>goTab('vpa');
   if(!edit)return;const c=$('#content');
-  bindSeg(c,(name,v)=>{const [g,k]=name.split(':');if(g==='bilan'){d.bilans={...(d.bilans||{}),[k]:d.bilans?.[k]===v?'':v}}else{vpa[k]=vpa[k]===v?'':v}panelBilans()});
-  c.querySelectorAll('[data-vpa]').forEach(i=>i.onchange=()=>{vpa[i.dataset.vpa]=i.value;setTimeout(panelBilans)});
-  const s=$('#vp-vpa');if(s)s.onclick=()=>{if(!vpa.consentement||!vpa.solides||!vpa.liquides){toast('Renseignez le jeûne et le consentement avant de signer.');return}Object.assign(vpa,{signedBy:who(),signedAt:new Date().toISOString()});trace(stay,'Visite préanesthésique signée','VPA');panelBilans()};
+  bindSeg(c,(name,v)=>{const [g,k]=name.split(':');if(g==='bilan'){d.bilans={...(d.bilans||{}),[k]:d.bilans?.[k]===v?'':v}}panelBilans()});
  }
- function vpaJeune(v){if(!v.solides&&!v.liquides)return '';const h=t=>t?(Date.now()-new Date(t))/3600000:null,s=h(v.solides),l=h(v.liquides);
-  const ok=(s==null||s>=6)&&(l==null||l>=2);return `<p class="${ok?'v-ok-t':'v-crit-t'}">${ok?I.check:I.alert} Jeûne : ${s!=null?Math.floor(s)+' h depuis les solides':'solides non renseignés'} · ${l!=null?Math.floor(l)+' h depuis les liquides clairs':'liquides non renseignés'} (repères SFAR : 6 h et 2 h)</p>`}
 
  /* ---------------- Saisie rapide, doses, moniteur, DMI, stupéfiants, hors ligne ---------------- */
  const LS='iaselo-hors-ligne-';

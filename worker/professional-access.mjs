@@ -4,6 +4,7 @@ import planningCore from '../dist/planning-core.js';
 const professions={unassigned:'Non attribué',anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier',secretariat:'Secrétariat',pharmacien:'Pharmacien',dim:'DIM',facturation:'Facturation',administration:'Administration'};
 const stable=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const same=(a,b)=>stable(a)===stable(b);
+const filled=o=>Object.fromEntries(Object.entries(o&&typeof o==='object'?o:{}).filter(([,v])=>v!==''&&v!=null));
 const appendOnly=(old=[],next=[])=>Array.isArray(old)&&Array.isArray(next)&&next.length>=old.length&&old.every((x,i)=>same(x,next[i]));
 const additions=(old=[],next=[])=>Array.isArray(next)&&old.every(x=>next.some(y=>same(x,y)));
 const fileReferences=v=>{const out=[];function scan(x){if(!x||typeof x!=='object')return;if(typeof x.$file==='string'&&/^[a-f0-9]{64}$/.test(x.$file))out.push(x.$file);for(const a of Object.values(x))scan(a);}scan(v);return [...new Set(out)];};
@@ -62,6 +63,9 @@ export async function professionalAccess(env,request,user,member,at){
    if(['checklistBloc','blocStatut','suiviAmbu','bionettoyage'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    // Prescriptions préopératoires de la consultation : rédigées et signées par un médecin du séjour.
    if(module==='prescriptionsPreop')return ['anesthesiste','chirurgien'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   // Visite pré-anesthésique : l'anesthésiste remplit, conclut et signe ; l'infirmier saisit le recueil sans toucher à la conclusion, à la signature ni aux versions.
+   if(module==='vpa'){if(!data||typeof data!=='object'||Array.isArray(data))return false;if(job==='anesthesiste')return true;
+    return job==='infirmier'&&same(old?.signed??null,data.signed??null)&&same(old?.history||[],data.history||[])&&same(filled(old?.draft?.conclusion),filled(data.draft?.conclusion))&&same(old?.draft?.acquittees||[],data.draft?.acquittees||[])&&same(old?.draft?.motifAlertes||'',data.draft?.motifAlertes||'');}
    if(module==='aideCpa')return job==='anesthesiste'&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='envoisInterop')return ['anesthesiste','chirurgien'].includes(job)&&appendOnly(old||[],data);
    if(job==='infirmier'){

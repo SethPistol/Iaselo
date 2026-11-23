@@ -192,6 +192,11 @@ function completude(stay,aide={},identityStatus=''){
   {id:'bilans',label:'Bilans et avis disponibles',ok:!!e.testStatus&&!/attente|Non évalué/.test(e.testStatus)&&!String(e.pendingTests||'').trim(),blocking:true,detail:String(e.pendingTests||'').trim()?'En attente : '+e.pendingTests:e.testStatus||'Bilan non évalué'},
   {id:'traitements',label:'Consignes sur les traitements validées',ok:!meds.length||!!aide?.consignes?.validatedAt,blocking:meds.length>0,na:!meds.length,detail:meds.length?meds.length+' traitement(s) à adapter':'Aucun traitement à adapter repéré'},
   {id:'jeune',label:'Consignes de jeûne données',ok:!!String(e.fasting||'').trim(),blocking:false,detail:String(e.fasting||'').trim()?'Données':'À donner au patient'},
+  // Visite pré-anesthésique (vpa.js) : sans objet avant la veille de l'intervention, bloquante ensuite ; un report décidé bloque.
+  (()=>{const v=stay?.vpa,sg=v?.signed,d=/^\d{4}-\d{2}-\d{2}$/.test(ctx.surgeryDate)?new Date(ctx.surgeryDate+'T12:00:00'):null,n=new Date(),jours=d&&!isNaN(d)?Math.round((d-new Date(n.getFullYear(),n.getMonth(),n.getDate(),12))/86400000):null;
+   if(sg)return {id:'vpa',label:'Visite pré-anesthésique',ok:sg.decision!=='report',blocking:true,detail:sg.decision==='report'?'Report décidé à la VPA'+(sg.motif?' : '+sg.motif:''):'Signée par '+(sg.name||'l’anesthésiste')};
+   if(jours==null||jours>1)return {id:'vpa',label:'Visite pré-anesthésique',ok:false,na:true,blocking:false,detail:'À réaliser dans les heures précédant l’intervention'};
+   return {id:'vpa',label:'Visite pré-anesthésique',ok:false,blocking:true,detail:v?.draft?.at?'En cours, non signée':'À faire avant l’entrée au bloc'};})(),
   {id:'ambulatoire',label:'Ambulatoire : accompagnant et retour organisés',ok:ctx.mode!=='Ambulatoire'||!!String(e.ambulatory||'').trim(),na:ctx.mode!=='Ambulatoire',blocking:ctx.mode==='Ambulatoire',detail:ctx.mode==='Ambulatoire'?(String(e.ambulatory||'').trim()?'Organisé':'Accompagnant, transport et nuit à domicile à vérifier'):'Hospitalisation'}
  ];
  const missing=items.filter(i=>!i.ok&&!i.na),blocking=missing.filter(i=>i.blocking);

@@ -2188,6 +2188,10 @@ if(prescriptionsPreop&&veilleModule){const panelBeforePreop=veilleModule.panel;v
 const documentsConsentement=window.createDocumentsConsentement?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),tab:()=>tab,goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},shared:()=>!!durableWorkspace,flush:()=>durableWorkspace?.flush(),refresh:()=>durableWorkspace?.refresh?.()||Promise.resolve()})||null;
 if(documentsConsentement&&veilleModule){const panelBeforeDocs=veilleModule.panel;veilleModule.panel=t=>documentsConsentement.panel(t)||panelBeforeDocs(t);const detailBeforeDocs=detail;detail=function(){detailBeforeDocs();documentsConsentement.detail(tab)}}
 
+// Visite pré-anesthésique (dist/vpa.js) : étape dédiée entre la consultation et le peropératoire.
+const vpaModule=window.createVpa?.({$,esc,toast,dossierStages,current:p,role:()=>role,job:()=>accessJob,access:()=>professionalWorkspace.getAccess(),canWrite:key=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite(key):true,identityStatus:stay=>identityWorkspace.status(stay),goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},flush:()=>durableWorkspace?.flush(),refreshHeader:()=>detail()})||null;
+if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule.panel=t=>vpaModule.panel(t)||panelBeforeVpa(t);const detailBeforeVpa=detail;detail=function(){detailBeforeVpa();vpaModule.detail(tab)}}
+
 // Accès direct au plan de soins du séjour sélectionné.
 if($('#open-nursing-record'))$('#open-nursing-record').onclick=()=>{
  if(view==='patients'&&tab==='consult'&&p())captureConsult();
