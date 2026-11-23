@@ -14,13 +14,14 @@ async function body(request){const bytes=await request.arrayBuffer();if(bytes.by
 const mask=v=>{v=String(v||'');return v.length>4?v.slice(0,3)+'*'.repeat(v.length-5)+v.slice(-2):'***'};
 
 // Messages volontairement génériques : ni nom, ni motif, ni date, ni information médicale.
-export function suiviMessages(establishment){
+export function suiviMessages(establishment,lienJ1=''){
  const etab=establishment||'Clinique du Trocadéro';
  return {
   'j-1':etab+' : rappel de votre venue prévue demain. Respectez les consignes de jeûne et l’heure d’arrivée qui vous ont été remises. En cas d’empêchement, appelez la clinique.',
   'j-7':etab+' : pensez à compléter votre dossier d’admission (pièces demandées). En cas de question, appelez la clinique.',
   'j-3':etab+' : rappel, votre dossier d’admission est incomplet. Merci de transmettre les pièces demandées ou d’appeler la clinique.',
-  'j+1':etab+' : nous espérons que tout va bien depuis votre retour. En cas de douleur importante, de fièvre, de saignement ou de gêne pour respirer, appelez la clinique. En cas d’urgence, appelez le 15.'
+  'j+1':lienJ1?etab+' : nous espérons que tout va bien depuis votre retour. Merci de répondre à 8 questions rapides pour votre médecin : '+lienJ1+' (votre date de naissance vous sera demandée). En cas d’urgence, appelez le 15.'
+   :etab+' : nous espérons que tout va bien depuis votre retour. En cas de douleur importante, de fièvre, de saignement ou de gêne pour respirer, appelez la clinique. En cas d’urgence, appelez le 15.'
  };
 }
 

@@ -54,6 +54,13 @@ test('Check-list HAS : un « Non » impose NO GO',()=>{
 test('Suivi J+1 : alertes selon les seuils',()=>{
  assert.deepEqual(R.alertesJ1({douleur:'3',saignement:'Non'}),[]);
  const a=R.alertesJ1({douleur:'7',temperature:'38,6',mollet:'Oui'});assert.equal(a.length,3);assert.ok(a.some(x=>x.level==='crit'));
+ // Seuils par défaut de l'équipe : douleur > 4, température < 36 ou > 38, « Oui » d'alerte, « Non » à la sécurité.
+ assert.equal(R.alertesJ1({douleur:'4',temperature:'38'}).length,0);assert.equal(R.alertesJ1({douleur:'5'}).length,1);
+ assert.equal(R.alertesJ1({temperature:'38.1'})[0].label,'Fièvre 38,1 °C');assert.match(R.alertesJ1({temperature:'35,9'})[0].label,/basse/);
+ assert.equal(R.alertesJ1({moral:'Non'}).length,1);assert.equal(R.alertesJ1({moral:'Oui',nausees:'Non'}).length,0);assert.equal(R.alertesJ1({miction:'Oui'}).length,1);
+ let v=R.validerJ1({douleur:'3',nausees:'Non'});assert.equal(v.ok,false);
+ v=R.validerJ1({douleur:'3',nausees:'Non',saignement:'Non',miction:'Non',respiration:'Non',mollet:'Non',moral:'Oui'});assert.equal(v.ok,true);assert.equal(v.answers.temperature,undefined);
+ assert.equal(R.validerJ1({douleur:'12',nausees:'Non',saignement:'Non',miction:'Non',respiration:'Non',mollet:'Non',moral:'Oui'}).ok,false);
 });
 
 test('Orientation après questionnaire et envoi DMP conditionné à l’INS qualifiée',()=>{

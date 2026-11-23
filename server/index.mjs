@@ -20,6 +20,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   // Lettre de liaison (lien personnel du patient) : lecture seule, aucun envoi possible.
   if(pathname.startsWith('/api/lettre-liaison/'))return workspaceApi(request,{DB});
   if(pathname.startsWith('/api/espace-patient/'))return workspaceApi(request,{DB,BUCKET:bucket,ESTABLISHMENT:messaging?.establishment||''});
+  // Questionnaire du lendemain (lien du SMS J+1) : réponses du patient, aucun envoi possible.
+  if(pathname.startsWith('/api/suivi-j1/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   const staff=await auth.user(request);
   if(pathname.startsWith('/api/workspace')){
    if(!staff)return Response.json({error:'Connexion professionnelle requise.'},{status:401});

@@ -14,3 +14,9 @@ Le serveur IASELO repasse toutes les 10 minutes et envoie entre 10 h et 20 h (he
 - **Traçabilité** : journal d'accès (acteur `iaselo-automatique`, numéro masqué) et `espacePatient.rappelsAuto` dans le dossier.
 - Le J+1 remplace l'appel systématique : le formulaire d'appel reste disponible pour tracer un échange si le patient rappelle.
 - Tests : `tests/clever/rappels-auto.test.mjs`.
+
+## Questionnaire du lendemain et alerte au médecin
+- Le SMS J+1 contient un lien personnel (valable 3 jours, stocké haché, date de naissance demandée, 5 erreurs ferment le lien) vers 8 questions (`dist/suivi-j1.html`). Sans date de naissance connue, le SMS part sans lien.
+- **Alerte** (seuils par défaut demandés par l'équipe médicale, à relire) : « Oui » à nausées/vomissements, saignement, difficulté à uriner, essoufflement/douleur thoracique, mollet ; « Non » à « en sécurité à la maison » ; douleur > 4/10 ; température < 36 °C ou > 38 °C (`alertesJ1`, `dist/veille-regles.js`).
+- **Notification dans IASELO** : encadré rouge en tête de « Ma journée » (patient, réponses en cause, anesthésiste et chirurgien du séjour), tour de contrôle, pastille « Alerte J+1 » du dossier ; actualisé chaque minute (`GET /api/workspace/suivi-j1/alertes`). Le médecin la marque « traitée » avec l'action réalisée (journal).
+- Aucun envoi externe au médecin pour l'instant (pas de donnée de santé hors MSSanté).

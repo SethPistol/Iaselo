@@ -45,10 +45,26 @@ test('rappels automatiques : J-2 / J-1 si le consentement n’est pas revenu, J+
   assert.ok(sms.some(m=>m.to===to(0)&&/rappel, un document est à signer/.test(m.content)&&/#acces=/.test(m.content)));
   assert.equal(sent.filter(m=>m.email).length,1);
   // S1 (opéré hier) : SMS de nouvelles, sans lien ni donnée de santé.
-  const j1=sms.find(m=>m.to===to(3));assert.ok(j1);assert.match(j1.content,/^Clinique test : nous espérons que tout va bien/);assert.equal(j1.tag,'iaselo-suivi-j1');
+  const j1=sms.find(m=>m.to===to(3));assert.ok(j1);assert.match(j1.content,/^Clinique test : nous espérons que tout va bien depuis votre retour\. Merci de répondre à 8 questions rapides pour votre médecin : http/);assert.equal(j1.tag,'iaselo-suivi-j1');
+  // Questionnaire J+1 : lien personnel, date de naissance, alerte au médecin selon les seuils.
+  const tj1=j1.content.match(/suivi-j1\.html#acces=([a-f0-9]{64})/)[1];
+  const q=async(route,data)=>{const x=await call('POST','/api/suivi-j1/'+route,{token:tj1,...data});return {status:x.status,data:await x.json()}};
+  let o=await q('open',{});assert.equal(o.status,200);assert.equal(o.data.questions.length,8);assert.equal(o.data.etablissement,'Clinique test');
+  const base={douleur:'3',nausees:'Non',saignement:'Non',miction:'Non',respiration:'Non',mollet:'Non',moral:'Oui'};
+  assert.equal((await q('submit',{birthDate:'1981-01-01',answers:base})).status,400);
+  assert.equal((await q('submit',{birthDate:'1980-01-01',answers:{douleur:'3'}})).status,400);
+  o=await q('submit',{birthDate:'1980-01-01',answers:base});assert.equal(o.status,200);assert.equal(o.data.alerte,false);
+  let al=(await api('GET','/suivi-j1/alertes')).data.alertes;assert.equal(al.length,0);
+  o=await q('submit',{birthDate:'1980-01-01',answers:{...base,douleur:'6',temperature:'35.5',moral:'Non'}});assert.equal(o.data.alerte,true);
+  al=(await api('GET','/suivi-j1/alertes')).data.alertes;assert.equal(al.length,1);assert.equal(al[0].stay,'S1');assert.equal(al[0].medecins.anesthesiste,'Dr Exemple FICTIF');
+  assert.deepEqual(al[0].alertes[0].alerts.map(a=>a.label),['Douleur 6/10','Température basse 35,5 °C','Ne se sent pas en sécurité']);
+  assert.equal((await api('POST','/suivi-j1/traiter',{stay:'S1',index:al[0].alertes[0].index,action:''})).status,400);
+  assert.equal((await api('POST','/suivi-j1/traiter',{stay:'S1',index:al[0].alertes[0].index,action:'Patient rappelé'})).status,200);
+  assert.equal((await api('GET','/suivi-j1/alertes')).data.alertes.length,0);
+  assert.equal((await q('submit',{birthDate:'1980-01-01',answers:base})).status,200);assert.equal((await q('submit',{birthDate:'1980-01-01',answers:base})).status,409);
   // Rien pour C1 (signé), C3 (jamais envoyé : alerte), S2 (sans numéro : alerte), X (J-7).
   assert.equal(sms.length,2,JSON.stringify(sms.map(m=>m.to)));
-  assert.doesNotMatch(JSON.stringify(sent),/FICTIF|1980|2026-11|fictive/);
+  assert.doesNotMatch(JSON.stringify(sent),/FICTIF|1980|2026-11|fictive|douleur/);
   let s=await space('C2');assert.equal(s.consentement.relances.length,1);assert.equal(s.consentement.relances[0].by,'Envoi automatique IASELO');
   assert.deepEqual(s.rappelsAuto.map(e=>[e.kind,e.ok]),[['consentement-j-2',true]]);
   s=await space('S1');assert.ok(s.rappelsAuto.some(e=>e.kind==='suivi-j+1'&&e.ok));
@@ -76,5 +92,6 @@ test('rappels automatiques : J-2 / J-1 si le consentement n’est pas revenu, J+
   s=await space('S3');assert.equal(s.rappelsAuto[0].ok,false);assert.match(s.rappelsAuto[0].raison,/Crédits SMS/);
   const {rows}=await pool.query("SELECT action,result FROM professional_access_log WHERE actor='iaselo-automatique'");
   assert.ok(rows.some(x=>x.action==='suivi-j+1'&&x.result==='allowed'));assert.ok(rows.some(x=>x.action==='suivi-j+1'&&x.result==='denied'));assert.ok(rows.some(x=>x.action==='consentement-relance'));
+  assert.ok((await pool.query("SELECT 1 FROM professional_access_log WHERE action='suivi-j1-reponse' AND result='denied'")).rows.length);
  }finally{await db.close()}
 });

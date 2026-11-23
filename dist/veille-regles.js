@@ -237,8 +237,9 @@ function etatChecklist(data={}){
 }
 
 /* ---------- Suivi ambulatoire J+1 ---------- */
-// Seuils par défaut (réglables par l'équipe) inspirés des protocoles de suivi ambulatoire SFAR/HAS.
-const SEUILS_J1={douleur:6,temperature:38.5};
+// Seuils par défaut demandés par l'équipe médicale (23/11/2026), À RELIRE PAR L'ÉQUIPE :
+// alerte si douleur > 4/10, température < 36 °C ou > 38 °C, « Oui » à une question d'alerte, « Non » à la sécurité à domicile.
+const SEUILS_J1={douleur:4,temperatureBasse:36,temperatureHaute:38};
 const QUESTIONS_J1=[
  ['douleur','Douleur au repos (0 à 10)','number'],
  ['nausees','Nausées ou vomissements persistants','yesno'],
@@ -249,10 +250,24 @@ const QUESTIONS_J1=[
  ['mollet','Douleur ou gonflement d’un mollet','yesno'],
  ['moral','Le patient se sent-il en sécurité à domicile ?','yesnoInv']
 ];
+// Mêmes questions, formulées pour le patient (questionnaire du SMS J+1).
+const QUESTIONS_J1_PATIENT={douleur:'Votre douleur au repos, de 0 (aucune) à 10 (maximale)',nausees:'Avez-vous des nausées ou des vomissements qui persistent ?',saignement:'Saignez-vous, ou votre pansement est-il imbibé ?',temperature:'Votre température, si vous l’avez prise (°C)',miction:'Avez-vous du mal à uriner depuis votre retour ?',respiration:'Êtes-vous essoufflé(e), ou avez-vous une douleur dans la poitrine ?',mollet:'Avez-vous une douleur ou un gonflement d’un mollet ?',moral:'Vous sentez-vous en sécurité à la maison ?'};
+// Réponses du patient : contrôle de forme (toutes les questions Oui/Non et la douleur sont obligatoires).
+function validerJ1(input={}){
+ const answers={},errors=[];
+ for(const [k,,type] of QUESTIONS_J1){
+  const v=input[k];
+  if(type==='number'){if(v===undefined||v===null||String(v).trim()===''){if(k==='douleur')errors.push('Indiquez votre douleur de 0 à 10.');continue}
+   const n=num(v),max=k==='temperature'?43:10,min=k==='temperature'?30:0;if(n==null||n<min||n>max){errors.push(k==='temperature'?'Température invalide (entre 30 et 43 °C).':'Douleur invalide (de 0 à 10).');continue}answers[k]=String(n)}
+  else if(v==='Oui'||v==='Non')answers[k]=v;else errors.push('Répondez à chaque question.');
+ }
+ return {ok:!errors.length,errors:[...new Set(errors)],answers};
+}
 function alertesJ1(rep={}){
  const out=[],n=num(rep.douleur),t=num(rep.temperature);
- if(n!=null&&n>=SEUILS_J1.douleur)out.push({level:'warn',label:'Douleur '+n+'/10'});
- if(t!=null&&t>=SEUILS_J1.temperature)out.push({level:'warn',label:'Fièvre '+String(t).replace('.',',')+' °C'});
+ if(n!=null&&n>SEUILS_J1.douleur)out.push({level:n>=8?'crit':'warn',label:'Douleur '+n+'/10'});
+ if(t!=null&&t>SEUILS_J1.temperatureHaute)out.push({level:'warn',label:'Fièvre '+String(t).replace('.',',')+' °C'});
+ if(t!=null&&t<SEUILS_J1.temperatureBasse)out.push({level:'warn',label:'Température basse '+String(t).replace('.',',')+' °C'});
  for(const [k,label,crit] of [['nausees','Nausées / vomissements persistants'],['saignement','Saignement','crit'],['miction','Rétention urinaire possible'],['respiration','Essoufflement ou douleur thoracique','crit'],['mollet','Signe de phlébite possible','crit']])if(rep[k]==='Oui')out.push({level:crit?'crit':'warn',label});
  if(rep.moral==='Non')out.push({level:'warn',label:'Ne se sent pas en sécurité'});
  return out;
@@ -266,5 +281,5 @@ function envoiLiaisonPossible(stay,identityStatus=''){
  return {ok:!reasons.length,reasons};
 }
 
-return {contexte,scores,resumeScore,orientation,consignes,REGLES,completude,STATUTS,statutSuivant,CHECKLIST_HAS,etatChecklist,SEUILS_J1,QUESTIONS_J1,alertesJ1,envoiLiaisonPossible};
+return {contexte,scores,resumeScore,orientation,consignes,REGLES,completude,STATUTS,statutSuivant,CHECKLIST_HAS,etatChecklist,SEUILS_J1,QUESTIONS_J1,QUESTIONS_J1_PATIENT,validerJ1,alertesJ1,envoiLiaisonPossible};
 });

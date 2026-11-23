@@ -9,6 +9,7 @@
 import R from '../dist/espace-patient-regles.js';
 import {envoyer,updateSpace} from './espace-patient.mjs';
 import {suiviMessages} from './veille.mjs';
+import {creerLienJ1} from './suivi-j1.mjs';
 export const ACTEUR='iaselo-automatique',NOM='Envoi automatique IASELO',HEURE_DEBUT=10,HEURE_FIN=20;
 export const LIBELLES={'consentement-j-2':'Rappel du consentement à J-2','consentement-j-1':'Rappel du consentement à J-1','suivi-j+1':'SMS de suivi à J+1'};
 const mask=v=>{v=String(v||'');return v.length>4?v.slice(0,3)+'*'.repeat(v.length-5)+v.slice(-2):'***'};
@@ -57,13 +58,15 @@ async function rappelConsentement(env,acl,stay,date,kind,origin){
  return {stay,kind,ok,detail};
 }
 
-async function suiviJ1(env,acl,stay,date){
+async function suiviJ1(env,acl,stay,date,origin){
  const kind='suivi-j+1',contact=(await docData(env,'stay/'+stay+'/invitationContact'))?.contact,messaging=env.MESSAGING;
  if(!contact?.phone)return alerte(env,acl,stay,kind,date,'Aucun numéro de portable vérifié : SMS du lendemain impossible. Enregistrez-le dans « Questionnaire patient ».');
  if(!messaging?.channels?.sms)return alerte(env,acl,stay,kind,date,'Envoi de SMS non configuré sur ce serveur (Brevo).');
  if(!await claim(env,stay,kind,date))return {stay,kind,deja:true};
  const key='stay/'+stay+'/suiviAmbu';let ok=false,detail;
- try{const ref=await messaging.sms({to:contact.phone,content:suiviMessages(messaging.establishment)['j+1'],tag:'iaselo-suivi-j1'});ok=true;detail='SMS envoyé à '+mask(contact.phone);
+ try{// Lien personnel vers le questionnaire (8 questions) ; sans date de naissance connue, SMS sans lien.
+  const lien=await creerLienJ1(env,{stay,date,birthDate:contact.birthDate,origin});
+  const ref=await messaging.sms({to:contact.phone,content:suiviMessages(messaging.establishment,lien)['j+1'],tag:'iaselo-suivi-j1'});ok=true;detail='SMS envoyé à '+mask(contact.phone)+(lien?' · questionnaire joint':' · sans questionnaire (date de naissance inconnue)');
   await acl.log('suivi-j+1',key,'allowed','SMS J+1 envoyé automatiquement via Brevo','Destinataire '+mask(contact.phone)+(ref?' · réf. Brevo '+ref:''));
  }catch(e){detail=String(e.message||'Envoi impossible.').slice(0,200);await acl.log('suivi-j+1',key,'denied','SMS J+1 non envoyé','Destinataire '+mask(contact.phone)+' · '+detail)}
  await record(env,stay,kind,date,ok?'envoye':'echec',detail);
@@ -86,7 +89,7 @@ async function tournee(env,{now=new Date(),origin=''}={}){
   try{
    if(date===decale(jour,2))resultats.push(await rappelConsentement(env,acl,stay,date,'consentement-j-2',origin));
    else if(date===decale(jour,1))resultats.push(await rappelConsentement(env,acl,stay,date,'consentement-j-1',origin));
-   else if(date===decale(jour,-1))resultats.push(await suiviJ1(env,acl,stay,date));
+   else if(date===decale(jour,-1))resultats.push(await suiviJ1(env,acl,stay,date,origin));
   }catch(e){console.error('rappels_auto',stay,e?.message||e)}
  }
  return {jour,resultats};
