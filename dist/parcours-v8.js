@@ -853,39 +853,8 @@ function dischargeRx(){
  const print=$('#print-discharge-rx');
  if(print)print.onclick=()=>{if(physician()&&p()===stay&&!preview.hidden)printDischargeDocument(dischargeRxDoc(stay.id,saved))};
 }
-const liaisonSections=[
- ['Identité et destinataires',[
-  ['birthname','Nom de naissance','text',true],['firstname','Prénom(s)','text',true],
-  ['dob','Date de naissance','date',true],['sex','Sexe','text',true],
-  ['gpStatus','Médecin traitant déclaré','select',true,['Déclaré','Aucun déclaré','Information inconnue']],
-  ['gpName','Nom du médecin traitant'],['gpContact','Adresse postale ou électronique du médecin traitant'],
-  ['referrer','Praticien adresseur et coordonnées, si applicable']
- ]],
- ['Séjour et signataire',[
-  ['admission','Date d’entrée','date',true],['admissionMode','Modalité d’entrée','text',true],
-  ['departure','Date de sortie','date',true],['departureMode','Modalité / destination de sortie','text',true],
-  ['doctor','Médecin signataire','text',true],['unit','Service','text',true],
-  ['facility','Établissement','text',true],['contact','Coordonnées professionnelles','text',true],['rpps','RPPS']
- ]],
- ['Synthèse médicale',[
-  ['reason','Motif d’hospitalisation','textarea',true],
-  ['summary','Synthèse de la prise en charge et de l’évolution','textarea',true],
-  ['condition','Situation clinique à la sortie','textarea',true],
-  ['procedures','Actes techniques et examens réalisés · résultats utiles','textarea',true],
-  ['incidents','Événements indésirables, si applicable','textarea'],
-  ['infection','Micro-organismes multirésistants ou émergents, si applicable','textarea'],
-  ['blood','Produits sanguins ou dérivés administrés, si applicable','textarea'],
-  ['implant','Dispositif médical implanté, si applicable','textarea'],
-  ['pending','Résultats en attente · suivi et responsable','textarea',true]
- ]],
- ['Traitements et suite des soins',[
-  ['medications','Traitements de sortie · médicament, dose, rythme, voie et durée','textarea',true],
-  ['changes','Traitements habituels poursuivis, modifiés ou arrêtés · préciser le motif','textarea',true],
-  ['followup','Soins, rendez-vous et examens à programmer','textarea',true],
-  ['surveillance','Recommandations, surveillances et conduite en cas de complication','textarea',true],
-  ['urgentPhone','Téléphone à contacter en cas d’urgence','tel']
- ]]
-];
+// Rubriques, destinataires et envoi automatique : lettre-liaison-regles.js (partagé avec le serveur).
+const LL=window.IaseloLettreLiaison,liaisonSections=LL.SECTIONS;
 const liaisonFields=liaisonSections.flatMap(([,fields])=>fields);
 function liaisonPrefill(stay,consult,announcement){
  const identity=stay.questionnaire?.answers||{},rx=stay.discharge.ordinance,head=rx?.header||{};
@@ -901,7 +870,8 @@ function liaisonPrefill(stay,consult,announcement){
   blood:(stay.perop?.records||[]).filter(r=>!r.voided&&r.kind==='Bilan hydrique'&&r.values.fluid==='Produit sanguin administré')
    .map(r=>periDescription(r)).join('\n'),
   medications:(rx?.items||[]).map(item=>[item.drug,item.dose,item.frequency,item.route,item.duration,item.notes].filter(Boolean).join(' · ')).join('\n'),
-  followup:stay.discharge.instructions||''
+  followup:stay.discharge.instructions||'',
+  patientEnvoi:LL.PATIENT_ENVOI[0]
  };
 }
 function liaisonMissing(values,mode,today){
@@ -910,6 +880,7 @@ function liaisonMissing(values,mode,today){
  if(mode==='Ambulatoire'&&!values.urgentPhone)errors.push('Téléphone à contacter en cas d’urgence');
  if(values.departure&&values.admission>values.departure)errors.push('Vérifier l’ordre des dates d’entrée et de sortie');
  if(values.departure>today)errors.push('Confirmer la date de sortie effective');
+ errors.push(...LL.controlerDiffusion(values));
  return errors;
 }
 function liaisonDocument(stay,letter){
@@ -919,15 +890,15 @@ function liaisonDocument(stay,letter){
   <div class="discharge-rx-heading"><div><strong>${esc(values.facility)}</strong><p>${esc(values.unit)}</p></div>
   <p>Rédigée le ${esc(dischargeRxDate(letter.date))}</p></div>
   <h2>Lettre de liaison à la sortie</h2><p>${esc(stay.id)} · ${esc(stay.mode)}</p>
-  ${liaisonSections.map(([title,fields])=>`<section><h3>${esc(title)}</h3>${fields.filter(([key])=>values[key]).map(([key,label,type])=>
+  ${liaisonSections.map(([title,fields])=>`<section><h3>${esc(title)}</h3>${fields.filter(([key])=>values[key]&&!LL.DIFFUSION.has(key)).map(([key,label,type])=>
    `<div><strong>${esc(label)}</strong><p class="preserve">${esc(type==='date'?dischargeRxDate(values[key]):values[key])}</p></div>`).join('')}</section>`).join('')}
   <div class="discharge-rx-signature"><strong>Signature du médecin</strong><p>${esc(values.doctor)}</p></div>
  </article>`;
 }
 function liaisonDelivery(letter,write=physician()){
  const trace=letter.delivery||{};
- return `<section class="liaison-delivery"><h4>Remise au patient et transmission</h4>
-  <p class="muted">Tracez les actions réalisées pour cette version. Ce formulaire n’envoie aucun document.</p>
+ return `<section class="liaison-delivery"><h4>Remise en main propre et autres transmissions</h4>
+  <p class="muted">Les envois électroniques sont tracés automatiquement ci-dessus. Tracez ici la remise de la lettre imprimée et toute transmission par un autre canal. Ce formulaire n’envoie aucun document.</p>
   ${trace.patientStatus||trace.gpDelivery?`<p class="preserve">${esc([
    trace.patientStatus&&['Patient',trace.patientStatus,trace.patientDate&&dischargeRxDate(trace.patientDate),trace.patientReason].filter(Boolean).join(' · '),
    trace.gpDelivery&&['Destinataires',trace.gpDelivery,trace.sentDate&&dischargeRxDate(trace.sentDate),trace.gpDetail].filter(Boolean).join(' · ')
@@ -964,20 +935,25 @@ function dischargeLiaison(){
    <p class="muted">En ambulatoire, le numéro à appeler en cas d’urgence est également attendu.</p>
    <details><summary>Consulter les éléments actuellement disponibles dans le dossier</summary><dl class="answers">${liaisonFields.filter(([key])=>prefill[key]).map(([key,label])=>`<div class="answer"><dt>${esc(label)}</dt><dd class="preserve">${esc(prefill[key])}</dd></div>`).join('')}</dl>
    <button type="button" class="secondary" id="liaison-fill">Compléter les champs encore vides</button></details>
+   <div id="liaison-apercu"></div>
    <p id="liaison-error" class="warn liaison-error" role="alert"></p>
    <div class="actions"><button class="secondary" name="liaisonAction" value="draft">Enregistrer le brouillon</button>
-   <button class="primary" name="liaisonAction" value="review">Valider la relecture et préparer l’impression</button></div>
+   <button class="primary" name="liaisonAction" value="review">Valider la relecture et envoyer</button></div>
   </form>`:''}
   <section id="liaison-preview">
    ${current&&current.date!==current.values.departure?'<p class="notice warn">La lettre a été rédigée après la date de sortie renseignée.</p>':''}
    ${write&&current&&!stale&&!letter.draft?'<button class="primary no-print" type="button" id="liaison-print">Imprimer la lettre de liaison</button>':''}
+   ${current?'<div id="liaison-diffusion" class="no-print"></div>':''}
    ${preview}
    ${current?liaisonDelivery(current):''}
    ${letter?.previous?.length?`<details><summary>Versions précédentes (${letter.previous.length})</summary>${letter.previous.map(document=>liaisonDocument(stay,document)+liaisonDelivery(document,false)).join('')}</details>`:''}
   </section>
   <p class="muted no-print"><a href="https://www.has-sante.fr/jcms/p_3587797/fr/iqss-2025-secteur-mco-fiche-descriptive-de-l-indicateur-qualite-de-la-lettre-de-liaison-a-la-sortie-janvier-2025" target="_blank" rel="noopener noreferrer">Critères HAS MCO</a> · <a href="https://www.has-sante.fr/jcms/p_3893099/fr/iqss-2026-ca-consignes-de-remplissage-dossier-du-patient-en-chirurgie-ambulatoire-en-mco-mars-2026" target="_blank" rel="noopener noreferrer">Critères HAS ambulatoire 2026</a></p>`;
+ const ecran=window.IaseloLettreLiaisonEcran;
+ if(current)ecran?.suivi($('#liaison-diffusion'),stay,{canRelaunch:write,toast});
  if(!write)return;
  const form=$('#liaison-form'),print=$('#liaison-print');
+ ecran?.apercu($('#liaison-apercu'),stay,form);
  const editing=()=>{if(print)print.hidden=true};
  form.oninput=editing;
  $('#liaison-fill').onclick=()=>{
@@ -1012,7 +988,7 @@ function dischargeLiaison(){
   state.document={values:data,source,date:today,delivery:revised?undefined:current?.delivery};
   if(stay.identityDocumentReview)stay.identityDocumentReview.liaison=false;
   delete state.draft;
-  event('Lettre de liaison de sortie relue et enregistrée','Sortie');
+  event('Lettre de liaison de sortie relue et enregistrée · envoi automatique','Sortie');
   detail();
   $('#liaison-print')?.focus();
  };

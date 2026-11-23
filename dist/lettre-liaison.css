@@ -1,0 +1,17 @@
+/* IASELO · lettre de liaison : envoi automatique (aperçu et suivi). */
+.ll-card{margin:16px 0}
+.ll-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ll-row{display:grid;grid-template-columns:32px 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:var(--i-r-m,10px);background:var(--i-s2)}
+.ll-row b{font-weight:600;font-size:14.5px}
+.ll-row small{display:block;color:var(--i-mut);font-size:13px;margin-top:2px}
+.ll-row .ll-relance{margin-top:8px;min-height:36px;padding:4px 12px}
+.ll-ic svg{width:22px;height:22px;fill:none;stroke:var(--i-acc);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ll-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.ll-ok{color:var(--i-ok);background:var(--i-ok-soft)}
+.ll-crit{color:var(--i-crit);background:var(--i-crit-soft)}
+.ll-warn{color:var(--i-warn);background:var(--i-warn-soft)}
+.ll-sim{color:var(--i-warn);background:transparent;border:1px dashed currentColor}
+.ll-info{color:var(--i-acc);background:var(--i-acc-soft)}
+.ll-muted{color:var(--i-mut);background:var(--i-s1);border:1px solid var(--i-line)}
+@media (max-width:640px){.ll-row{grid-template-columns:28px 1fr}.ll-row .ll-badge{grid-column:2;justify-self:start}}
+@media print{.ll-card{display:none}}

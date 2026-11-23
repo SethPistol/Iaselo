@@ -3,7 +3,7 @@
    - Complétude du dossier et blocage de programmation
    - Tour de contrôle du bloc (statut patient en un clic) et check-list HAS signée
    - Suivi ambulatoire J-1 / J+1 (SMS Brevo, appel tracé, alertes)
-   - Lettre de liaison vers DMP et MSSanté : SIMULATION tant que l'homologation ANS n'est pas obtenue
+   - Lettre de liaison : envoi automatique déplacé dans lettre-liaison.js (patient, MSSanté, DMP)
    Le module est branché par parcours-v8.js (window.createVeille) ; ses données vivent dans des rubriques
    dédiées du séjour : aideCpa, checklistBloc, blocStatut, suiviAmbu, envoisInterop. */
 (function(){
@@ -150,22 +150,6 @@ window.createVeille=function(ctx){
   document.querySelectorAll('[data-handle]').forEach(b=>b.onclick=()=>{const c=s.appels[Number(b.dataset.handle)];const action=prompt('Action réalisée (rappel par le médecin, consultation, retour aux urgences…)','Patient rappelé par l’anesthésiste');if(!action)return;c.handled={by:who(),at:new Date().toISOString(),action:action.slice(0,300)};trace(stay,'Alerte J+1 traitée : '+c.handled.action,'Suivi ambulatoire');panelSuivi()});
  }
 
- /* ================= Lettre de liaison : DMP + MSSanté (simulation) ================= */
- function liaisonEnvoi(){
-  const stay=current(),content=$('#content');if(!content||content.querySelector('.v-interop'))return;
-  const st=identity(stay),pre=R.envoiLiaisonPossible(stay,st),sent=Array.isArray(stay.envoisInterop)?stay.envoisInterop:[],editable=can('envoisInterop')&&isDoctor();
-  content.insertAdjacentHTML('beforeend',`<section class="v-card v-interop"><header class="v-card-head"><div><p class="v-kicker">Ségur · obligation à la sortie</p><h4>Envoyer la lettre de liaison</h4><p>Dépôt dans le DMP (Mon espace santé) et envoi par MSSanté au médecin traitant et au patient.</p></div><span class="v-sim">Simulation · homologation ANS requise</span></header>
-   <ul class="v-checklist">${[['Lettre relue et enregistrée',!!stay.discharge?.liaison?.document],['Identité INS qualifiée',/qualifi/i.test(st)],['Connecteur DMP (LPS homologué)',false],['Boîte MSSanté de l’établissement',false]].map(([l,ok],i)=>`<li class="${ok?'is-ok':i>1?'is-na':'is-block'}"><span class="v-ic">${ok?ICON.check:i>1?ICON.dot:ICON.alert}</span><span><b>${l}</b>${i>1?'<small>En attente de référencement Ségur : réponse simulée</small>':''}</span></li>`).join('')}</ul>
-   ${pre.ok?'':`<p class="v-warn-t">${pre.reasons.map(esc).join(' ')}</p>`}
-   ${editable?`<div class="v-actions"><label class="v-inline"><input type="checkbox" id="v-dmp" checked> DMP</label><label class="v-inline"><input type="checkbox" id="v-mss-mt" checked> MSSanté médecin traitant</label><label class="v-inline"><input type="checkbox" id="v-mss-pat" checked> Messagerie de Mon espace santé</label><button type="button" class="primary" id="v-send-liaison" ${stay.discharge?.liaison?.document?'':'disabled'}>${ICON.send}Simuler l’envoi</button></div>`:''}
-   <ul class="v-log">${sent.slice().reverse().map(e=>`<li class="is-ok">${ICON.check}<span>${esc(fmtDT(e.at))} · ${esc(e.targets.join(', '))} · réf. ${esc(e.refs.join(' / '))} · ${esc(e.by)}${e.identity!=='Qualifiée'?' · identité '+esc(e.identity):''}</span></li>`).join('')||'<li class="is-na">Aucun envoi.</li>'}</ul></section>`);
-  const b=$('#v-send-liaison');if(!b)return;
-  b.onclick=async()=>{const targets=[['dmp','v-dmp','DMP'],['mssante-mt','v-mss-mt','MSSanté médecin traitant'],['mssante-patient','v-mss-pat','Messagerie Mon espace santé']].filter(([,id])=>$('#'+id).checked);if(!targets.length)return;b.disabled=true;
-   try{const r=await fetch('/api/workspace/interop/liaison',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stay:stay.id,targets:targets.map(t=>t[0]),identity:st})});const d=await r.json();if(!r.ok)throw Error(d.error||'Envoi refusé');
-    stay.envoisInterop=[...sent,{at:d.at,by:who(),targets:targets.map(t=>t[2]),refs:d.results.map(x=>x.ref),mode:d.mode,identity:st||'inconnue'}];trace(stay,'Lettre de liaison envoyée (simulation) : '+targets.map(t=>t[2]).join(', '),'Interopérabilité');toast('Envoi simulé enregistré');content.querySelector('.v-interop').remove();liaisonEnvoi();
-   }catch(e){toast(e.message);b.disabled=false}};
- }
-
  /* ================= Tour de contrôle ================= */
  function statut(stay){const s=stay.blocStatut;if(s?.state)return s.state;return {Consultation:'attendu',Préopératoire:'attendu',Intervention:'salle',SSPI:'sspi',Hospitalisation:'chambre',Sortie:'sorti'}[stay.stage]||'attendu'}
  function advance(stay,target){
@@ -209,7 +193,7 @@ window.createVeille=function(ctx){
   if(chips&&!chips.querySelector('.v-chip')){const c=R.completude(stay,stay.aideCpa,identity(stay));const al=openAlerts(stay);
    chips.insertAdjacentHTML('beforeend',`<button type="button" class="pb-chip v-chip ${c.ready?'pb-ok':'pb-crit'}" data-v-goto="aideCpa">${c.ready?ICON.check:ICON.lock}${c.ready?'Dossier complet':'Programmation bloquée · '+c.blocking.length}</button>${al.length?`<button type="button" class="pb-chip v-chip pb-crit" data-v-goto="suiviJ1">${ICON.phone}Alerte J+1</button>`:''}`);
    chips.querySelectorAll('[data-v-goto]').forEach(b=>b.onclick=()=>ctx.goTab(b.dataset.vGoto));}
-  if(tab==='dischargeLiaison')liaisonEnvoi();
+  // Lettre de liaison : l'envoi est désormais automatique à la validation (lettre-liaison.js) ; l'ancienne carte manuelle n'est plus affichée.
   // Blocage de programmation : passage à l'étape « Intervention » avec dossier incomplet.
   const sel=$('#stage-status');
   if(sel&&!sel.dataset.vHooked){sel.dataset.vHooked='1';sel.addEventListener('change',e=>{if(sel.value!=='Intervention')return;const c=R.completude(stay,stay.aideCpa,identity(stay));if(c.ready)return;

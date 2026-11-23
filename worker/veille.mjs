@@ -28,13 +28,13 @@ export function suiviMessages(establishment){
 export {interopStatus};
 async function docData(env,key){const row=await env.DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(key).first();return row?JSON.parse(row.data):null}
 // Identité du séjour telle que qualifiée dans l'identitovigilance (seule source d'INS acceptée pour un envoi réel).
-async function identityRecord(env,stay){
+export async function identityRecord(env,stay){
  const data=await docData(env,'identities/records'),rows=Array.isArray(data?.records)?data.records:Object.entries(data||{});
  const rec=(rows.find(([id])=>id===stay)||[])[1]||null;if(!rec)return null;
  const qualified=rec.remote?.outcome==='matched'&&!!rec.proof&&rec.remote?.mode&&rec.remote.mode!=='simulation';
  return {status:qualified?'Qualifiée':'Non qualifiée',ins:qualified?rec.ins:null};
 }
-async function authorOf(env,user){const p=await env.DB.prepare('SELECT display_name,rpps FROM professional_profiles WHERE user_id=?').bind(user).first();const [firstName,...rest]=String(p?.display_name||'').replace(/^Dr\.?\s+/,'').split(' ');return {rpps:p?.rpps||'',firstName,lastName:rest.join(' ')}}
+export async function authorOf(env,user){const p=await env.DB.prepare('SELECT display_name,rpps FROM professional_profiles WHERE user_id=?').bind(user).first();const [firstName,...rest]=String(p?.display_name||'').replace(/^Dr\.?\s+/,'').split(' ');return {rpps:p?.rpps||'',firstName,lastName:rest.join(' ')}}
 
 export async function veilleApi(request,env,acl){
  const url=new URL(request.url),path=url.pathname;
