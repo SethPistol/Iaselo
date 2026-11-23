@@ -15,6 +15,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(pathname==='/auth/unlock'&&request.method==='POST')return auth.unlock(request);
   if(pathname==='/api/questionnaire/submit'||pathname==='/api/questionnaire/resolve'||pathname==='/api/prescriptions/open'||pathname==='/api/prescriptions/view')return workspaceApi(request,{DB,BUCKET:bucket,ENABLE_DEMO_SEED:cfg.enableDemoSeed});
   // Espace patient (lien personnel) : seul le nom de l'établissement de la messagerie est transmis, aucun envoi possible.
+  // Lettre de liaison (lien personnel du patient) : lecture seule, aucun envoi possible.
+  if(pathname.startsWith('/api/lettre-liaison/'))return workspaceApi(request,{DB});
   if(pathname.startsWith('/api/espace-patient/'))return workspaceApi(request,{DB,BUCKET:bucket,ESTABLISHMENT:messaging?.establishment||''});
   const staff=await auth.user(request);
   if(pathname.startsWith('/api/workspace')){
