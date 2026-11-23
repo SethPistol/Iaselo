@@ -8,6 +8,18 @@ OCR : Tesseract.js 6.0.1, moteur tesseract.js-core 6.0.0 LSTM sans SIMD pour la 
 
 Les invitations contiennent 256 bits aléatoires dans un fragment d’URL. Seule leur empreinte SHA-256 est stockée. Validité 48 heures, remplacement révocatoire et consommation atomique à usage unique. Le questionnaire ne peut écrire que dans le séjour associé ; ses réponses sont filtrées et son identité confrontée aux coordonnées relues.
 
+## Lecture du nom et du prénom (correctif du 23/11/2026)
+
+La lecture reconnaît désormais les principales mises en page Doctolib (données fictives de test) :
+
+- en-tête de fiche praticien : « Mme Camille MARTIN », « Née DUPONT · 14/06/1985 (41 ans) », avec ou sans civilité, avatar à initiales ignoré ;
+- formulaire « Modifier le patient » en deux colonnes : libellé au-dessus de la valeur (« Nom de naissance * », « Prénom(s) de naissance * », « Nom d'usage », « Prénom utilisé ») ;
+- tableau libellé/valeur sur une ligne et écran « Informations personnelles » de l'application patient.
+
+Règles : le nom de naissance alimente l'identité (Doctolib affiche le nom d'usage en tête et le nom de naissance après « née ») ; le nom d'usage lu est seulement signalé à côté du formulaire. Le premier prénom de naissance est le premier élément de la liste des prénoms. Noms mis en capitales, accents, traits d'union et apostrophes conservés. Les noms précédés de « Dr » (médecin traitant, praticien du rendez-vous) sont ignorés. Si le nom ou le prénom n'est pas reconnu, un avertissement demande de les recopier : la relecture et la case de vérification restent obligatoires.
+
+OCR : petites captures agrandies (×2 à ×2,5), niveaux de gris, fond sombre inversé, espaces conservés pour retrouver les colonnes (`InvitationCore.prepareCanvas`, `OCR_PARAMS`). Sur 7 captures fictives de test, le nom et le prénom étaient lus sur 1 avant le correctif et sur 7 après.
+
 ## Envoi par SMS et e-mail (Brevo)
 
 Quand Brevo est configuré (voir `clevercloud/environment.example`), l’écran affiche « Envoyer par SMS », « Envoyer par e-mail » et « Envoyer les deux » après la préparation du lien. Sinon, les anciens boutons de brouillon (mailto/sms) restent affichés.
