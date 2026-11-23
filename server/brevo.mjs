@@ -6,7 +6,7 @@
 //     (BREVO_SENDER_EMAIL, facultatif, pour en imposer une) ;
 //   - nom d’expéditeur SMS : déduit du nom de l’établissement (BREVO_SMS_SENDER, facultatif) ;
 //   - ETABLISSEMENT_NOM, BREVO_SENDER_NAME : facultatifs.
-// MESSAGING_ALLOWED_RECIPIENTS (facultatif) : si renseignée, seuls ces destinataires reçoivent.
+// MESSAGING_ALLOWED_RECIPIENTS n’est plus lue : tout patient peut recevoir (recette : messages « [TEST] »).
 // Serveur de recette : les messages sont préfixés « [TEST] ».
 const API='https://api.brevo.com/v3';
 // Clé « restreinte » sans la portée Compte : Brevo refuse /account et /senders (403).
@@ -54,13 +54,10 @@ export function brevoError(status,data={}){
 export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
  const key=clean(env.BREVO_API_KEY),establishment=clean(env.ETABLISSEMENT_NOM)||'Clinique du Trocadéro';
  const senderName=clean(env.BREVO_SENDER_NAME)||establishment,smsSender=clean(env.BREVO_SMS_SENDER).replace(/[^A-Za-z0-9]/g,'').slice(0,11)||smsSenderFrom(establishment);
- const recette=env.IASELO_RECETTE==='true',allowList=clean(env.MESSAGING_ALLOWED_RECIPIENTS).split(/[,;\n]+/).map(normalizeRecipient).filter(Boolean);
+ const recette=env.IASELO_RECETTE==='true';
  const channels={email:!!key,sms:!!key&&smsSender.length>=3};
  let senderEmail=clean(env.BREVO_SENDER_EMAIL),statusCache=null;
- function refusal(to){
-  if(allowList.length&&!allowList.includes(normalizeRecipient(to)))return 'Destinataire hors de la liste MESSAGING_ALLOWED_RECIPIENTS.';
-  return '';
- }
+ function refusal(){return ''}
  // Un nouvel essai si Brevo est saturé ou momentanément injoignable (jamais après un délai
  // dépassé : le message a pu partir, on évite le doublon).
  async function call(method,path,payload,attempt=1){

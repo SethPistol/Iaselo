@@ -59,11 +59,11 @@ test('envoi du lien : destinataire vérifié côté serveur, lien actif requis, 
  }finally{f.close()}
 });
 test('envoi refusé proprement si Brevo n’est pas configuré',async()=>{const f=fixture(undefined);try{assert.equal((await f.call('owner','/questionnaire/send',{stay:'A',token:'0'.repeat(64),channels:['sms']})).status,503)}finally{f.close()}});
-test('liste de test : e-mails avec points, 06/0033/+33, espaces, guillemets et points-virgules',async()=>{
+test('ancienne liste MESSAGING_ALLOWED_RECIPIENTS ignorée ; e-mails avec points, 06/0033/+33, espaces, guillemets et points-virgules',async()=>{
  const f=fake(),m=brevoMessaging({BREVO_API_KEY:'k',BREVO_SENDER_EMAIL:'a@b.test',BREVO_SMS_SENDER:'IASELO',IASELO_RECETTE:'true',MESSAGING_ALLOWED_RECIPIENTS:' "06 00 00 00 42" ; Prenom.Nom@Example.COM '},f.fetch);
  await m.sms({to:'+33600000042',content:'x'});await m.email({to:'prenom.nom@example.com',subject:'s',text:'t',html:'h'});assert.equal(f.calls.length,2);
  for(const v of ['0600000042','0033 6 00 00 00 42','+33 (0)6 00 00 00 42','33600000042','+33.6.00.00.00.42'])assert.equal(normalizeRecipient(v),'+33600000042',v);
- await assert.rejects(m.email({to:'autre@example.com',subject:'s',text:'t',html:'h'}),/MESSAGING_ALLOWED_RECIPIENTS/);
+ await m.email({to:'nouveau.patient@example.com',subject:'s',text:'t',html:'h'});assert.equal(f.calls.length,3);assert.match(f.calls[2].body.subject,/^\[TEST\] /);
 });
 import {smsRecipientError,deliveryState} from '../server/brevo.mjs';
 test('SMS : mobiles uniquement, numéros normalisés avant envoi',async()=>{

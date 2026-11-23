@@ -53,7 +53,7 @@ Quand Brevo est configuré (voir `clevercloud/environment.example`), l’écran 
 - Contenu minimal : nom de l’établissement et lien à usage unique, sans nom du patient, motif, date ni information médicale. SMS de type `transactional` (`/v3/transactionalSMS/send`), e-mail via `/v3/smtp/email`.
 - Traçabilité : chaque tentative (réussie ou non) est inscrite dans `professional_access_log` (action `questionnaire-envoi`) avec l’auteur, le séjour, le canal, le destinataire masqué et la référence Brevo. Ni le jeton ni les coordonnées complètes ne sont journalisés.
 - Clé d’API : uniquement dans la variable d’environnement `BREVO_API_KEY`.
-- Recette : les messages sont préfixés « [TEST] ». `MESSAGING_ALLOWED_RECIPIENTS` reste disponible (facultatif) pour restreindre les envois.
+- Recette : les messages sont préfixés « [TEST] ». `MESSAGING_ALLOWED_RECIPIENTS` n’est plus lue : tout patient peut recevoir.
 - Configuration : seule `BREVO_API_KEY` est requise ; l’adresse d’expédition est la première adresse validée du compte Brevo, le nom SMS est déduit de l’établissement. L’écran affiche l’état de Brevo (clé, expéditeur, crédits SMS) et les erreurs en consignes claires (`GET /api/workspace/messaging/status`).
 - Un seul bouton « Envoyer le questionnaire au patient » prépare le lien et l’envoie par SMS et e-mail selon les coordonnées vérifiées.
 - À faire côté Brevo avant usage réel : signer le DPA (contrat de sous-traitance RGPD), désactiver le suivi des ouvertures et des clics pour les e-mails transactionnels, authentifier le domaine d’envoi (SPF/DKIM/DMARC). Brevo conserve le contenu des messages (donc le lien, valable 48 h) dans ses journaux.
