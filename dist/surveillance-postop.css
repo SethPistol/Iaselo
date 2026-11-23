@@ -1,0 +1,77 @@
+/* IASELO · surveillance postopératoire en graphe */
+.nurse-vitals.sp{background:var(--i-s1);border:1px solid var(--i-line);border-radius:var(--i-r-l);padding:16px 18px}
+.sp-graph{margin:6px 0 18px}
+.sp-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}
+.sp-last-alerts{flex:1;min-width:260px}
+.sp-kicker{margin:0 0 6px;font-size:12.5px;font-weight:650;letter-spacing:.03em;color:var(--i-mut);text-transform:uppercase}
+.sp-ok{margin:0;color:var(--i-ok);font-weight:600}
+.sp-muted,.sp-foot{margin:6px 0 0;font-size:12.5px;color:var(--i-mut)}
+.sp-alerts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.sp-alerts li{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border-radius:var(--i-r-s);font-size:13.5px;line-height:1.4;color:var(--i-ink)}
+.sp-alerts li svg{width:16px;height:16px;flex:none;margin-top:2px}
+.sp-alerts .sp-crit{background:var(--i-crit-soft)}.sp-alerts .sp-crit svg{color:var(--i-crit)}
+.sp-alerts .sp-warn{background:var(--i-warn-soft)}.sp-alerts .sp-warn svg{color:var(--i-warn)}
+.sp-alerts b{font-weight:650;margin-right:4px}
+.sp-tools{display:flex;gap:8px;flex-wrap:wrap}
+.sp-seg{display:inline-flex;border:1px solid var(--i-line-strong);border-radius:999px;overflow:hidden;background:var(--i-s1)}
+.sp-seg button{border:0;background:none;padding:6px 12px;font:600 13px var(--i-font);color:var(--i-mut);cursor:pointer;min-height:32px}
+.sp-seg button[aria-pressed=true]{background:var(--i-acc);color:var(--i-on-acc)}
+.sp-seg button:focus-visible{outline:2px solid var(--i-acc);outline-offset:-2px}
+.sp-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.sp-chart{position:relative;min-width:760px}
+.sp-svg{display:block;width:100%;height:auto;font-family:var(--i-font)}
+.sp-plot{fill:var(--i-s2)}.sp-band{fill:var(--i-s3)}
+.sp-row-bg{fill:var(--i-s2)}.sp-row-alt{fill:var(--i-s1);stroke:var(--i-line);stroke-width:1}
+.sp-vgrid{stroke:var(--i-line);stroke-width:1}
+.sp-hgrid{stroke:var(--i-line-strong);stroke-width:1;stroke-dasharray:2 4;opacity:.7}
+.sp-seuil{stroke:var(--i-warn);stroke-width:1.2;stroke-dasharray:5 4}
+.sp-tick,.sp-ytick{font-size:11px;fill:var(--i-mut);font-family:var(--i-mono)}
+.sp-day{font-family:var(--i-font);font-weight:600}
+.sp-name{font-size:12.5px;font-weight:650;fill:var(--i-ink)}
+.sp-unit{font-size:11px;fill:var(--i-mut)}
+.sp-last{font:700 17px var(--i-mono);fill:var(--i-ink)}
+.sp-legend{font-size:10.5px;fill:var(--i-mut)}.sp-key-bar{fill:var(--i-acc)}.sp-key-ring{fill:var(--i-acc)}
+.sp-rowname{font-size:12px;font-weight:600;fill:var(--i-ink)}
+.sp-line{fill:none;stroke:var(--i-acc);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.sp-dot{fill:var(--i-acc);stroke:var(--i-s1);stroke-width:2}
+.sp-hollow{fill:var(--i-s1);stroke:var(--i-acc);stroke-width:2}
+.sp-bar{fill:var(--i-acc);opacity:.85}
+.sp-zero{stroke:var(--i-acc);stroke-width:3;stroke-linecap:round}
+.sp-pa{stroke:var(--i-acc);stroke-width:2}
+.sp-chev{fill:none;stroke:var(--i-acc);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.sp-dot.sp-m-crit,.sp-bar.sp-m-crit{fill:var(--i-crit);opacity:1}.sp-dot.sp-m-warn,.sp-bar.sp-m-warn{fill:var(--i-warn);opacity:1}
+.sp-hollow.sp-m-crit,.sp-pa.sp-m-crit,.sp-chev.sp-m-crit{stroke:var(--i-crit)}.sp-hollow.sp-m-warn,.sp-pa.sp-m-warn,.sp-chev.sp-m-warn{stroke:var(--i-warn)}
+.sp-chip{fill:var(--i-s1);stroke:var(--i-line-strong);stroke-width:1}
+.sp-chiptxt{font:600 11.5px var(--i-mono);fill:var(--i-ink)}
+.sp-chip.sp-c-crit{fill:var(--i-crit);stroke:var(--i-crit)}.sp-chiptxt.sp-ct-crit{fill:var(--i-on-crit)}
+.sp-chip.sp-c-warn{fill:var(--i-warn-soft);stroke:var(--i-warn)}.sp-chiptxt.sp-ct-warn{fill:var(--i-warn)}
+.sp-chip.sp-c-info{fill:var(--i-acc-soft);stroke:var(--i-acc-soft)}
+.sp-flag path{fill:currentColor}.sp-t-crit{color:var(--i-crit);fill:var(--i-crit)}.sp-t-warn{color:var(--i-warn);fill:var(--i-warn)}
+dd.sp-t-crit,dd.sp-t-warn{font-weight:700}
+.sp-hit{fill:transparent;cursor:crosshair}
+.sp-cross{stroke:var(--i-ink);stroke-width:1;opacity:.35;pointer-events:none}
+.sp-tip{position:absolute;z-index:5;width:300px;max-width:80%;background:var(--i-s1);border:1px solid var(--i-line-strong);border-radius:var(--i-r-m);box-shadow:var(--i-shadow-lift);padding:10px 12px;font-size:13px;pointer-events:none}
+.sp-tip-h{margin:0 0 6px}
+.sp-tip dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0 0 6px}.sp-tip dt{color:var(--i-mut)}.sp-tip dd{margin:0}
+.sp-tip .sp-alerts li{padding:5px 8px;font-size:12.5px}
+.sp-tip-note{margin:4px 0;font-style:italic}.sp-tip-by{margin:4px 0 0;color:var(--i-mut);font-size:12px}
+.sp-empty{display:flex;flex-direction:column;gap:4px;padding:18px;border:1px dashed var(--i-line-strong);border-radius:var(--i-r-m);color:var(--i-mut)}.sp-empty b{color:var(--i-ink)}
+.sp-tablewrap{overflow-x:auto;border:1px solid var(--i-line);border-radius:var(--i-r-m)}
+.sp-table{border-collapse:collapse;font-size:13px;min-width:100%}
+.sp-table th,.sp-table td{padding:6px 10px;border-bottom:1px solid var(--i-line);text-align:center;white-space:nowrap}
+.sp-table th[scope=row]{text-align:left;position:sticky;left:0;background:var(--i-s1);font-weight:600}
+.sp-table thead th{background:var(--i-s2);font:600 12px var(--i-mono)}
+.sp-table td{font-family:var(--i-mono)}
+.sp-td-crit{background:var(--i-crit-soft);color:var(--i-crit);font-weight:700}.sp-td-warn{background:var(--i-warn-soft);color:var(--i-warn);font-weight:700}
+.sp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.sp-form-wrap{border-top:1px solid var(--i-line);padding-top:10px;margin-top:6px}
+.sp-form-wrap summary{cursor:pointer;font-weight:650;font-size:15px;padding:4px 0}
+.sp-form{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.sp-group{border:1px solid var(--i-line);border-radius:var(--i-r-m);padding:8px 12px 12px;margin:0}
+.sp-group legend{font-size:12.5px;font-weight:650;color:var(--i-mut);padding:0 6px;text-transform:uppercase;letter-spacing:.03em}
+.sp-group label small{color:var(--i-mut);font-weight:500}
+.sp-preview:empty{display:none}.sp-preview-title{margin:0 0 6px;font-weight:600}
+.sp-hist-alerts{margin-top:6px}
+@media print{.sp-scroll{overflow:visible}.sp-chart{min-width:0}.sp-form-wrap{display:none}}
+.sp-older summary{cursor:pointer;color:var(--i-acc);font-weight:600;margin:8px 0}
+.sp-form .formgrid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}

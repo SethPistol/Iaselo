@@ -605,11 +605,25 @@ function prescriptions(){
  });
 }
 const postopVitalKeys=['sbp','dbp','hr','rr','spo2','temp'];
+let surveillanceUi=null;
+const postopUi=()=>surveillanceUi??=window.createSurveillancePostop?.({esc})||null;
+function postopHistory(ui,records){
+ const item=record=>`<article class="event"><strong>${esc(record.values.location)} · ${esc(periTime(record.at))}</strong>
+ <p>${esc(ui.decrire(record.values)||periDescription(record))}</p>${ui.alertesHtml(record.values)?`<div class="sp-hist-alerts">${ui.alertesHtml(record.values)}</div>`:''}
+ <p class="muted">${esc(record.author)} · ${esc(record.role)} · Saisi le ${esc(periTime(record.created))}${record.photo?' · source photo validée':''}</p></article>`;
+ if(!records.length)return '<p class="muted">Aucun relevé postopératoire enregistré.</p>';
+ return records.slice(0,4).map(item).join('')+(records.length>4?`<details class="sp-older"><summary>Relevés plus anciens (${records.length-4})</summary>${records.slice(4).map(item).join('')}</details>`:'');
+}
 function postopVitals(stay){
- const fields=periVitals.filter(([key])=>postopVitalKeys.includes(key));
+ const ui=postopUi();
  const records=periSorted(stay.postopVitals||[]).reverse();
+ const canWrite=nurseProfile()||role==='Anesthésiste';
+ if(ui)return `<section class="workflow-form nurse-vitals sp"><h4>Surveillance postopératoire · graphe</h4>${ui.graph(stay.postopVitals||[])}
+ ${canWrite?ui.form({location:stay.stage==='Hospitalisation'||stay.stage==='Sortie'?'Hospitalisation':'SSPI',at:periNow(),author:!sharedWorkspace}):''}
+ <h4>Derniers relevés</h4>${postopHistory(ui,records.filter(r=>!r.voided))}</section>`;
+ const fields=periVitals.filter(([key])=>postopVitalKeys.includes(key));
  return `<section class="workflow-form nurse-vitals"><h4>Relevé des constantes</h4>
- ${nurseProfile()||role==='Anesthésiste'?`<form id="postop-vitals-form"><div class="formgrid">
+ ${canWrite?`<form id="postop-vitals-form"><div class="formgrid">
  <label>Lieu de surveillance<select name="location">${optionHTML(['SSPI','Hospitalisation'],'SSPI')}</select></label>
  ${periField('at','Date et heure du relevé','datetime-local',periNow(),'required')}
  ${sharedWorkspace?'':periField('author','Soignant · nom ou initiales fictifs','text','','required maxlength="80"')}
@@ -621,19 +635,24 @@ function postopVitals(stay){
  <p class="muted">${esc(record.author)} · ${esc(record.role)} · Saisi le ${esc(periTime(record.created))}</p></article>`).join('')||'<p class="muted">Aucun relevé postopératoire enregistré.</p>'}</section>`;
 }
 function bindPostopVitals(stay){
+ const ui=postopUi();
+ ui?.bind(document.querySelector('.nurse-vitals.sp'),()=>stay.postopVitals||[]);
  const form=$('#postop-vitals-form');
  if(!form)return;
  form.onsubmit=e=>{
   e.preventDefault();
   if((!nurseProfile()&&role!=='Anesthésiste')||p()!==stay)return;
   const values=Object.fromEntries(new FormData(form));
-  if(values.pain!==''&&(!Number.isInteger(Number(values.pain))||Number(values.pain)<0||Number(values.pain)>10)){
+  if(typeof values.note==='string')values.note=values.note.trim();
+  const uiError=ui?ui.verifier(values):'';
+  if(uiError){form.querySelector('[role="alert"]').textContent=uiError;return}
+  if(!ui&&values.pain!==''&&(!Number.isInteger(Number(values.pain))||Number(values.pain)<0||Number(values.pain)>10)){
    form.querySelector('[role="alert"]').textContent='La douleur doit être comprise entre 0 et 10.';
    return;
   }
   if(sharedWorkspace)values.author=role;
-  const hasMeasurement=postopVitalKeys.some(key=>values[key]!==''&&values[key]!==undefined)||values.pain!=='';
-  const error=hasMeasurement?periValidate('Surveillance',{...values,clinical:values.pain!==''?'Douleur':''}):'Renseignez au moins une mesure.';
+  const hasMeasurement=ui?ui.renseigne(values):postopVitalKeys.some(key=>values[key]!==''&&values[key]!==undefined)||values.pain!=='';
+  const error=hasMeasurement?periValidate('Surveillance',{...values,clinical:'Surveillance'}):'Renseignez au moins une mesure ou une cotation.';
   if(error){form.querySelector('[role="alert"]').textContent=error;return}
   if(sharedWorkspace){
    const fingerprint=JSON.stringify(values);
