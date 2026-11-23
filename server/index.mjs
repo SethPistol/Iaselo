@@ -1,5 +1,5 @@
 import http from 'node:http';import fs from 'node:fs/promises';import {createReadStream,existsSync} from 'node:fs';import {Readable} from 'node:stream';import path from 'node:path';import {fileURLToPath} from 'node:url';
-import {workspaceApi} from '../worker/workspace.mjs';import {config} from './config.mjs';import {createPool,migrate,postgresBinding} from './database.mjs';import {cellarBinding} from './storage.mjs';import {bootstrap,createAuth,loginPage} from './auth.mjs';import {brevoMessaging} from './brevo.mjs';import {createPsc} from './interop/psc.mjs';import {createConnectors} from './interop/index.mjs';
+import {workspaceApi} from '../worker/workspace.mjs';import {config} from './config.mjs';import {createPool,migrate,postgresBinding} from './database.mjs';import {cellarBinding} from './storage.mjs';import {bootstrap,createAuth,loginPage} from './auth.mjs';import {brevoMessaging} from './brevo.mjs';import {createPsc} from './interop/psc.mjs';import {createConnectors} from './interop/index.mjs';import {tourneeRappels} from '../worker/rappels-auto.mjs';
 const root=path.resolve(fileURLToPath(new URL('../dist/',import.meta.url)));
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.svg':'image/svg+xml','.wasm':'application/wasm','.gz':'application/gzip','.mjs':'application/javascript; charset=utf-8','.onnx':'application/octet-stream','.txt':'text/plain; charset=utf-8'};
 // Module de transcription vocale du compte rendu opératoire (Whisper small, ONNX), voir scripts/modele-whisper.mjs,
@@ -10,7 +10,9 @@ const modelesRoot=path.resolve(process.env.IASELO_MODELES_DIR||(existsSync(path.
 const modeleAutorise=/^\/modeles\/Xenova\/whisper-small\/(?:onnx\/(?:encoder_model_quantized|decoder_model_merged_quantized)\.onnx|[a-z_]+\.(?:json|txt))$/;
 export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),interopEnv={},connectors=createConnectors(interopEnv),psc=createPsc({env:interopEnv,baseUrl:cfg.baseUrl,secret:cfg.sessionSecret})}){
  const auth=await createAuth(pool,cfg,{psc}),DB=postgresBinding(pool);
- return async function handle(request){const url=new URL(request.url),pathname=url.pathname;
+ // Rappels SMS automatiques (consentement J-2/J-1, suivi J+1) : lancés par start() toutes les 10 minutes.
+ const rappels=opts=>tourneeRappels({DB,MESSAGING:messaging},{origin:cfg.baseUrl,...opts});
+ const handle=async function handle(request){const url=new URL(request.url),pathname=url.pathname;
   if(pathname==='/healthz'){try{await pool.query('SELECT 1');return Response.json({status:'ok'})}catch{return Response.json({status:'unavailable'},{status:503})}}
   if(pathname==='/auth/psc/start'&&request.method==='GET')return auth.pscStart();
   if(pathname==='/auth/psc/callback'&&request.method==='GET')return auth.pscCallback(request);
@@ -24,6 +26,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   // Lettre de liaison (lien personnel du patient) : lecture seule, aucun envoi possible.
   if(pathname.startsWith('/api/lettre-liaison/'))return workspaceApi(request,{DB});
   if(pathname.startsWith('/api/espace-patient/'))return workspaceApi(request,{DB,BUCKET:bucket,ESTABLISHMENT:messaging?.establishment||''});
+  // Questionnaire du lendemain (lien du SMS J+1) : réponses du patient, aucun envoi possible.
+  if(pathname.startsWith('/api/suivi-j1/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   const staff=await auth.user(request);
   if(pathname.startsWith('/api/workspace')){
    if(!staff)return Response.json({error:'Connexion professionnelle requise.'},{status:401});
@@ -43,6 +47,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   const file=path.resolve(root,'.'+name);if(!file.startsWith(root+path.sep))return new Response('Introuvable',{status:404});
   try{const stat=await fs.stat(file);if(!stat.isFile())throw Error();return new Response(request.method==='HEAD'?null:await fs.readFile(file),{headers:{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'}})}catch{return new Response('Introuvable',{status:404})}
  };
+ handle.rappels=rappels;
+ return handle;
 }
 export function httpServer(handle,cfg){return http.createServer(async(req,res)=>{
  try{
@@ -64,5 +70,5 @@ export function httpServer(handle,cfg){return http.createServer(async(req,res)=>
   res.end(Buffer.from(await response.arrayBuffer()));
  }catch(error){console.error('request_failed',error.code||error.name||'Error');if(!res.headersSent)res.writeHead(500,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'});res.end('Service indisponible. Réessayez.');}
  })}
-export async function start(env=process.env){const cfg=config(env),pool=createPool(env);try{await migrate(pool);await bootstrap(pool,env);const bucket=cellarBinding(env);await bucket.check();const handle=await makeApp({pool,bucket,cfg,messaging:brevoMessaging(env),interopEnv:env}),server=httpServer(handle,cfg);await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(cfg.port,'0.0.0.0',resolve)});console.log('Parcours Anesthésie écoute sur 0.0.0.0:'+cfg.port);const stop=()=>server.close(async()=>{bucket.close();await pool.end();process.exit(0)});process.once('SIGTERM',stop);process.once('SIGINT',stop);return server;}catch(e){await pool.end();throw e}}
+export async function start(env=process.env){const cfg=config(env),pool=createPool(env);try{await migrate(pool);await bootstrap(pool,env);const bucket=cellarBinding(env);await bucket.check();const handle=await makeApp({pool,bucket,cfg,messaging:brevoMessaging(env),interopEnv:env}),server=httpServer(handle,cfg);await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(cfg.port,'0.0.0.0',resolve)});console.log('Parcours Anesthésie écoute sur 0.0.0.0:'+cfg.port);const tour=()=>handle.rappels().then(r=>{const n=(r.resultats||[]).filter(x=>x.ok!==undefined||x.alerte).length;if(n)console.log('Rappels automatiques : '+n+' traité(s)')}).catch(e=>console.error('rappels_auto',e?.message||e));const rappelsTimer=setInterval(tour,10*60*1000);rappelsTimer.unref?.();setTimeout(tour,30000).unref?.();const stop=()=>server.close(async()=>{bucket.close();await pool.end();process.exit(0)});process.once('SIGTERM',stop);process.once('SIGINT',stop);return server;}catch(e){await pool.end();throw e}}
 if(process.argv[1]===fileURLToPath(import.meta.url))start().catch(e=>{console.error('Démarrage impossible : '+(e.code||e.message));process.exit(1)});

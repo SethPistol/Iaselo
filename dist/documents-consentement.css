@@ -160,3 +160,7 @@
 .dc-pt-list li b { overflow-wrap: anywhere; }
 .dc-pt-list li span { font-size: 13.5px; color: var(--i-mut); }
 @media print { body.dc-patient.dc-printing > *:not(#dc-print) { display: none !important; } }
+/* Questionnaire du lendemain (page patient) */
+.sj-q{display:flex;flex-direction:column;gap:8px;margin:0 0 18px;border:0;padding:0}
+.sj-q>span,.sj-q legend{font-weight:600}
+.sj-q input[type=number],.sj-q input[type=date]{max-width:220px}

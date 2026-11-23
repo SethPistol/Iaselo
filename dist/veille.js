@@ -114,7 +114,36 @@ window.createVeille=function(ctx){
 
  /* ================= Suivi ambulatoire J-1 / J+1 ================= */
  function suivi(stay){stay.suiviAmbu=stay.suiviAmbu&&typeof stay.suiviAmbu==='object'?stay.suiviAmbu:{};stay.suiviAmbu.appels??=[];stay.suiviAmbu.envois??=[];return stay.suiviAmbu}
- function openAlerts(stay){const s=stay.suiviAmbu;if(!s?.appels?.length)return [];const last=s.appels[s.appels.length-1];return last.alerts?.length&&!last.handled?last.alerts:[]}
+ function callAlerts(stay){const s=stay.suiviAmbu;if(!s?.appels?.length)return [];const last=s.appels[s.appels.length-1];return last.alerts?.length&&!last.handled?last.alerts:[]}
+ // Réponses du patient au questionnaire J+1 (rubrique écrite par le serveur) ; état serveur le plus récent si chargé.
+ const j1Server=new Map();let j1Loaded=false;
+ function j1Reponses(stay){const r=stay.espacePatient?.suiviJ1?.reponses;return Array.isArray(r)?r.map((x,index)=>({...x,index})):[]}
+ function j1Open(stay){if(j1Loaded)return j1Server.get(stay.id)?.alertes||[];return j1Reponses(stay).filter(x=>x.alerts?.length&&!x.traite)}
+ function openAlerts(stay){return [...callAlerts(stay),...j1Open(stay).flatMap(x=>x.alerts.map(a=>({...a,source:'patient',at:x.at})))]}
+ async function loadJ1(){
+  try{const r=await fetch('/api/workspace/suivi-j1/alertes',{cache:'no-store'});if(!r.ok)return;const d=await r.json();
+   const before=JSON.stringify([...j1Server]);j1Server.clear();for(const a of d.alertes||[])j1Server.set(a.stay,a);j1Loaded=true;
+   if(before!==JSON.stringify([...j1Server]))refreshViews();
+  }catch{}
+ }
+ const medecinsTexte=stay=>{const m=j1Server.get(stay.id)?.medecins||{anesthesiste:stay.consult?.ext?.author||'',chirurgien:stay.consult?.ext?.surgeon||''};return [m.anesthesiste&&'Anesthésiste : '+m.anesthesiste,m.chirurgien&&'Chirurgien : '+m.chirurgien].filter(Boolean).join(' · ')};
+ // « Ma journée » : encadré d'alerte en tête, pour le médecin en charge (séjours de son équipe).
+ function journeeJ1(){
+  if(!document.body.classList.contains('j-home'))return;const ws=$('#workspace');if(!ws)return;
+  ws.querySelector('.v-j1-home')?.remove();
+  const rows=patients.filter(x=>j1Open(x).length);if(!rows.length)return;
+  const html=`<section class="v-card v-alertbox is-crit v-j1-home" role="alert"><header class="v-card-head"><div><h4>${ICON.phone} Alertes du lendemain (questionnaire J+1)</h4><p>${rows.length} patient${rows.length>1?'s':''} à rappeler · seuils par défaut, à relire par l’équipe</p></div></header><ul>${rows.map(x=>`<li><button type="button" class="v-link" data-j1-open="${esc(x.id)}">${esc(name(x))}</button><small>${j1Open(x).flatMap(r=>r.alerts.map(a=>esc(a.label))).join(' · ')} · réponse du ${esc(fmtDT(j1Open(x).at(-1).at))}</small><small>${esc(medecinsTexte(x))}</small></li>`).join('')}</ul></section>`;
+  const hero=ws.querySelector('.j-hero');if(hero)hero.insertAdjacentHTML('afterend',html);else ws.insertAdjacentHTML('afterbegin',html);
+  ws.querySelectorAll('[data-j1-open]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.j1Open,'suiviJ1'));
+ }
+ function refreshViews(){
+  if(document.body.classList.contains('v-controle-on'))renderControle();
+  journeeJ1();
+  const cur=current();if(cur&&ctx.tab?.()==='suiviJ1'&&!document.querySelector('#v-j1 :focus'))panelSuivi();
+  document.querySelectorAll('#detail .v-chip').forEach(x=>x.remove());if(cur)detailHook(ctx.tab?.());
+ }
+ loadJ1();setInterval(loadJ1,60000);
+ new MutationObserver(()=>{if(document.body.classList.contains('j-home')&&!document.querySelector('.v-j1-home')&&patients.some(x=>j1Open(x).length))journeeJ1()}).observe(document.body,{childList:true,subtree:true});
  async function sendSms(stay,kind,button){
   button.disabled=true;
   try{const r=await fetch('/api/workspace/suivi/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stay:stay.id,kind})});const d=await r.json().catch(()=>({}));
@@ -123,23 +152,35 @@ window.createVeille=function(ctx){
   }catch{toast('Envoi impossible : serveur injoignable.')}
   panelSuivi();
  }
+ function reponsesJ1HTML(stay){
+  const rows=j1Reponses(stay),q=R.QUESTIONS_J1,open=new Set(j1Open(stay).map(x=>x.index));
+  return `<section class="v-card ${open.size?'v-alertbox is-crit':''}"><header class="v-card-head"><div><h4>${ICON.phone} Réponses du patient au questionnaire J+1</h4><p>${rows.length?rows.length+' réponse'+(rows.length>1?'s':''):'Pas encore de réponse. Le questionnaire part avec le SMS du lendemain à 10 h.'} · ${esc(medecinsTexte(stay)||'médecin en charge non renseigné')}</p></div></header>
+   ${rows.length?`<table class="v-table"><thead><tr><th>Reçu le</th><th>Réponses</th><th>Alertes</th><th></th></tr></thead><tbody>${rows.slice().reverse().map(r=>`<tr class="${open.has(r.index)?'is-alert':''}"><td class="v-mono">${esc(fmtDT(r.at))}</td><td>${esc(q.filter(([k])=>r.answers?.[k]).map(([k,l])=>l.split(' (')[0]+' : '+r.answers[k]).join(' · '))}</td><td>${r.alerts?.length?r.alerts.map(a=>`<span class="v-pill ${a.level==='crit'?'v-crit':'v-warn'}">${esc(a.label)}</span>`).join(' '):'<span class="v-pill v-ok">Aucune</span>'}</td><td>${r.traite?`<small>Traitée par ${esc(r.traite.by)} le ${esc(fmtDT(r.traite.at))} · ${esc(r.traite.action)}</small>`:open.has(r.index)&&isDoctor()?`<button type="button" class="secondary" data-j1-traiter="${r.index}">Marquer traitée</button>`:''}</td></tr>`).join('')}</tbody></table>`:''}</section>`;
+ }
+ async function traiterJ1(stay,index){
+  const action=prompt('Action réalisée (patient rappelé, consultation programmée, retour aux urgences…)','Patient rappelé par le médecin');if(!action||action.trim().length<3)return;
+  try{const r=await fetch('/api/workspace/suivi-j1/traiter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stay:stay.id,index,action:action.trim()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Serveur indisponible');
+   stay.espacePatient=d.espacePatient;trace(stay,'Alerte J+1 traitée : '+action.trim(),'Suivi ambulatoire');toast('Alerte traitée');await loadJ1();panelSuivi()}catch(e){toast(e.message)}
+ }
  function panelSuivi(){
   const stay=current(),s=suivi(stay),editable=can('suiviAmbu'),q=R.QUESTIONS_J1;
-  const last=s.appels[s.appels.length-1],alerts=openAlerts(stay);
-  $('#content').innerHTML=`<div class="v-wrap"><header class="v-head"><div><p class="v-kicker">Suivi ambulatoire · inspiré du suivi SMS conversationnel</p><h3>Appel de la veille et du lendemain</h3><p class="v-sub">SMS sans information médicale envoyés via Brevo, appel du lendemain tracé, alertes selon des seuils réglés par l’équipe (douleur ≥ ${R.SEUILS_J1.douleur}/10, fièvre ≥ ${String(R.SEUILS_J1.temperature).replace('.',',')} °C, saignement, dyspnée, mollet, rétention).</p></div>${alerts.length?`<span class="v-go v-crit">${ICON.alert}${alerts.length} alerte${alerts.length>1?'s':''} à traiter</span>`:''}</header>
+  const last=s.appels[s.appels.length-1],alerts=openAlerts(stay),j1=(stay.espacePatient?.rappelsAuto||[]).filter(e=>e.kind==='suivi-j+1').at(-1);
+  $('#content').innerHTML=`<div class="v-wrap"><header class="v-head"><div><p class="v-kicker">Suivi ambulatoire · inspiré du suivi SMS conversationnel</p><h3>SMS de la veille et du lendemain</h3><p class="v-sub">SMS sans information médicale envoyés via Brevo, SMS du lendemain envoyé automatiquement à chaque patient opéré, le patient répond à un court questionnaire ; alerte au médecin si douleur > ${R.SEUILS_J1.douleur}/10, température < ${R.SEUILS_J1.temperatureBasse} °C ou > ${R.SEUILS_J1.temperatureHaute} °C, « Oui » à une question d’alerte ou « Non » à la sécurité à domicile (seuils par défaut, à relire par l’équipe).</p></div>${alerts.length?`<span class="v-go v-crit">${ICON.alert}${alerts.length} alerte${alerts.length>1?'s':''} à traiter</span>`:''}</header>
   <div class="v-two">
    <section class="v-card"><header class="v-card-head"><div><h4>SMS automatiques</h4><p>Contenu : nom de l’établissement et rappel générique. Aucune donnée de santé.</p></div></header>
     <div class="v-sms"><div><b>J-1 · Rappel de venue</b><small>« Rappel de votre venue prévue demain. Respectez les consignes de jeûne et l’heure d’arrivée qui vous ont été remises. »</small></div>${editable?`<button type="button" class="secondary" data-sms="j-1">${ICON.send}Envoyer</button>`:''}</div>
-    <div class="v-sms"><div><b>J+1 · Annonce de l’appel</b><small>« Un membre de l’équipe va vous appeler aujourd’hui pour prendre de vos nouvelles. En cas d’urgence, appelez le 15. »</small></div>${editable?`<button type="button" class="secondary" data-sms="j+1">${ICON.send}Envoyer</button>`:''}</div>
+    <div class="v-sms"><div><b>J+1 · SMS automatique, le lendemain à 10 h</b><small>« Nous espérons que tout va bien depuis votre retour. En cas de douleur importante, de fièvre, de saignement ou de gêne pour respirer, appelez la clinique. En cas d’urgence, appelez le 15. »</small>${j1?`<small class="${j1.ok?'v-ok':'v-ko'}">${j1.ok?ICON.check+' Envoyé automatiquement le '+esc(fmtDT(j1.at))+' · '+esc(j1.detail||''):ICON.alert+' Non envoyé : '+esc(j1.raison||'')}</small>`:'<small>Envoyé à chaque patient opéré, sans action de l’équipe.</small>'}</div></div>
     <ul class="v-log">${s.envois.slice(-4).reverse().map(e=>`<li class="${e.sent?'is-ok':'is-ko'}">${e.sent?ICON.check:ICON.alert}<span>${esc(e.kind.toUpperCase())} · ${esc(fmtDT(e.at))} · ${esc(e.detail)}</span></li>`).join('')||'<li class="is-na">Aucun SMS envoyé pour ce séjour.</li>'}</ul></section>
-   <section class="v-card"><header class="v-card-head"><div><h4>${ICON.phone} Appel J+1</h4><p>${last?'Dernier appel '+esc(fmtDT(last.at))+' par '+esc(last.by):'Aucun appel tracé'}</p></div></header>
+   <section class="v-card"><header class="v-card-head"><div><h4>${ICON.phone} Si le patient rappelle</h4><p>${last?'Dernier échange '+esc(fmtDT(last.at))+' par '+esc(last.by):'Le SMS J+1 remplace l’appel systématique. Tracez ici un échange avec le patient s’il rappelle la clinique.'}</p></div></header>
     ${editable?`<form id="v-j1" class="v-form">${q.map(([k,label,type])=>type==='number'?`<label><span>${esc(label)}</span><input name="${k}" type="number" step="${k==='temperature'?'0.1':'1'}" min="0" max="${k==='temperature'?'43':'10'}" inputmode="decimal"></label>`:`<fieldset><legend>${esc(label)}</legend><span class="v-seg">${['Oui','Non'].map(o=>`<label><input type="radio" name="${k}" value="${o}"><span>${o}</span></label>`).join('')}</span></fieldset>`).join('')}
      <label class="v-wide"><span>Commentaire</span><textarea name="note" rows="2"></textarea></label>
      <label class="v-wide v-inline"><input type="checkbox" name="noanswer"> Patient injoignable (nouvelle tentative à prévoir)</label>
      <div class="v-actions v-wide"><button class="primary">Enregistrer l’appel</button></div></form>`:''}
    </section></div>
+  ${reponsesJ1HTML(stay)}
   <section class="v-card"><header class="v-card-head"><div><h4>Historique des appels</h4></div></header>
    ${s.appels.length?`<table class="v-table"><thead><tr><th>Date</th><th>Soignant</th><th>Réponses</th><th>Alertes</th><th></th></tr></thead><tbody>${s.appels.slice().reverse().map((c,ri)=>{const i=s.appels.length-1-ri;return `<tr><td class="v-mono">${esc(fmtDT(c.at))}</td><td>${esc(c.by)}</td><td>${c.noanswer?'Injoignable':esc(q.filter(([k])=>c.answers?.[k]).map(([k,l])=>l.split(' (')[0]+' : '+c.answers[k]).join(' · '))}${c.note?`<small>${esc(c.note)}</small>`:''}</td><td>${c.alerts?.length?c.alerts.map(a=>`<span class="v-flag v-${a.level}">${ICON.alert}${esc(a.label)}</span>`).join(''):'<span class="v-flag v-ok">'+ICON.check+'Aucune</span>'}</td><td>${c.alerts?.length?(c.handled?`<small>Traitée par ${esc(c.handled.by)} · ${esc(c.handled.action)}</small>`:editable?`<button type="button" class="secondary" data-handle="${i}">Tracer le rappel médecin</button>`:''):''}</td></tr>`}).join('')}</tbody></table>`:'<p class="v-empty">Aucun appel.</p>'}</section></div>`;
+  document.querySelectorAll('[data-j1-traiter]').forEach(b=>b.onclick=()=>traiterJ1(stay,Number(b.dataset.j1Traiter)));
   if(!editable)return;
   document.querySelectorAll('[data-sms]').forEach(b=>b.onclick=()=>sendSms(stay,b.dataset.sms,b));
   $('#v-j1').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget),answers={};for(const [k] of q){const v=f.get(k);if(v!==null&&v!=='')answers[k]=String(v)}
@@ -205,7 +246,10 @@ window.createVeille=function(ctx){
 
  // Bouton de navigation « Tour de contrôle », juste après « Ma journée ».
  const home=document.querySelector('.nav[data-view="priorities"]');
- if(home&&!document.querySelector('.nav[data-view="controle"]')){let after=home;for(const [id,label,icon] of [['controle','Tour de contrôle',ICON.tower],...(plus?[['pilotage','Pilotage & qualité','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/></svg>'],['droits','Droits & traçabilité','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6Z"/></svg>']]:[])]){const b=document.createElement('button');b.type='button';b.className='nav';b.dataset.view=id;b.innerHTML=icon+label;after.after(b);after=b;b.addEventListener('click',()=>ctx.setView(id));}}
+ if(home&&!document.querySelector('.nav[data-view="controle"]')){let after=home;for(const [id,label,icon] of [['controle','Tour de contrôle',ICON.tower],...(plus?[['pilotage','Pilotage & qualité','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/></svg>'],['droits','Droits & traçabilité','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6Z"/></svg>']]:[])]){const b=document.createElement('button');b.type='button';b.className='nav';b.dataset.view=id;b.innerHTML=icon+label;after.after(b);after=b;b.addEventListener('click',()=>ctx.setView(id));}
+  // « Pilotage & qualité » et « Droits & traçabilité » vont dans la section « Gestion de la clinique » (mêmes droits d'accès).
+  const gestion=document.querySelector('.nav[data-view="billing"]')||[...document.querySelectorAll('.navtitle')].find(t=>/GESTION/i.test(t.textContent));
+  if(gestion){let apres=gestion;for(const id of ['pilotage','droits']){const b=document.querySelector(`.nav[data-view="${id}"]`);if(b){apres.after(b);apres=b}}}}
 
  return {panel,tabs:Object.keys(TABS),detail:detailHook,render:view=>{if(view==='controle'){renderControle();return true}if(plus?.views[view]){plus.views[view]();return true}document.body.classList.remove('v-controle-on');return false}};
 };

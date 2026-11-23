@@ -24,7 +24,7 @@ async function docData(env,key){const row=await env.DB.prepare('SELECT data FROM
 const empty=()=>({consentement:null,documents:[]});
 
 // Écriture serveur de la rubrique « espacePatient » : révision suivante, versions conservées (déclencheur), sans écrasement concurrent.
-async function updateSpace(env,stay,actor,reason,mutate){
+export async function updateSpace(env,stay,actor,reason,mutate){
  const key=docKey(stay);
  for(let attempt=0;attempt<4;attempt++){
   const row=await env.DB.prepare('SELECT data,revision FROM workspace_documents WHERE key=?').bind(key).first();
@@ -61,7 +61,7 @@ async function send(request,env,acl,url){
  return json(r.body,r.status);
 }
 // Envoi d'un lien patient (bouton du dossier ou envoi automatique à la validation de la consultation).
-async function envoyer(env,acl,origin,{stay,purpose,channels:asked,fiche:ficheDemandee,relance:relanceDemandee=false,auto=false}){
+export async function envoyer(env,acl,origin,{stay,purpose,channels:asked,fiche:ficheDemandee,relance:relanceDemandee=false,auto=false}){
  const json=(body,status=200)=>({body,status});
  if(!validStay(stay)||!['documents','consentement'].includes(purpose))return json({error:'Demande invalide.'},400);
  const contactKey='stay/'+stay+'/invitationContact';
