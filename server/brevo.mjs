@@ -9,6 +9,8 @@
 // MESSAGING_ALLOWED_RECIPIENTS (facultatif) : si renseignée, seuls ces destinataires reçoivent.
 // Serveur de recette : les messages sont préfixés « [TEST] ».
 const API='https://api.brevo.com/v3';
+// Clé « restreinte » sans la portée Compte : Brevo refuse /account et /senders (403).
+export const SCOPE_MESSAGE='La clé Brevo n’a pas le droit de lire le compte. Dans Brevo › Paramètres › SMTP et API › clé « Iaselo » : ligne « Compte », choisir « Lues », puis enregistrer.';
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const clean=s=>String(s||'').trim();
 // Comparaison tolérante : guillemets, espaces, casse, 06… / 0033… / +33…
@@ -66,12 +68,12 @@ export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
   try{
    const r=await fetchImpl(API+path,{method,headers:{'api-key':key,Accept:'application/json',...(payload?{'Content-Type':'application/json'}:{})},...(payload?{body:JSON.stringify(payload)}:{}),signal:controller.signal});
    let data={};try{data=await r.json()}catch{}
-   if(!r.ok){if(attempt===1&&[429,502,503,504].includes(r.status)){clearTimeout(timer);await pause(1500);return call(method,path,payload,2)}const error=Error(brevoError(r.status,data));error.provider=true;throw error}
+   if(!r.ok){if(attempt===1&&[429,502,503,504].includes(r.status)){clearTimeout(timer);await pause(1500);return call(method,path,payload,2)}const error=Error(brevoError(r.status,data));error.provider=true;error.status=r.status;throw error}
    return data;
   }catch(e){if(e.provider)throw e;if(attempt===1&&e.name!=='AbortError'){clearTimeout(timer);await pause(1500);return call(method,path,payload,2)}const error=Error(e.name==='AbortError'?'Brevo ne répond pas. Réessayez dans un instant.':'Brevo injoignable depuis le serveur. Réessayez dans un instant.');error.provider=true;throw error}
   finally{clearTimeout(timer)}
  }
- async function activeSenders(){const data=await call('GET','/senders');return (data.senders||[]).filter(s=>s.active!==false&&s.email)}
+ async function activeSenders(){let data;try{data=await call('GET','/senders')}catch(e){if(e.status===401||e.status===403)throw Error(SCOPE_MESSAGE);throw e}return (data.senders||[]).filter(s=>s.active!==false&&s.email)}
  async function sender(){
   if(senderEmail)return senderEmail;
   const first=(await activeSenders())[0];if(!first)throw Error('Aucune adresse d’expédition validée dans Brevo. Ajoutez-en une dans Brevo › Expéditeurs et domaines.');
@@ -105,11 +107,12 @@ export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
    if(statusCache&&Date.now()-statusCache.at<60000)return statusCache.value;
    let value;
    try{
-    const account=await call('GET','/account'),plans=Array.isArray(account.plan)?account.plan:[],smsPlan=plans.find(p=>p.type==='sms'),credits=smsPlan?Number(smsPlan.credits)||0:0;
+    let account=null,scopeError='';try{account=await call('GET','/account')}catch(e){if(e.status===401||e.status===403)scopeError=SCOPE_MESSAGE;else throw e}
+    const plans=Array.isArray(account?.plan)?account.plan:[],smsPlan=plans.find(p=>p.type==='sms'),credits=account?(smsPlan?Number(smsPlan.credits)||0:0):null;
     let from=clean(env.BREVO_SENDER_EMAIL),emailError='';
     if(!from){try{from=(await activeSenders())[0]?.email||'';if(from)senderEmail=from;else emailError='Aucune adresse d’expédition validée dans Brevo (Brevo › Expéditeurs et domaines).'}catch(e){emailError=e.message}}
-    const smsError=credits>0?'':'Aucun crédit SMS dans Brevo.';
-    value={ready:!emailError||!smsError,recette,email:{ok:!emailError,from,error:emailError},sms:{ok:!smsError,sender:smsSender,credits,error:smsError}};
+    const smsError=credits===null?'':credits>0?'':'Aucun crédit SMS dans Brevo.';
+    value={ready:!emailError||!smsError,recette,...(scopeError?{warning:scopeError}:{}),email:{ok:!emailError,from,error:emailError},sms:{ok:!smsError,sender:smsSender,credits,error:smsError}};
    }catch(e){value={ready:false,recette,message:e.message}}
    statusCache={at:Date.now(),value};return value;
   }

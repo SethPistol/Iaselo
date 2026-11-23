@@ -86,3 +86,12 @@ test('statut de délivrance : livré, échec expliqué, en attente',async()=>{
  assert.equal((await m.delivery({channel:'sms',ref:'99',to:'06 00 00 00 42'})).state,'delivered');assert.match(calls[0],/phoneNumber=33600000042/);
  assert.equal((await m.delivery({channel:'sms',ref:'12',to:'+33600000042'})).state,'failed');
 });
+
+test('clé restreinte sans portée Compte : consigne claire, SMS non bloqué',async()=>{
+ const {brevoMessaging,SCOPE_MESSAGE}=await import('../server/brevo.mjs');
+ const m=brevoMessaging({BREVO_API_KEY:'k'},async url=>url.endsWith('/account')||url.endsWith('/senders')?new Response('{"code":"permission_denied","message":"Key not authorized"}',{status:403}):new Response('{"messageId":"1"}',{status:201}));
+ const st=await m.status();
+ assert.equal(st.warning,SCOPE_MESSAGE);assert.equal(st.sms.ok,true);assert.equal(st.sms.credits,null);
+ assert.equal(st.email.ok,false);assert.match(st.email.error,/Compte/);assert.ok(!/activé/.test(JSON.stringify(st)));
+ assert.equal(await m.sms({to:'0612345678',content:'x'}),'1');
+});
