@@ -49,8 +49,8 @@ async function sendInvitation(request,env,acl,url){
  if(request.method!=='POST')return invitationJson({error:'Méthode refusée.'},405);
  const d=await invitationBody(request),stay=String(d.stay||''),key='stay/'+stay+'/invitationContact';
  if(!acl.canRead(key)||!acl.keyWrite(key,null,{}))return invitationJson({error:'Envoi hors habilitation.'},403);
- const channels=Array.isArray(d.channels)?[...new Set(d.channels)]:[];
- if(!channels.length||channels.some(c=>!['sms','email'].includes(c)))return invitationJson({error:'Choisissez SMS et/ou e-mail.'},400);
+ let channels=Array.isArray(d.channels)?[...new Set(d.channels)]:null;
+ if(channels&&(!channels.length||channels.some(c=>!['sms','email'].includes(c))))return invitationJson({error:'Choisissez SMS et/ou e-mail.'},400);
  const messaging=env.MESSAGING;if(!messaging)return invitationJson({error:'Envoi Brevo non configuré sur ce serveur.'},503);
  if(typeof d.token!=='string'||!/^[a-f0-9]{64}$/.test(d.token))return invitationJson({error:'Préparez d’abord le lien.'},400);
  const at=new Date().toISOString(),row=await env.DB.prepare('SELECT stay_id FROM questionnaire_invitations WHERE token_hash=? AND stay_id=? AND revoked=0 AND used_at IS NULL AND expires_at>?').bind(await invitationHash(d.token),stay,at).first();
@@ -58,6 +58,9 @@ async function sendInvitation(request,env,acl,url){
  // Le destinataire vient toujours des coordonnées vérifiées enregistrées, jamais de la requête.
  const saved=await env.DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(key).first(),contact=saved?JSON.parse(saved.data).contact:null;
  if(!contact)return invitationJson({error:'Coordonnées vérifiées introuvables.'},409);
+ // Sans choix explicite : tous les canaux pour lesquels une coordonnée vérifiée existe.
+ if(!channels)channels=[...(contact.phone?['sms']:[]),...(contact.email?['email']:[])];
+ if(!channels.length)return invitationJson({error:'Ni téléphone ni e-mail vérifié pour ce patient.'},400);
  const link=url.origin+'/patient.html#invitation='+d.token,text=invitationMessages(messaging.establishment,link),results=[];
  for(const channel of channels){
   const to=channel==='sms'?contact.phone:contact.email,label=channel==='sms'?'SMS':'E-mail';
@@ -77,6 +80,11 @@ async function sendInvitation(request,env,acl,url){
 export async function staffQuestionnaireApi(request,env,acl){
  const url=new URL(request.url);
  if(url.pathname==='/api/workspace/questionnaire/send')return sendInvitation(request,env,acl,url);
+ if(url.pathname==='/api/workspace/messaging/status'){
+  if(request.method!=='GET')return invitationJson({error:'Méthode refusée.'},405);
+  if(!env.MESSAGING?.status)return invitationJson({ready:false,message:'Envoi Brevo indisponible sur ce serveur.'});
+  return invitationJson(await env.MESSAGING.status());
+ }
  if(url.pathname!=='/api/workspace/questionnaire/invite')return null;
  if(request.method!=='POST')return invitationJson({error:'Méthode refusée.'},405);
  const d=await invitationBody(request),key='stay/'+String(d.stay||'')+'/invitationContact';

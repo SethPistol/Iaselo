@@ -24,4 +24,4 @@ Pendant la consultation d’anesthésie, onglet **Consultation d’anesthésie �
 ## À faire relire / limites
 - Listes d’examens, délais de jeûne et textes patients : valeurs par défaut à valider par l’équipe d’anesthésie.
 - La validation électronique n’est pas une signature électronique qualifiée (e-prescription Ségur / Pro Santé Connect) : pour le laboratoire, l’ordonnance imprimée signée reste la référence.
-- Nom de l’établissement dans les messages : variable `ETABLISSEMENT_NOM`. En recette, envoi limité à `MESSAGING_ALLOWED_RECIPIENTS`.
+- Nom de l’établissement dans les messages : variable `ETABLISSEMENT_NOM`. En recette, les messages sont marqués « [TEST] ».
