@@ -3,6 +3,7 @@ for(const file of ['dist/index.html','dist/patient.html','dist/ocr/tesseract.min
 // Fichiers périmés retirés en phase 0 : leur retour réintroduirait du code mort ou un build qui écrase parcours-v8.js.
 for(const file of ['dist/parcours-v5.js','dist/parcours-v6.js','dist/parcours-v7.js','dist/app.js','dist/patient.js','dist/consultation.js','dist/workflow.js','scripts/build-static.mjs'])if(fs.existsSync(file))throw Error('Fichier retiré réapparu : '+file);
 for(const dir of ['server','worker'])for(const file of fs.readdirSync(dir))if(file.endsWith('.mjs'))execFileSync(process.execPath,['--check',path.join(dir,file)],{stdio:'inherit'});
-// Module de transcription du compte rendu opératoire (paquet npm sts-whisper-small) : sans lui, la dictée affiche « module non installé ».
-if(!fs.existsSync('node_modules/sts-whisper-small/models/Xenova/whisper-small/onnx/encoder_model_quantized.onnx')&&!process.env.IASELO_MODELES_DIR)console.warn('Attention : module de transcription vocale absent (npm install). La dictée du compte rendu opératoire sera indisponible.');
+// Module de transcription du compte rendu opératoire : source officielle Hugging Face vérifiée par empreintes, repli sur la copie npm.
+{const {installerModele}=await import('./modele-whisper.mjs');const source=await installerModele();
+ if(source==='npm'&&!fs.existsSync('node_modules/sts-whisper-small/models/Xenova/whisper-small/onnx/encoder_model_quantized.onnx')&&!process.env.IASELO_MODELES_DIR)console.warn('Attention : module de transcription vocale absent. La dictée du compte rendu opératoire sera indisponible.');}
 console.log('Sources autonomes, ressources et migrations vérifiées. Démarrage : npm start (port 8080).');

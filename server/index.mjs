@@ -1,10 +1,12 @@
-import http from 'node:http';import fs from 'node:fs/promises';import {createReadStream} from 'node:fs';import {Readable} from 'node:stream';import path from 'node:path';import {fileURLToPath} from 'node:url';
+import http from 'node:http';import fs from 'node:fs/promises';import {createReadStream,existsSync} from 'node:fs';import {Readable} from 'node:stream';import path from 'node:path';import {fileURLToPath} from 'node:url';
 import {workspaceApi} from '../worker/workspace.mjs';import {config} from './config.mjs';import {createPool,migrate,postgresBinding} from './database.mjs';import {cellarBinding} from './storage.mjs';import {bootstrap,createAuth,loginPage} from './auth.mjs';import {brevoMessaging} from './brevo.mjs';import {createPsc} from './interop/psc.mjs';import {createConnectors} from './interop/index.mjs';
 const root=path.resolve(fileURLToPath(new URL('../dist/',import.meta.url)));
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.svg':'image/svg+xml','.wasm':'application/wasm','.gz':'application/gzip','.mjs':'application/javascript; charset=utf-8','.onnx':'application/octet-stream','.txt':'text/plain; charset=utf-8'};
-// Module de transcription vocale du compte rendu opératoire (Whisper small, ONNX) : paquet npm figé dans package-lock.json,
+// Module de transcription vocale du compte rendu opératoire (Whisper small, ONNX), voir scripts/modele-whisper.mjs,
 // servi par IASELO aux seuls professionnels connectés ; la transcription se fait dans le navigateur, rien n'est envoyé ailleurs.
-const modelesRoot=path.resolve(process.env.IASELO_MODELES_DIR||fileURLToPath(new URL('../node_modules/sts-whisper-small/models/',import.meta.url)));
+// Ordre : dossier imposé, copie officielle Hugging Face vérifiée à la construction (modeles/), sinon copie npm.
+const modeleOfficiel=fileURLToPath(new URL('../modeles/',import.meta.url));
+const modelesRoot=path.resolve(process.env.IASELO_MODELES_DIR||(existsSync(path.join(modeleOfficiel,'Xenova/whisper-small/onnx/encoder_model_quantized.onnx'))?modeleOfficiel:fileURLToPath(new URL('../node_modules/sts-whisper-small/models/',import.meta.url))));
 const modeleAutorise=/^\/modeles\/Xenova\/whisper-small\/(?:onnx\/(?:encoder_model_quantized|decoder_model_merged_quantized)\.onnx|[a-z_]+\.(?:json|txt))$/;
 export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),interopEnv={},connectors=createConnectors(interopEnv),psc=createPsc({env:interopEnv,baseUrl:cfg.baseUrl,secret:cfg.sessionSecret})}){
  const auth=await createAuth(pool,cfg,{psc}),DB=postgresBinding(pool);
