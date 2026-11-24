@@ -1,3 +1,17 @@
+# IASELO · refonte du stockage (24 novembre 2026, audit point 4)
+
+- **Listes partagées fusionnées patient par patient** : identités, réservations du bloc, actes, mouvements, PMSI, factures et brouillons de séjour. Deux postes qui modifient deux patients différents ne se bloquent plus ; seul un même patient modifié des deux côtés est un conflit (`worker/items.mjs`).
+- **Historique par élément** : l'historique de ces listes ne recopie plus la liste entière à chaque ajout (croissance quadratique), seul l'élément modifié est gardé (`workspace_item_versions`, migration 014). L'écran « Comparer les versions » reconstitue la liste à n'importe quelle révision.
+- **Chargement à la demande** : un séjour sorti, sans activité depuis 60 jours et sans réservation de bloc récente ou à venir n'est plus chargé à l'ouverture. Options › « Séjours archivés » le retrouve (nom, prénom, naissance, numéro) et le rouvre ; recherche et réouverture sont tracées (`worker/archives.mjs`).
+
+# IASELO · lot sécurité de l'audit (24 novembre 2026)
+
+Suite de l'audit du 24/11 (points critiques 1 à 3) :
+
+- **Recette** : la page de connexion n'affiche plus aucun identifiant de test (comptes inchangés, communiqués par l'équipe).
+- **Signatures posées par le serveur** : pour toute signature nouvelle ou modifiée (prescriptions, VPA, CRO, check-list HAS, bilans…), le signataire enregistré est la personne connectée (identifiant, nom, RPPS), jamais l'identité envoyée par le navigateur. Une signature inchangée garde son auteur ; les historiques ne sont pas réécrits (`worker/signatures.mjs`).
+- **Double authentification** pour toute connexion par mot de passe : code à 6 chiffres d'une application d'authentification (TOTP, RFC 6238), inscription par QR code à la première connexion, 5 codes faux ferment la session, rejeu refusé. Pro Santé Connect en est dispensé. Toujours active hors recette ; en recette, activable par `MFA_OBLIGATOIRE=true` (les deux comptes de test restent dispensés). Réinitialisation : Accès professionnels › « Double authentification » (motif tracé) ou `RESET_USER_EMAIL=… npm run user:mfa-reset`. Migration 013.
+
 # IASELO · visite pré-anesthésique (23 novembre 2026)
 
 Nouvelle étape du dossier « Visite pré-anesthésique » : rappel de la consultation, évolution, jeûne calculé à l’heure prévue, consignes sur les traitements, constantes du jour, résultats et RAI, préparation, consentement, conclusion (apte / plan modifié / report) signée par l’anesthésiste, pastille dans le bandeau et élément de complétude bloquant le jour J. Détail : docs/visite-pre-anesthesique.md.

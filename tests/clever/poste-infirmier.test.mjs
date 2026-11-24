@@ -12,7 +12,7 @@ test('infirmier(ère) de bloc ou d’étage : check-list HAS et ouverture des sa
   const id=await createAccount(pool,{email:'ide@example.test',name:'IDE Test',passwordHash:await hashPassword(password)});
   await pool.query("UPDATE professional_profiles SET profession='infirmier',poste='',updated_at=$2 WHERE user_id=$1",[id,at]);
   await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);
-  await pool.query("DELETE FROM app_migrations WHERE name='013_poste_infirmier.sql'");await migrate(pool);
+  await pool.query("DELETE FROM app_migrations WHERE name='015_poste_infirmier.sql'");await migrate(pool);
   assert.equal((await pool.query('SELECT poste FROM professional_profiles WHERE user_id=$1',[id])).rows[0].poste,'etage');
   const app=await makeApp({pool,bucket:{},cfg:config(env)});
   const call=(method,route,data,cookie)=>app(new Request(origin+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},...(data!==undefined?{body:JSON.stringify(data)}:{})}));

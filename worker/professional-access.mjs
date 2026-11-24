@@ -1,6 +1,6 @@
 import invitationCore from '../dist/invitation-core.js';
 import nursingCore from '../dist/nursing-core.js';
-import planningCore from '../dist/planning-core.js';
+import planningCore from '../dist/planning-core.js';import {stampSignatures} from './signatures.mjs';
 const professions={unassigned:'Non attribué',anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier',secretariat:'Secrétariat',pharmacien:'Pharmacien',dim:'DIM',facturation:'Facturation',administration:'Administration'};
 const stable=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const same=(a,b)=>stable(a)===stable(b);
@@ -122,7 +122,7 @@ export async function professionalAccess(env,request,user,member,at){
    if(!clinical&&d.key.endsWith('/core')&&Object.keys(d.data||{}).some(k=>!['id','specialty','mode','stage','sector','identity','careTeamId'].includes(k))){await log('write',d.key,'denied','Champ clinique réservé');return null}
    let data;try{data=merge(d.key,old,d.data)}catch{await log('write',d.key,'denied','Tentative hors équipe');return null}
    for(const hash of fileReferences(data))if(!await DB.prepare('SELECT hash FROM file_scopes WHERE hash=? AND document_key=?').bind(hash,d.key).first()){await log('file-link',d.key,'denied','Pièce jointe sans autorisation de rattachement');return null}
-   out.push({...d,data});
+   if(d.key.startsWith('stay/'))data=stampSignatures(old,data,{userId:user,name:profile.display_name,rpps:profile.rpps});out.push({...d,data});
   }
   // Contrôle sur le programme complet : les réservations des autres équipes
   // participent aux conflits sans être renvoyées au professionnel.
@@ -148,7 +148,9 @@ export async function professionalAccess(env,request,user,member,at){
  }
  function planningOccupancy(rows){return canRead('management/planningResources')?(rows||[]).filter(r=>planningCore.active(r)&&!allowed.has(r.patient)).flatMap(r=>planningCore.allocations(r).filter(planningCore.interval).map(a=>({resource:a.resource,start:a.start,end:a.end,current:r.state==='Occupée'&&planningCore.currentResource(r)===a.resource}))):[];}
  function policyGuard(){return DB.prepare('INSERT INTO workspace_write_checks(operation,valid) VALUES(?,CASE WHEN (SELECT revision FROM professional_policy_revision WHERE id=1)=? THEN 1 ELSE 0 END)').bind('policy-'+crypto.randomUUID(),epoch);}
- return {get planningError(){return nursingError||planningError},profile:{...profile,poste,isAdmin},teams,allowed,epoch,active,job,poste,bloc,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,policyGuard,log,fileReferences};
+ // Périmètre d'un élément de liste partagée (même règle que merge) : voir worker/items.mjs.
+ function inScope(row,key,id){const [group,name]=key.split('/');if(name==='patientDrafts')return allowed.has(id);if(group==='identities'||['pmsi','invoices'].includes(name))return Array.isArray(row)&&(name==='reviews'?String(row[0]).split('|').every(x=>allowed.has(x)):allowed.has(row[0]));return allowed.has(row?.patient)}
+ return {get planningError(){return nursingError||planningError},profile:{...profile,poste,isAdmin},teams,allowed,epoch,active,job,poste,bloc,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,inScope,policyGuard,log,fileReferences};
 }
 export {professions};
 export async function professionalRoutes(acl,request,env,json,body){
