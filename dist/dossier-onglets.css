@@ -1,0 +1,72 @@
+/* IASELO · onglets du dossier patient (Annonce, Consultation, VPA, Peropératoire, Postopératoire).
+   Demande de Romain (24/11/2026) : couleurs plus visibles et onglet actif nettement repérable.
+   Chaque étape a sa couleur (pastille + bordure) ; l'onglet ouvert est plein, en gras, avec une flèche vers le contenu.
+   Chargée en dernier : elle remplace les règles « pastilles discrètes » de dossier.css. */
+
+:root, :root[data-theme=light] {
+  --og-annonce: #5B3FB0; --og-consultation: #0F5E70; --og-vpa: #1B6E4A; --og-peroperatoire: #1F5FB4; --og-postoperatoire: #8E2F6E; --og-administratif: #0F5E70;
+  --og-on: #FFFFFF;
+}
+:root[data-theme=dark] {
+  --og-annonce: #C0B0F5; --og-consultation: #7FCAD8; --og-vpa: #86D9B0; --og-peroperatoire: #9CC0F5; --og-postoperatoire: #EDAED6; --og-administratif: #7FCAD8;
+  --og-on: #071017;
+}
+
+html body #detail .dossier-tabs { gap: 10px; padding: 4px 0 16px; margin: 22px 0 10px; border-bottom: 2px solid var(--i-line-strong); }
+html body #detail .dossier-tabs > button[data-dossier-stage] {
+  --og: var(--og-consultation);
+  position: relative; min-height: 48px; padding: 0 18px 0 14px; gap: 10px; border-radius: 12px;
+  background: color-mix(in srgb, var(--og) 9%, var(--i-s1));
+  border: 1.5px solid color-mix(in srgb, var(--og) 45%, var(--i-s1));
+  color: var(--i-ink); box-shadow: none;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease;
+}
+html body #detail .dossier-tabs > button[data-dossier-stage="annonce"] { --og: var(--og-annonce); }
+html body #detail .dossier-tabs > button[data-dossier-stage="consultation"] { --og: var(--og-consultation); }
+html body #detail .dossier-tabs > button[data-dossier-stage="vpa"] { --og: var(--og-vpa); }
+html body #detail .dossier-tabs > button[data-dossier-stage="peroperatoire"] { --og: var(--og-peroperatoire); }
+html body #detail .dossier-tabs > button[data-dossier-stage="postoperatoire"] { --og: var(--og-postoperatoire); }
+html body #detail .dossier-tabs > button[data-dossier-stage="administratif"] { --og: var(--og-administratif); }
+
+/* Pastille de couleur de l'étape */
+html body #detail .dossier-tabs > button[data-dossier-stage]::before {
+  content: ""; flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: var(--og);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--og) 22%, transparent);
+}
+html body #detail .dossier-tabs > button[data-dossier-stage]:hover {
+  background: color-mix(in srgb, var(--og) 18%, var(--i-s1)); border-color: var(--og); color: var(--i-ink);
+}
+html body #detail .dossier-tabs > button[data-dossier-stage] .dossier-tab-text > :first-child { font-size: 15px; font-weight: 620; color: inherit; }
+
+/* Onglet ouvert : plein, texte contrasté, ombre et flèche vers le contenu */
+html body #detail .dossier-tabs > button[data-dossier-stage].active,
+html body #detail .dossier-tabs > button[data-dossier-stage][aria-selected="true"] {
+  background: var(--og); border-color: var(--og); color: var(--og-on);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--og) 30%, transparent), 0 8px 22px color-mix(in srgb, var(--og) 28%, transparent);
+}
+html body #detail .dossier-tabs > button[data-dossier-stage].active::before { background: var(--og-on); box-shadow: 0 0 0 3px color-mix(in srgb, var(--og-on) 35%, transparent); }
+html body #detail .dossier-tabs > button[data-dossier-stage].active .dossier-tab-text > :first-child { font-weight: 720; }
+html body #detail .dossier-tabs > button[data-dossier-stage].active::after {
+  content: ""; position: absolute; left: 50%; bottom: -9px; width: 14px; height: 14px; margin-left: -7px;
+  background: var(--og); transform: rotate(45deg); border-radius: 2px;
+}
+html body #detail .dossier-tabs > button[data-dossier-stage]:focus-visible { outline: 3px solid var(--og); outline-offset: 3px; }
+
+/* Le contenu de l'onglet ouvert reprend la couleur de l'étape (liseré en haut) */
+html body #detail .dossier-tabs:has(> button[data-dossier-stage].active) + #dossier-panel { border-top: 4px solid var(--og-active, transparent); }
+html body #detail[data-og-stage="annonce"] { --og-active: var(--og-annonce); }
+html body #detail[data-og-stage="consultation"] { --og-active: var(--og-consultation); }
+html body #detail[data-og-stage="vpa"] { --og-active: var(--og-vpa); }
+html body #detail[data-og-stage="peroperatoire"] { --og-active: var(--og-peroperatoire); }
+html body #detail[data-og-stage="postoperatoire"] { --og-active: var(--og-postoperatoire); }
+html body #detail[data-og-stage="administratif"] { --og-active: var(--og-administratif); }
+
+@media (forced-colors: active) {
+  html body #detail .dossier-tabs > button[data-dossier-stage].active { outline: 3px solid Highlight; }
+}
+@media (max-width: 700px) {
+  html body #detail .dossier-tabs { gap: 8px; }
+  html body #detail .dossier-tabs > button[data-dossier-stage] { flex: 1 1 100%; justify-content: flex-start; }
+  html body #detail .dossier-tabs > button[data-dossier-stage].active::after { display: none; }
+}
+@media print { html body #detail .dossier-tabs { display: none !important; } }

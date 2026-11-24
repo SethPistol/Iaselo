@@ -1,0 +1,30 @@
+/* IASELO · annonce chirurgicale d'un nouveau patient et accès à la consultation (annonce-patient.js). Jetons --i-* (iaselo.css). */
+html body #new-annonce { display: inline-flex; align-items: center; gap: 8px; }
+html body #new-annonce[hidden] { display: none; }
+html body #new-annonce svg { flex: 0 0 auto; }
+
+.annonce-patient-modal { width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 24px 26px; }
+.annonce-patient-modal::backdrop { background: rgba(6, 16, 23, .55); }
+.annonce-patient-modal .ap-intro { margin: 4px 0 16px; color: var(--i-mut); }
+.annonce-patient-modal .ap-group { border: 1px solid var(--i-line); border-radius: var(--i-r-m, 14px); padding: 12px 16px 16px; margin: 0 0 14px; }
+.annonce-patient-modal .ap-group legend { padding: 0 6px; font-weight: 650; color: var(--i-ink); }
+.annonce-patient-modal .ap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 14px; }
+.annonce-patient-modal .ap-grid label { display: flex; flex-direction: column; gap: 6px; margin: 0; font-weight: 560; }
+.annonce-patient-modal .ap-team:empty { display: none; }
+.annonce-patient-modal .ap-error:empty { display: none; }
+.annonce-patient-modal .ap-error { color: var(--i-crit); font-weight: 600; margin: 0 0 10px; }
+.annonce-patient-modal .ap-match ul { margin: 8px 0 12px; padding-left: 18px; }
+.annonce-patient-modal .ap-match li { margin: 6px 0; }
+.annonce-patient-modal .ap-match li button { margin-left: 8px; }
+.annonce-patient-modal .actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Encadré sous le titre de l'annonce : étape suivante */
+#content .ap-next { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 12px 0 18px; padding: 16px 18px;
+  border-radius: var(--i-r-m, 14px); border: 1.5px solid var(--i-line-strong); background: var(--i-s2); }
+#content .ap-next p { margin: 4px 0 0; }
+#content .ap-next strong { font-size: 16px; }
+#content .ap-next-go { border-color: var(--og-consultation, var(--i-acc)); background: color-mix(in srgb, var(--og-consultation, var(--i-acc)) 10%, var(--i-s1)); }
+#content .ap-next-go .primary { min-height: 48px; padding: 0 22px; font-size: 15.5px; font-weight: 650; }
+#content .ap-next-done { border-color: var(--i-ok); background: var(--i-ok-soft); }
+#content .ap-prov { color: var(--i-warn); font-weight: 600; }
+@media print { #content .ap-next, html body #new-annonce { display: none !important; } }

@@ -2256,6 +2256,12 @@ if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule
 const indicateursModule=window.createIndicateurs?.({$,esc,toast,sectors:serviceSectors,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(view==='indicateurs'){closeCroDictation();indicateursModule.render();return}renderBeforeIndicateurs()}}
 
+// Annonce chirurgicale pour un patient pas encore connu, puis consultation d’anesthésie lancée depuis l’annonce (dist/annonce-patient.js).
+{const renderHooks=[];const annoncePatient=window.createAnnoncePatient?.({$,esc,toast,role:()=>role,canCreate:()=>canCreateStay(),teams:()=>careTeams,checkIdentity:identity=>identityWorkspace.checkNew(identity),add:stay=>patients.unshift(stay),current:p,tab:()=>tab,
+ open:(id,nextTab)=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();selected=id;tab=nextTab;filter='Tous';query='';view='patients';render()},
+ goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},save:()=>durableWorkspace?.flush(),onRender:f=>renderHooks.push(f)});
+ if(annoncePatient){const detailBeforeAnnonce=detail;detail=function(){detailBeforeAnnonce();annoncePatient.detail()};const renderBeforeAnnonce=render;render=function(){renderBeforeAnnonce();renderHooks.forEach(f=>f())}}}
+
 // Ouverture des salles (dist/ouverture-salles.js) : vérifications quotidiennes infirmière et anesthésie, rappel sur la feuille d’anesthésie.
 const ouvertureSalles=window.createOuvertureSalles?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(ouvertureSalles){const renderBeforeOuverture=render;render=function(){if(view==='ouvertureSalles'){closeCroDictation();ouvertureSalles.render();return}renderBeforeOuverture()};const detailBeforeOuverture=detail;detail=function(){if(blocInterdit(tab))tab='perop';detailBeforeOuverture();if(tab==='perop'&&['anesthesiste','infirmier','chirurgien'].includes(jobNow())&&!infirmierEtage())ouvertureSalles.bandeauPerop($('#content'))}}
@@ -2276,7 +2282,7 @@ if(sharedWorkspace){
  $('#workspace').textContent='Chargement des séjours partagés…';
  loadSharedWorkspace().catch(error=>window.showPatientLoadError?.(error));
 }else if(!patientStandalone){
- const coreKeys=new Set(['id','specialty','mode','stage','task','sector','identity','identityAliases','identityReviewRequired','done','careTeamId']);
+ const coreKeys=new Set(['id','specialty','mode','stage','task','sector','identity','identityAliases','identityReviewRequired','done','careTeamId','origin']);
  const emptyStay=id=>({id,specialty:'Non renseignée',mode:'Hospitalisation',stage:'Consultation',task:'Dossier partagé',done:false,consult:{asa:'Non renseigné',history:'',allergies:'À vérifier',treatments:'',plan:'',checks:[],validated:false},notes:[],rx:[],discharge:{summary:'',instructions:'',validated:false},events:[]});
  const shared=window.createDurableWorkspace({esc,toast,setPlanningOccupancy:rows=>professionalWorkspace.setPlanningOccupancy(rows),setAccess:a=>{if(a)professionalWorkspace.setAccess(a)},canWrite:key=>professionalWorkspace.canWrite(key),readOnly:()=>{role='Infirmier';$('#role').value=role;$('#role').disabled=true;if($('#doctor'))$('#doctor').disabled=true;},capture:()=>{if(view==='patients'&&tab==='consult'&&p())captureConsult()},render:()=>{render();document.body.dataset.appReady='true'},export:()=>{
   const out={};
