@@ -28,8 +28,8 @@ test('menu : chaque entrée correspond à un écran existant',()=>{
 test('dossier : profils administratifs sans volets médicaux, création de séjour pour le secrétariat',()=>{
  const s=fs.readFileSync(path.join(__dirname,'..','dist','parcours-v8.js'),'utf8');
  assert.match(s,/const adminJob=\(\)=>\['secretariat','facturation','administration','unassigned'\]/);
- assert.match(s,/if\(adminJob\(\)\)tab='adminDossier'/);
- assert.match(s,/\(adminJob\(\)\?\[ADMIN_STAGE\]:dossierStages\)\.map/);
+ assert.match(s,/if\(adminJob\(\)&&!\(tab==='surgeryAnnouncement'&&jobNow\(\)==='secretariat'\)\)tab='adminDossier'/);
+ assert.match(s,/\(adminJob\(\)\?\[ADMIN_STAGE,\.\.\.\(jobNow\(\)==='secretariat'\?dossierStages\.filter\(g=>g\.id==='annonce'\):\[\]\)\]:dossierStages\)\.map/);
  assert.match(s,/canCreateStay=\(\)=>jobNow\(\)\?\['anesthesiste','chirurgien','secretariat'\]/);
  assert.doesNotMatch(s,/newform'\)\.onsubmit=e=>\{\s*e\.preventDefault\(\);if\(nurseProfile\(\)\)return;/,'création bloquée pour le secrétariat');
  assert.equal((s.match(/newform'\)\.onsubmit=e=>\{\s*e\.preventDefault\(\);if\(!canCreateStay\(\)\)return;/g)||[]).length,2);

@@ -135,7 +135,7 @@ test('programme du bloc : le secrétariat reçoit les annonces du jour de son é
   assert.doesNotMatch(JSON.stringify(r.data),/SECRET/);
   assert.equal((await f.call('secretary','GET','/annonces-bloc?date=2026-12-02')).data.annonces.length,0);
   assert.equal((await f.call('secretary','GET','/annonces-bloc?date=demain')).status,400);
-  // Le secrétariat ne lit toujours pas l'annonce complète dans le dossier.
-  const all=await f.call('secretary','GET','');assert.ok(!all.data.documents.some(d=>d.key==='stay/A/surgicalAnnouncement'));
+  // Depuis le 24/11/2026 (demande de Romain), le secrétariat rédige l'annonce : il la lit dans le dossier de son équipe, sans autre volet médical.
+  const all=await f.call('secretary','GET','');assert.ok(all.data.documents.some(d=>d.key==='stay/A/surgicalAnnouncement'));assert.ok(!all.data.documents.some(d=>d.key==='stay/B/surgicalAnnouncement'),'hors équipe');assert.ok(!all.data.documents.some(d=>/\/(consult|rx|perop)$/.test(d.key)));
  }finally{f.close()}
 });

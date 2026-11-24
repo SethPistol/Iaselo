@@ -5,7 +5,9 @@ const stages=['Consultation','Préopératoire','Intervention','SSPI','Hospitalis
 const fictitiousIdentities=[['Martin', 'Camille', '1984-04-12'], ['Lefèvre', 'Élodie', '1975-09-23'], ['Bernard', 'Noé', '1993-02-08'], ['Rousseau', 'Lina', '1988-12-15'], ['Dubois', 'Sacha', '1966-06-30'], ['Martin', 'Camille', '1991-07-04']];
 const patients=[['DÉMO-001','Orthopédie','Hospitalisation','Préopératoire','Bilan à compléter'],['DÉMO-002','Chirurgie digestive','Hospitalisation','Hospitalisation','Transmission attendue','etage-1'],['DÉMO-003','ORL','Ambulatoire','Consultation','Consultation à valider'],['DÉMO-004','Gynécologie','Ambulatoire','SSPI','Surveillance en cours','sspi-chir'],['DÉMO-005','Urologie','Hospitalisation','Intervention','Dossier disponible','bloc-chir'],['DÉMO-006','Orthopédie','Hospitalisation','Sortie','Synthèse à compléter']].map((p,i)=>({id:p[0],specialty:p[1],mode:p[2],stage:p[3],task:p[4],sector:p[5]||'',identity:Object.fromEntries(['lastName','firstName','birthDate'].map((key,j)=>[key,fictitiousIdentities[i][j]])),done:false,consult:{asa:'Non renseigné',history:'',allergies:'À vérifier',treatments:'',plan:'',checks:[],validated:false},notes:[],rx:[],discharge:{summary:'',instructions:'',validated:false},events:[{at:'Exemple initial',role:'Démonstration',text:'Séjour fictif créé',kind:'Dossier'}]}));
 let selected='DÉMO-001',tab='consult',view='patients',query='',filter='Tous',role='Anesthésiste';let veilleModule=null;
-const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const p=()=>patients.find(x=>x.id===selected);const nurseProfile=()=>role==='Infirmier';const jobNow=()=>document.body.dataset.profession||'';const infirmierEtage=()=>jobNow()==='infirmier'&&document.body.dataset.poste!=='bloc';const blocInterdit=key=>infirmierEtage()&&key==='checklistHas';const adminJob=()=>['secretariat','facturation','administration','unassigned'].includes(jobNow());const canCreateStay=()=>jobNow()?['anesthesiste','chirurgien','secretariat'].includes(jobNow()):!nurseProfile();const physician=()=>!nurseProfile();
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const p=()=>patients.find(x=>x.id===selected);const nurseProfile=()=>role==='Infirmier';const jobNow=()=>document.body.dataset.profession||'';const infirmierEtage=()=>jobNow()==='infirmier'&&document.body.dataset.poste!=='bloc';const blocInterdit=key=>infirmierEtage()&&key==='checklistHas';const adminJob=()=>['secretariat','facturation','administration','unassigned'].includes(jobNow());const canCreateStay=()=>jobNow()?['anesthesiste','chirurgien','secretariat'].includes(jobNow())||cadreBloc():!nurseProfile();const cadreBloc=()=>jobNow()==='infirmier'&&document.body.dataset.cadre==='true';
+// Rédaction de l'annonce chirurgicale : chirurgien, anesthésiste, secrétariat et cadre de bloc (le serveur applique la même règle).
+const annonceWriter=()=>jobNow()?['chirurgien','anesthesiste','secretariat'].includes(jobNow())||cadreBloc():['Chirurgien','Anesthésiste'].includes(role);const physician=()=>!nurseProfile();
 function toast(s){$('#toast').textContent=s;$('#toast').style.display='block';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$('#toast').style.display='none',4000)}
 function event(text,kind='Modification'){p().events.unshift({at:new Date().toLocaleString('fr-FR'),role,text,kind})}
 function stats(){const pending=patients.filter(x=>!x.done).length;$('#stats').innerHTML=[[patients.length,'Séjours fictifs'],[patients.filter(x=>['Intervention','SSPI','Hospitalisation'].includes(x.stage)).length,'Prises en charge en cours'],[pending,'Actions en attente'],[patients.filter(x=>x.stage==='Sortie').length,'Séjours en sortie']].map((x,i)=>`<div class="stat ${i===2?'accent':''}"><span>${x[1]}</span><strong>${x[0]}</strong></div>`).join('')}
@@ -201,18 +203,20 @@ function surgeryBanner(x){
   <button type="button" class="secondary" id="open-surgical-announcement">Voir l’annonce</button>
  </div>`;
 }
+// Auteur de l'annonce (traçabilité quand elle est saisie pour le chirurgien par l'anesthésiste, le secrétariat ou la cadre de bloc).
+function annonceAuthor(){const me=(()=>{try{return professionalWorkspace?.getAccess?.()?.profile}catch{return null}})(),job=me?.profession||'';return {name:me?.display_name||role,label:job==='infirmier'&&me?.poste==='cadre'?'cadre de bloc':({chirurgien:'chirurgien',anesthesiste:'anesthésiste',secretariat:'secrétariat'})[job]||''}}
 function surgeryAnnouncement(){
  const stay=p();
  const saved=stay.surgicalAnnouncement||{};
  const published=saved.published;
- const write=role==='Chirurgien';
+ const write=annonceWriter();
  const me=(()=>{try{return professionalWorkspace?.getAccess?.()?.profile}catch{return null}})();
  const initial={mode:stay.mode,surgeon:me?.profession==='chirurgien'&&me.display_name?me.display_name:activeDoctor==='med-c'?'Dr Dubois':''};
  const bloc=(()=>{try{return clinicManagement}catch{return null}})();
  const draft=saved.draft||published?.fields||initial;
  const transmitted=published?`<section class="surgery-announcement-summary">
    <div class="row"><h4>Annonce ${published.state.toLowerCase()}</h4><span class="pill ${published.state==='Transmise'?'good':'warn'}">${esc(published.state)}</span></div>
-   <p class="muted">${esc(published.at)} · ${esc(published.fields.surgeon)}</p>
+   <p class="muted">${esc(published.at)} · ${esc(published.fields.surgeon)}${published.author?.name&&published.author.name!==published.fields.surgeon?` · rédigée par ${esc(published.author.name)}${published.author.label?' ('+esc(published.author.label)+')':''}`:''}</p>
    ${published.reason?`<p class="preserve"><strong>Motif de l’annulation</strong> · ${esc(published.reason)}</p>`:''}
    <dl class="answers">${surgicalFields.filter(([key])=>published.fields[key]).map(([key,label])=>{
     const value=key==='date'?published.fields[key].split('-').reverse().join('/'):published.fields[key];
@@ -238,13 +242,13 @@ function surgeryAnnouncement(){
  </form>
  ${published?.state==='Transmise'?`<details class="surgery-cancel"><summary>Annuler l’annonce transmise</summary>
  <form id="cancel-surgical-form"><label>Motif de l’annulation<input name="reason" required maxlength="250"></label><button class="secondary">Confirmer l’annulation</button></form>
- </details>`:''}`:'<p class="muted">Lecture seule · la saisie de l’annonce est réservée au profil chirurgien.</p>'}`;
+ </details>`:''}`:'<p class="muted">Lecture seule · l’annonce est rédigée par le chirurgien, l’anesthésiste, le secrétariat ou la cadre de bloc.</p>'}`;
  if(!write)return;
  const sIn=$('#surgical-form input[name="surgeon"]'),names=bloc?.surgeonNames?.()||[];
  if(sIn&&names.length){sIn.setAttribute('list','surgical-surgeons');sIn.insertAdjacentHTML('afterend',`<datalist id="surgical-surgeons">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`)}
  $('#surgical-form').onsubmit=e=>{
   e.preventDefault();
-  if(role!=='Chirurgien'||p()!==stay)return;
+  if(!annonceWriter()||p()!==stay)return;
   const fields=Object.fromEntries([...new FormData(e.currentTarget)].map(([key,value])=>[key,value.trim()]));
   const sending=e.submitter?.value==='send';
   const error=$('#surgical-error');
@@ -258,8 +262,8 @@ function surgeryAnnouncement(){
   }
   if(sending){
    const revision=(published?.revision||0)+1;
-   stay.surgicalAnnouncement={published:{fields,state:'Transmise',at:new Date().toLocaleString('fr-FR'),sentAt:published?.sentAt||new Date().toISOString(),revision}};
-   event(`Annonce chirurgicale transmise (v${revision}) · ${fields.procedure} · ${fields.surgeon}`,'Annonce chirurgicale');
+   stay.surgicalAnnouncement={published:{fields,state:'Transmise',at:new Date().toLocaleString('fr-FR'),sentAt:published?.sentAt||new Date().toISOString(),revision,author:annonceAuthor()}};
+   {const a=annonceAuthor();event(`Annonce chirurgicale transmise (v${revision}) · ${fields.procedure} · ${fields.surgeon}${a.label&&a.label!=='chirurgien'?' · saisie par '+a.name+' ('+a.label+')':''}`,'Annonce chirurgicale')}
   }else{
    stay.surgicalAnnouncement={...saved,draft:fields};
   }
@@ -270,7 +274,7 @@ function surgeryAnnouncement(){
  const cancel=$('#cancel-surgical-form');
  if(cancel)cancel.onsubmit=e=>{
   e.preventDefault();
-  if(role!=='Chirurgien'||p()!==stay||stay.surgicalAnnouncement?.published!==published)return;
+  if(!annonceWriter()||p()!==stay||stay.surgicalAnnouncement?.published!==published)return;
   const reason=new FormData(e.currentTarget).get('reason').trim();
   if(!reason){toast('Renseignez le motif de l’annulation');return}
   stay.surgicalAnnouncement.published={...published,state:'Annulée',at:new Date().toLocaleString('fr-FR'),reason};
@@ -298,9 +302,9 @@ function dossierStageFor(key){if(key==='adminDossier')return ADMIN_STAGE;return 
 function detail(){
  closeCroDictation();
  if(nurseProfile()&&tab==='science')tab='consult';
- if(adminJob())tab='adminDossier';else if(tab==='adminDossier')tab='consult';
+ if(adminJob()&&!(tab==='surgeryAnnouncement'&&jobNow()==='secretariat'))tab='adminDossier';else if(tab==='adminDossier')tab='consult';
  const x=p(),group=dossierStageFor(tab);if(!group.items.some(([k])=>k===tab))tab=group.defaultTab;
- $('#detail').innerHTML=`${printHead(x)}<div class="detailhead"><div class="row"><div><h2>${x.id}</h2><p>${esc(x.specialty)} · ${esc(x.mode)}</p>${x.identity?.lastName||x.identity?.firstName?`<p>${esc([x.identity.lastName,x.identity.firstName].filter(Boolean).join(' '))}</p>`:''}</div><div class="actions"><span class="identity">Patient fictif</span><button type="button" class="focus-toggle" id="focusdossier" aria-pressed="${document.body.classList.contains('dossier-focus')}">${document.body.classList.contains('dossier-focus')?'Afficher la liste':'Agrandir le dossier'}</button></div></div><div class="dossier-status"><span class="pill ${x.done?'good':'warn'}">${x.done?'Action réalisée':esc(x.task)}</span><label for="stage-status">Étape du séjour<select id="stage-status" ${!physician()?'disabled':''}>${stages.map(stage=>`<option ${stage===x.stage?'selected':''}>${esc(stage)}</option>`).join('')}</select></label><label for="sector-status">Secteur actuel<select id="sector-status" ${!physician()?'disabled':''}>${sectorOptions(x.sector)}</select></label></div></div><div class="dossier-tabs" role="tablist" aria-label="Étapes de la prise en charge">${(adminJob()?[ADMIN_STAGE]:dossierStages).map((g,i)=>`<button type="button" id="dossier-tab-${g.id}" role="tab" aria-label="${g.label}" aria-selected="${g.id===group.id}" aria-controls="dossier-panel" tabindex="${g.id===group.id?'0':'-1'}" data-dossier-stage="${g.id}" class="${g.id===group.id?'active':''}"><span class="dossier-tab-number" aria-hidden="true">0${i+1}</span><span class="dossier-tab-text"><strong>${g.label}</strong><small>${g.hint}</small></span></button>`).join('')}</div><section id="dossier-panel" role="tabpanel" aria-labelledby="dossier-tab-${group.id}">${group.items.length>1?`<div class="dossier-subnav"><label for="dossier-section">${({consultation:'Contenu de la consultation',peroperatoire:'Bloc opératoire'})[group.id]||'Prescription et suivi'}<select id="dossier-section">${group.items.filter(([key])=>(!nurseProfile()||key!=='science')&&!blocInterdit(key)).map(([k,n])=>`<option value="${k}" ${k===tab?'selected':''}>${n}</option>`).join('')}</select></label><span>${esc(group.items.find(([k])=>k===tab)?.[1]||'')}</span></div>`:''}<div class="content" id="content"></div></section>`;
+ $('#detail').innerHTML=`${printHead(x)}<div class="detailhead"><div class="row"><div><h2>${x.id}</h2><p>${esc(x.specialty)} · ${esc(x.mode)}</p>${x.identity?.lastName||x.identity?.firstName?`<p>${esc([x.identity.lastName,x.identity.firstName].filter(Boolean).join(' '))}</p>`:''}</div><div class="actions"><span class="identity">Patient fictif</span><button type="button" class="focus-toggle" id="focusdossier" aria-pressed="${document.body.classList.contains('dossier-focus')}">${document.body.classList.contains('dossier-focus')?'Afficher la liste':'Agrandir le dossier'}</button></div></div><div class="dossier-status"><span class="pill ${x.done?'good':'warn'}">${x.done?'Action réalisée':esc(x.task)}</span><label for="stage-status">Étape du séjour<select id="stage-status" ${!physician()?'disabled':''}>${stages.map(stage=>`<option ${stage===x.stage?'selected':''}>${esc(stage)}</option>`).join('')}</select></label><label for="sector-status">Secteur actuel<select id="sector-status" ${!physician()?'disabled':''}>${sectorOptions(x.sector)}</select></label></div></div><div class="dossier-tabs" role="tablist" aria-label="Étapes de la prise en charge">${(adminJob()?[ADMIN_STAGE,...(jobNow()==='secretariat'?dossierStages.filter(g=>g.id==='annonce'):[])]:dossierStages).map((g,i)=>`<button type="button" id="dossier-tab-${g.id}" role="tab" aria-label="${g.label}" aria-selected="${g.id===group.id}" aria-controls="dossier-panel" tabindex="${g.id===group.id?'0':'-1'}" data-dossier-stage="${g.id}" class="${g.id===group.id?'active':''}"><span class="dossier-tab-number" aria-hidden="true">0${i+1}</span><span class="dossier-tab-text"><strong>${g.label}</strong><small>${g.hint}</small></span></button>`).join('')}</div><section id="dossier-panel" role="tabpanel" aria-labelledby="dossier-tab-${group.id}">${group.items.length>1?`<div class="dossier-subnav"><label for="dossier-section">${({consultation:'Contenu de la consultation',peroperatoire:'Bloc opératoire'})[group.id]||'Prescription et suivi'}<select id="dossier-section">${group.items.filter(([key])=>(!nurseProfile()||key!=='science')&&!blocInterdit(key)).map(([k,n])=>`<option value="${k}" ${k===tab?'selected':''}>${n}</option>`).join('')}</select></label><span>${esc(group.items.find(([k])=>k===tab)?.[1]||'')}</span></div>`:''}<div class="content" id="content"></div></section>`;
  $('#focusdossier').onclick=()=>{const focused=document.body.classList.toggle('dossier-focus');$('#focusdossier').textContent=focused?'Afficher la liste':'Agrandir le dossier';$('#focusdossier').setAttribute('aria-pressed',String(focused))};
  $('#stage-status').onchange=e=>{if(!physician())return;x.stage=e.target.value;event('Étape : '+x.stage,'Parcours');stats();list();toast('Étape du séjour simulée mise à jour')};
  $('#sector-status').onchange=e=>{
@@ -2112,7 +2116,7 @@ function saveSharedConsult(button,prospective){
 
 let accessJob='',careTeams=[];
 const professionalWorkspace=window.createProfessionalWorkspace({esc,toast,setProfile:(profile,teams)=>{
- accessJob=profile.profession;careTeams=teams;document.body.dataset.admin=profile.isAdmin===true?'true':'false';document.body.dataset.poste=accessJob==='infirmier'?(profile.poste==='bloc'?'bloc':'etage'):'';document.body.dataset.profession=accessJob;
+ accessJob=profile.profession;careTeams=teams;document.body.dataset.admin=profile.isAdmin===true?'true':'false';document.body.dataset.poste=accessJob==='infirmier'?(['bloc','cadre'].includes(profile.poste)?'bloc':'etage'):'';document.body.dataset.cadre=accessJob==='infirmier'&&profile.poste==='cadre'?'true':'false';document.body.dataset.profession=accessJob;
  role=({anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier'})[accessJob]||'Infirmier';
  $('#role').value=role;$('#role').disabled=true;if($('#doctor'))$('#doctor').disabled=true;
  const details=document.querySelector('.art-profile');if(details)details.hidden=true;
@@ -2257,7 +2261,7 @@ const indicateursModule=window.createIndicateurs?.({$,esc,toast,sectors:serviceS
 if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(view==='indicateurs'){closeCroDictation();indicateursModule.render();return}renderBeforeIndicateurs()}}
 
 // Annonce chirurgicale pour un patient pas encore connu, puis consultation d’anesthésie lancée depuis l’annonce (dist/annonce-patient.js).
-{const renderHooks=[];const annoncePatient=window.createAnnoncePatient?.({$,esc,toast,role:()=>role,canCreate:()=>canCreateStay(),teams:()=>careTeams,checkIdentity:identity=>identityWorkspace.checkNew(identity),add:stay=>patients.unshift(stay),current:p,tab:()=>tab,
+{const renderHooks=[];const annoncePatient=window.createAnnoncePatient?.({$,esc,toast,role:()=>role,writer:()=>annonceWriter(),canCreate:()=>canCreateStay(),teams:()=>careTeams,checkIdentity:identity=>identityWorkspace.checkNew(identity),add:stay=>patients.unshift(stay),current:p,tab:()=>tab,
  open:(id,nextTab)=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();selected=id;tab=nextTab;filter='Tous';query='';view='patients';render()},
  goTab:key=>{if(tab==='consult')captureConsult();tab=key;detail()},save:()=>durableWorkspace?.flush(),onRender:f=>renderHooks.push(f)});
  if(annoncePatient){const detailBeforeAnnonce=detail;detail=function(){detailBeforeAnnonce();annoncePatient.detail()};const renderBeforeAnnonce=render;render=function(){renderBeforeAnnonce();renderHooks.forEach(f=>f())}}}
@@ -2286,7 +2290,7 @@ if(sharedWorkspace){
  const emptyStay=id=>({id,specialty:'Non renseignée',mode:'Hospitalisation',stage:'Consultation',task:'Dossier partagé',done:false,consult:{asa:'Non renseigné',history:'',allergies:'À vérifier',treatments:'',plan:'',checks:[],validated:false},notes:[],rx:[],discharge:{summary:'',instructions:'',validated:false},events:[]});
  const shared=window.createDurableWorkspace({esc,toast,setPlanningOccupancy:rows=>professionalWorkspace.setPlanningOccupancy(rows),setAccess:a=>{if(a)professionalWorkspace.setAccess(a)},canWrite:key=>professionalWorkspace.canWrite(key),readOnly:()=>{role='Infirmier';$('#role').value=role;$('#role').disabled=true;if($('#doctor'))$('#doctor').disabled=true;},capture:()=>{if(view==='patients'&&tab==='consult'&&p())captureConsult()},render:()=>{render();document.body.dataset.appReady='true'},export:()=>{
   const out={};
-  for(const stay of patients){out['stay/'+stay.id+'/core']=Object.fromEntries(Object.entries(stay).filter(([key])=>coreKeys.has(key)&&(!['secretariat','facturation','administration'].includes(accessJob)||['id','specialty','mode','stage','sector','identity','careTeamId'].includes(key))));for(const [key,value]of Object.entries(stay))if(!coreKeys.has(key)&&!['sharedSavedConsult','sharedDirty'].includes(key))out['stay/'+stay.id+'/'+key]=value;}
+  for(const stay of patients){out['stay/'+stay.id+'/core']=Object.fromEntries(Object.entries(stay).filter(([key])=>coreKeys.has(key)&&(!['secretariat','facturation','administration'].includes(accessJob)||['id','specialty','mode','stage','sector','identity','careTeamId','origin'].includes(key))));for(const [key,value]of Object.entries(stay))if(!coreKeys.has(key)&&!['sharedSavedConsult','sharedDirty'].includes(key))out['stay/'+stay.id+'/'+key]=value;}
   for(const [key,value]of Object.entries(clinicManagement.exportState()))out['management/'+key]=value;
   out['management/patientDrafts']=patientDrafts;
   for(const [key,value]of Object.entries(identityWorkspace.exportState()))out['identities/'+key]=value;

@@ -1,9 +1,10 @@
 // IASELO · annonce chirurgicale pour un patient pas encore connu (demande de Romain, 24/11/2026).
-// 1. Le chirurgien crée le patient et son séjour depuis « Nouvelle annonce » : identité provisoire (à vérifier à
+// 1. Le chirurgien (ou l'anesthésiste, le secrétariat, la cadre de bloc) crée le patient et son séjour depuis « Nouvelle annonce » : identité provisoire (à vérifier à
 //    l'admission, INS), contrôle des identités approchantes, puis l'onglet Annonce s'ouvre pour la saisie.
 // 2. Une fois l'annonce transmise, l'anesthésiste lance la consultation d'anesthésie depuis l'annonce, sur ce séjour.
 // Les droits restent ceux du serveur (worker/professional-access.mjs) : création du séjour par anesthésiste, chirurgien
-// ou secrétariat d'une équipe de soins ; annonce écrite par le chirurgien seulement ; consultation par l'anesthésiste.
+// ou secrétariat d'une équipe de soins, et cadre de bloc ; annonce écrite par le chirurgien, l'anesthésiste, le secrétariat
+// ou la cadre de bloc (auteur tracé) ; consultation par l'anesthésiste.
 (function(root){
  'use strict';
  const SPECIALTIES=['Orthopédie','Chirurgie digestive','ORL','Gynécologie','Urologie'];
@@ -40,10 +41,10 @@
 
  root.createAnnoncePatient=function(ctx){
   const {$,esc,toast}=ctx;
-  const surgeon=()=>ctx.role()==='Chirurgien'&&ctx.canCreate();
+  const surgeon=()=>ctx.writer()&&ctx.canCreate();
   const fr=d=>d?d.split('-').reverse().join('/'):'';
 
-  // Bouton « Nouvelle annonce » à côté de « Nouveau séjour » (même visibilité, profil chirurgien).
+  // Bouton « Nouvelle annonce » à côté de « Nouveau séjour » (profils qui rédigent l'annonce et créent un séjour).
   const nw=$('#new');
   if(nw&&!$('#new-annonce')){
    nw.insertAdjacentHTML('beforebegin','<button type="button" class="primary" id="new-annonce" hidden><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg> Nouvelle annonce · nouveau patient</button>');
@@ -83,7 +84,7 @@
    return d;
   }
   function open(){
-   if(!surgeon()){toast('La création d’une annonce est réservée au chirurgien');return}
+   if(!surgeon()){toast('Votre profil ne permet pas de créer une annonce');return}
    const d=dialog(),form=$('#annonce-patient-form');form.reset();d.dataset.confirmed='';
    form.querySelector('.ap-error').textContent='';form.querySelector('.ap-match').innerHTML='';
    const teams=ctx.teams();
@@ -108,7 +109,7 @@
     return;
    }
    const stay=buildStay(v,{id:'DÉMO-'+crypto.randomUUID().slice(0,12),at:new Date().toLocaleString('fr-FR'),role:ctx.role()});
-   if(matches.length)stay.events.unshift({at:new Date().toLocaleString('fr-FR'),role:ctx.role(),text:'Nouveau dossier créé après alerte d’identité approchante, vérifiée par le chirurgien',kind:'Identitovigilance'});
+   if(matches.length)stay.events.unshift({at:new Date().toLocaleString('fr-FR'),role:ctx.role(),text:'Nouveau dossier créé après alerte d’identité approchante, vérifiée par l’auteur de l’annonce',kind:'Identitovigilance'});
    ctx.add(stay);
    d.close();
    ctx.open(stay.id,'surgeryAnnouncement');
@@ -146,14 +147,14 @@
     }else if(pub?.state==='Annulée'){
      html=`<section class="ap-next"><div><strong>Annonce annulée par le chirurgien</strong><p class="muted">La consultation d’anesthésie reste accessible depuis l’onglet Consultation d’anesthésie si elle est encore nécessaire.</p></div></section>`;
     }else{
-     html=`<section class="ap-next"><div><strong>Annonce pas encore transmise</strong><p class="muted">Le bouton pour commencer la consultation d’anesthésie apparaîtra ici dès que le chirurgien aura transmis l’annonce.</p>${provisional}</div></section>`;
+     html=`<section class="ap-next"><div><strong>Annonce pas encore transmise</strong><p class="muted">Complétez et transmettez l’annonce ci-dessous (ou attendez celle du chirurgien) : le bouton pour faire la consultation d’anesthésie apparaîtra ici.</p>${provisional}</div></section>`;
     }
-   }else if(ctx.role()==='Chirurgien'){
+   }else if(ctx.writer()){
     if(pub?.state==='Transmise')html=`<section class="ap-next ap-next-done"><div><strong>Annonce transmise à l’équipe d’anesthésie</strong><p class="muted">L’anesthésiste peut maintenant faire la consultation d’anesthésie de ce patient à partir de l’annonce.</p>${provisional}</div></section>`;
     else if(stay.origin==='annonce')html=`<section class="ap-next"><div><strong>Nouveau patient · annonce à compléter</strong><p class="muted">Renseignez l’intervention puis transmettez l’annonce : l’équipe d’anesthésie pourra lancer la consultation.</p>${provisional}</div></section>`;
    }
    if(!html)return;
-   const h=content.querySelector('h3');(h||content.firstChild)?h.insertAdjacentHTML('afterend',html):content.insertAdjacentHTML('afterbegin',html);
+   const h=content.querySelector('h3');if(h)h.insertAdjacentHTML('afterend',html);else content.insertAdjacentHTML('afterbegin',html);
    content.querySelector('[data-ap-consult]')?.addEventListener('click',()=>{ctx.goTab('consult');toast('Consultation d’anesthésie ouverte pour '+(who||stay.id))});
   }
   function detail(){

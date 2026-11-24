@@ -115,7 +115,7 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   if(!name||name.length>160)return Response.json({error:'Nom et prénom requis.'},{status:400});
   if(!PROFESSIONS.includes(profession))return Response.json({error:'Métier inconnu.'},{status:400});
   // Infirmier(ère) : poste de bloc (check-list HAS, ouverture des salles) ou d'étage. Par défaut : étage.
-  const poste=profession==='infirmier'?String(d.poste||'etage'):'';if(poste&&!['bloc','etage'].includes(poste))return Response.json({error:'Poste infirmier inconnu : bloc ou étage.'},{status:400});
+  const poste=profession==='infirmier'?String(d.poste||'etage'):'';if(poste&&!['bloc','etage','cadre'].includes(poste))return Response.json({error:'Poste infirmier inconnu : bloc, étage ou cadre de bloc.'},{status:400});
   if(rpps&&!/^\d{11}$/.test(rpps))return Response.json({error:'Le RPPS comporte 11 chiffres.'},{status:400});
   // Le motif n'est plus demandé dans le formulaire : la trace garde un libellé par défaut.
   const motif=reason||'Création du compte par l’administrateur';
