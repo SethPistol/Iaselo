@@ -2256,6 +2256,10 @@ if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule
 const indicateursModule=window.createIndicateurs?.({$,esc,toast,sectors:serviceSectors,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(view==='indicateurs'){closeCroDictation();indicateursModule.render();return}renderBeforeIndicateurs()}}
 
+// Ouverture des salles (dist/ouverture-salles.js) : vérifications quotidiennes infirmière et anesthésie, rappel sur la feuille d’anesthésie.
+const ouvertureSalles=window.createOuvertureSalles?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(ouvertureSalles){const renderBeforeOuverture=render;render=function(){if(view==='ouvertureSalles'){closeCroDictation();ouvertureSalles.render();return}renderBeforeOuverture()};const detailBeforeOuverture=detail;detail=function(){detailBeforeOuverture();if(tab==='perop'&&['anesthesiste','infirmier','chirurgien'].includes(jobNow()))ouvertureSalles.bandeauPerop($('#content'))}}
+
 // Accès direct au plan de soins du séjour sélectionné.
 if($('#open-nursing-record'))$('#open-nursing-record').onclick=()=>{
  if(view==='patients'&&tab==='consult'&&p())captureConsult();

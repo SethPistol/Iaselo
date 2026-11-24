@@ -8,9 +8,9 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else{root.IaseloMenu=api;api.installer(root.document)}})(typeof self!=='undefined'?self:this,function(){
 'use strict';
 const MENUS={
- anesthesiste:['priorities','controle','patients','releve','regulation','pharmacy','questionnaireSend','tasks','droits'],
+ anesthesiste:['priorities','controle','patients','releve','regulation','ouvertureSalles','pharmacy','questionnaireSend','tasks','droits'],
  chirurgien:['priorities','controle','patients','regulation','pmsi','questionnaireSend','tasks','droits'],
- infirmier:['priorities','controle','patients','releve','identity','regulation','pharmacy','tasks'],
+ infirmier:['priorities','controle','patients','releve','identity','regulation','ouvertureSalles','pharmacy','tasks'],
  secretariat:['priorities','controle','patients','identity','questionnaireSend','regulation','tasks'],
  pharmacien:['controle','patients','pharmacy','tasks'],
  dim:['patients','pmsi','activity','tasks'],

@@ -2,8 +2,8 @@
 // Menu par profil : chaque métier ne voit que ses entrées utiles, sans doublons.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),M=require('../dist/menu-profils.js');
 
-test('menu : 6 à 9 entrées pour les métiers de soins et le secrétariat',()=>{
- for(const job of ['anesthesiste','chirurgien','infirmier','secretariat']){const n=M.menuPourProfil(job,false).length;assert.ok(n>=6&&n<=9,job+' : '+n+' entrées')}
+test('menu : 6 à 10 entrées pour les métiers de soins et le secrétariat',()=>{
+ for(const job of ['anesthesiste','chirurgien','infirmier','secretariat']){const n=M.menuPourProfil(job,false).length;assert.ok(n>=6&&n<=10,job+' : '+n+' entrées')}
 });
 test('menu : doublons retirés pour tous les profils',()=>{
  for(const job of Object.keys(M.MENUS))for(const admin of [false,true]){const v=M.menuPourProfil(job,admin);for(const r of M.RETIREES)assert.ok(!v.includes(r),job+' voit '+r);assert.equal(new Set(v).size,v.length,job+' : entrée en double')}
