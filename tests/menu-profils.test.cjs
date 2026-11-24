@@ -11,8 +11,8 @@ test('menu : doublons retirés pour tous les profils',()=>{
 test('menu : écrans hors métier masqués',()=>{
  const inf=M.menuPourProfil('infirmier',false),sec=M.menuPourProfil('secretariat',false);
  for(const v of ['pmsi','billing','activity','pilotage','professionalAccess'])assert.ok(!inf.includes(v),'infirmier voit '+v);
- for(const v of ['pmsi','billing','pharmacy','releve','priorities'])assert.ok(!sec.includes(v),'secrétariat voit '+v);
- assert.ok(sec.includes('patients')&&sec.includes('regulation')&&sec.includes('questionnaireSend'));
+ for(const v of ['pmsi','billing','pharmacy','releve'])assert.ok(!sec.includes(v),'secrétariat voit '+v);
+ assert.ok(sec.includes('priorities')&&inf.includes('priorities')&&sec.includes('patients')&&sec.includes('regulation')&&sec.includes('questionnaireSend'));
  assert.deepEqual(M.menuPourProfil('administration',false),['professionalAccess','droits']);
  assert.deepEqual(M.menuPourProfil('inconnu',false),['professionalAccess']);
 });
@@ -34,4 +34,18 @@ test('dossier : profils administratifs sans volets médicaux, création de séjo
  assert.doesNotMatch(s,/newform'\)\.onsubmit=e=>\{\s*e\.preventDefault\(\);if\(nurseProfile\(\)\)return;/,'création bloquée pour le secrétariat');
  assert.equal((s.match(/newform'\)\.onsubmit=e=>\{\s*e\.preventDefault\(\);if\(!canCreateStay\(\)\)return;/g)||[]).length,2);
  assert.match(s,/function captureConsult\(\)\{const cx=p\(\);if\(!cx\?\.consult/,'plantage sans dossier');
+});
+test('barre « Dossier partagé » : indicateur compact, options repliées, export réservé à l’administrateur',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','dist','dossier-partage.js'),'utf8'),css=fs.readFileSync(path.join(__dirname,'..','dist','iaselo.css'),'utf8');
+ assert.match(s,/<details class="shared-menu"><summary>Options<\/summary>/);
+ assert.match(s,/bar\.dataset\.state=alerte\?'alert':occupe\?'busy':'ok'/);
+ for(const id of ['shared-save-now','shared-refresh','shared-history','shared-backup'])assert.ok(s.includes('id="'+id+'"'),id+' conservé');
+ assert.match(css,/body:not\(\[data-admin="true"\]\) #shared-backup \{ display: none; \}/);
+});
+test('Ma journée : indicateurs adaptés au métier, saisie peropératoire masquée sans droit',()=>{
+ const s=fs.readFileSync(path.join(__dirname,'..','dist','parcours-v8.js'),'utf8');
+ for(const label of ['Patients à surveiller','Dossiers en préparation','Comptes rendus à rédiger','Consultations à valider'])assert.ok(s.includes(label),label);
+ assert.match(s,/\['Surveillance','Médicament','Événement','Bilan hydrique'\]\.filter\(periCanWrite\)/);
+ assert.match(s,/peri-readonly/);
+ assert.doesNotMatch(s,/if\(nurseProfile\(\)&&\['portal','priorities'\]\.includes\(view\)\)view='patients'/);
 });

@@ -10,8 +10,8 @@
 const MENUS={
  anesthesiste:['priorities','controle','patients','releve','regulation','pharmacy','questionnaireSend','tasks','droits'],
  chirurgien:['priorities','controle','patients','regulation','pmsi','questionnaireSend','tasks','droits'],
- infirmier:['controle','patients','releve','identity','regulation','pharmacy','tasks'],
- secretariat:['controle','patients','identity','questionnaireSend','regulation','tasks'],
+ infirmier:['priorities','controle','patients','releve','identity','regulation','pharmacy','tasks'],
+ secretariat:['priorities','controle','patients','identity','questionnaireSend','regulation','tasks'],
  pharmacien:['controle','patients','pharmacy','tasks'],
  dim:['patients','pmsi','activity','tasks'],
  facturation:['patients','activity','billing'],

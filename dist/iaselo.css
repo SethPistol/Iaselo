@@ -297,3 +297,20 @@ html body .integrated-frame { border: 1px solid var(--i-line); border-radius: va
   body.print-perop .peri-sheet > h3 { margin: 0 0 70px !important; padding-left: 6px; }
   body.print-perop #dossier-panel { overflow: visible !important; }
 }
+
+/* Indicateur d'enregistrement compact (audit 24/11) : une ligne discrète, options repliées, alerte visible. */
+html body .shared-save { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 10px; width: fit-content; max-width: 100%; margin: 0 0 14px auto; padding: 4px 6px 4px 12px; background: transparent; border: 1px solid transparent; border-radius: 999px; position: relative; }
+html body .shared-save .shared-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--i-ok); box-shadow: 0 0 0 3px var(--i-ok-soft); flex: none; }
+html body .shared-save[data-state=busy] .shared-dot { background: var(--i-warn); box-shadow: 0 0 0 3px var(--i-warn-soft); }
+html body .shared-save > p { margin: 0; font-size: 12px; color: var(--i-mut); }
+html body .shared-save[data-state=alert] { background: var(--i-crit-soft); border-color: var(--i-crit); border-radius: var(--i-r-m); padding: 8px 10px 8px 14px; width: auto; }
+html body .shared-save[data-state=alert] .shared-dot { background: var(--i-crit); box-shadow: 0 0 0 3px var(--i-crit-soft); }
+html body .shared-save[data-state=alert] > p { color: var(--i-ink); font-weight: 600; font-size: 13px; }
+html body .shared-save .shared-menu > summary { list-style: none; cursor: pointer; font-size: 12px; color: var(--i-mut); padding: 4px 10px; border-radius: 999px; }
+html body .shared-save .shared-menu > summary::-webkit-details-marker { display: none; }
+html body .shared-save .shared-menu > summary:hover, html body .shared-save .shared-menu[open] > summary { background: var(--i-s2); color: var(--i-ink); }
+html body .shared-save .shared-menu-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(360px, 90vw); background: var(--i-s1); border: 1px solid var(--i-line); border-radius: var(--i-r-m); box-shadow: var(--i-shadow-lift); padding: 10px; }
+html body .shared-save .shared-menu-panel .actions { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+html body .shared-save .shared-menu-panel .actions button { justify-content: flex-start; text-align: left; width: 100%; }
+html body .shared-save .shared-menu-panel .muted { display: block; margin: 8px 4px 2px; font-size: 12px; color: var(--i-mut); }
+body:not([data-admin="true"]) #shared-backup { display: none; }
