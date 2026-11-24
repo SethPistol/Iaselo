@@ -250,6 +250,8 @@ window.createDocumentsConsentement=function(ctx){
 
  /* ================= Alertes dans le dossier ================= */
  function detail(tab){
+  // Secrétariat, facturation, administration : le suivi du consentement et des documents relève des soignants (lecture refusée par le serveur).
+  if(['secretariat','facturation','administration','unassigned'].includes(ctx.job?.()))return;
   const s=cur();if(!s)return;
   surveiller(s);
   const sp=space(s),al=R.alerteBloc({...s,espacePatient:sp}),chips=document.querySelector('#detail .pb-chips');
