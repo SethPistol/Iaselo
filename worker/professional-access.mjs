@@ -1,6 +1,6 @@
 import invitationCore from '../dist/invitation-core.js';
 import nursingCore from '../dist/nursing-core.js';
-import planningCore from '../dist/planning-core.js';import {stampSignatures} from './signatures.mjs';
+import planningCore from '../dist/planning-core.js';import {stampSignatures} from './signatures.mjs';import {heal,stamp} from './horodatage.mjs';import {lockCheck} from './verrous.mjs';
 const professions={unassigned:'Non attribué',anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier',secretariat:'Secrétariat',pharmacien:'Pharmacien',dim:'DIM',facturation:'Facturation',administration:'Administration'};
 const stable=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const same=(a,b)=>stable(a)===stable(b);
@@ -55,7 +55,9 @@ export async function professionalAccess(env,request,user,member,at){
    if(module==='nursingRecord')return ['anesthesiste','chirurgien','infirmier'].includes(job)&&appendOnly(old||[],data);
    if(module==='medicationCircuit')return ['anesthesiste','chirurgien','pharmacien'].includes(job)&&appendOnly(old||[],data)&&data.slice((old||[]).length).every(e=>['analysis','reconciliation','validation'].includes(e.kind)&&(e.kind!=='validation'||job==='pharmacien')&&e.author?.trim()&&e.note?.trim()&&Number.isFinite(Date.parse(e.at)));
    if(module==='events')return clinical&&Array.isArray(data)&&additions(old||[],data);
-   if(['periopPlus','peropRapide','soinsPlus','sortiePlus','iaTrace'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object';
+   // Saisie rapide au bloc : anesthésiste et infirmier (IADE) seulement, le chirurgien la lit (audit du 24/11, point 5).
+   if(module==='peropRapide')return ['anesthesiste','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(['periopPlus','soinsPlus','sortiePlus','iaTrace'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object';
    if(module==='codage')return ['anesthesiste','chirurgien','dim'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='droitsRgpd')return (['anesthesiste','chirurgien'].includes(job)||isAdmin)&&Array.isArray(data);
@@ -108,6 +110,7 @@ export async function professionalAccess(env,request,user,member,at){
   for(const id of newStays)allowed.add(id);
   const out=[];
   for(const d of docs){const oldRow=await DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(d.key).first(),old=oldRow?JSON.parse(oldRow.data):null;
+   const mod=d.key.startsWith('stay/')?d.key.split('/')[2]:'';d.data=heal(mod,old,d.data);
    if(!keyWrite(d.key,old,d.data,newStays)){await log('write',d.key,'denied','Métier ou équipe de soins non autorisé');return null}
    if(d.key.startsWith('stay/')&&d.key.endsWith('/invitationContact')){
     const v=d.data,error=invitationCore.contactError(v?.contact);
@@ -120,7 +123,7 @@ export async function professionalAccess(env,request,user,member,at){
    if(!clinical&&d.key.endsWith('/core')&&Object.keys(d.data||{}).some(k=>!['id','specialty','mode','stage','sector','identity','careTeamId'].includes(k))){await log('write',d.key,'denied','Champ clinique réservé');return null}
    let data;try{data=merge(d.key,old,d.data)}catch{await log('write',d.key,'denied','Tentative hors équipe');return null}
    for(const hash of fileReferences(data))if(!await DB.prepare('SELECT hash FROM file_scopes WHERE hash=? AND document_key=?').bind(hash,d.key).first()){await log('file-link',d.key,'denied','Pièce jointe sans autorisation de rattachement');return null}
-   if(d.key.startsWith('stay/'))data=stampSignatures(old,data,{userId:user,name:profile.display_name,rpps:profile.rpps});out.push({...d,data});
+   if(d.key.startsWith('stay/')){const lock=lockCheck(mod,old,data);if(lock.error){nursingError=lock.error;await log('write',d.key,'denied',lock.error);return null}if(lock.revision)await log('revision-ouverte',d.key,'allowed',lock.revision);data=stamp(mod,stampSignatures(old,data,{userId:user,name:profile.display_name,rpps:profile.rpps}),{at,user})}out.push({...d,data});
   }
   // Contrôle sur le programme complet : les réservations des autres équipes
   // participent aux conflits sans être renvoyées au professionnel.

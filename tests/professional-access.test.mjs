@@ -84,7 +84,7 @@ test('transmission libre infirmière : texte, auteur, responsable et horaires pe
  const f=fixture();try{
   const note={id:'TRANSMISSION-LIBRE',kind:'transmission',format:'Libre',context:'Relève',target:'Transmission libre',observations:'Texte libre fictif de relève,\navec une seconde ligne.',actions:'',results:'',occurredAt:'2026-11-19T10:00',recordedAt:'2026-11-19T09:02:00Z',authorId:'nurse',authorLabel:'nurse',ownerId:'nurse',ownerLabel:'nurse'};
   assert.equal((await f.call('nurse','PUT','/document',change('stay/A/nursingRecord',[note],0))).status,200);
-  const data=await f.call('surgeon','GET','');const saved=data.data.documents.find(d=>d.key==='stay/A/nursingRecord').data[0];assert.deepEqual(saved,note);
+  const data=await f.call('surgeon','GET','');const {serverAt,serverBy,...saved}=data.data.documents.find(d=>d.key==='stay/A/nursingRecord').data[0];assert.deepEqual(saved,note);assert.equal(serverBy,'nurse','auteur constaté par le serveur');assert.ok(Date.parse(serverAt),'heure serveur (audit 24/11, point 6)');
   assert.ok(!(await f.call('other','GET','')).data.documents.some(d=>d.key==='stay/A/nursingRecord'));
  }finally{f.close()}
 });

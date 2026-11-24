@@ -570,7 +570,7 @@ function prescriptions(){
  ${!rx.validated?`<button class="secondary" data-validate="${index}">Simuler la validation médicale</button>`:`
   <h4>Exécutions tracées</h4>
   ${rx.administered?'<p>Réalisation simulée enregistrée antérieurement.</p>':''}
-  ${(rx.executions||[]).map(item=>`<div class="event"><strong>${esc(item.status)} · ${esc(periTime(item.at))}</strong>
+  ${(rx.executions||[]).map(item=>`<div class="event"><strong>${esc(item.status)} · ${esc(periTime(item.at))}</strong>${item.serverAt&&Math.abs(Date.parse(item.serverAt)-Date.parse(item.at))>15*60000?`<small class="late-entry">Saisie enregistrée le ${esc(new Date(item.serverAt).toLocaleString('fr-FR'))}</small>`:''}
    ${item.dose?`<p>${esc(item.dose)} · ${esc(item.route)}</p>`:''}
    <p>${esc(item.author)} · ${esc(item.role)} · Saisie le ${esc(periTime(item.recordedAt))}</p>
    ${item.note?`<p class="preserve">${esc(item.note)}</p>`:''}</div>`).join('')||(!rx.administered?'<p class="muted">Aucune exécution enregistrée.</p>':'')}

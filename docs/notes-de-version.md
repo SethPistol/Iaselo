@@ -1,3 +1,9 @@
+# IASELO · documents validés figés et heure serveur des soins (24 novembre 2026, audit points 5 et 6)
+
+- **Documents validés figés par le serveur** (`worker/verrous.mjs`) : consultation validée, CRO validé, VPA et prescriptions signées ne peuvent plus être modifiés en restant validés ou signés. Il faut ouvrir une révision (tracée « revision-ouverte » dans le journal), puis valider ou signer la nouvelle version.
+- **Feuille d'anesthésie, saisie rapide** : registre des stupéfiants et traçabilité des implants sans effacement ni modification ; un événement horodaté s'annule (mention « annulé », auteur, heure) au lieu d'être effacé. Saisie réservée à l'anesthésiste et à l'infirmier, le chirurgien la lit.
+- **Heure serveur des soins** (`worker/horodatage.mjs`) : chaque nouvelle administration, surveillance, transmission, entrée de circuit du médicament ou de feuille d'anesthésie reçoit l'heure et l'auteur constatés par le serveur (`serverAt`, `serverBy`), que le poste ne peut ni fixer ni modifier. L'heure clinique choisie par le soignant est conservée ; un écart de plus de 15 minutes est affiché (« Saisie enregistrée le… »).
+
 # IASELO · refonte du stockage (24 novembre 2026, audit point 4)
 
 - **Listes partagées fusionnées patient par patient** : identités, réservations du bloc, actes, mouvements, PMSI, factures et brouillons de séjour. Deux postes qui modifient deux patients différents ne se bloquent plus ; seul un même patient modifié des deux côtés est un conflit (`worker/items.mjs`).

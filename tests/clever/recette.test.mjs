@@ -78,3 +78,20 @@ test('audit 24/11 : une signature est toujours attribuée à la personne connect
   assert.equal((await c.json()).document.data.validatedBy,me.display_name);
  }finally{await db.close()}
 });
+test('audit 24/11 points 5 et 6 : consultation validée figée, saisie rapide fermée au chirurgien, heure serveur',async()=>{
+ const db=new PGlite(),pool=pgPool(db),origin='http://localhost:8080',env={NODE_ENV:'test',BASE_URL:origin,SESSION_SECRET:'test-only-secret-with-at-least-32-characters',IASELO_RECETTE:'true'};
+ try{await migrate(pool);await bootstrap(pool,env);const app=await makeApp({pool,bucket:{async put(){},async get(){return null}},cfg:config(env)});
+  const call=(method,route,data,cookie)=>app(new Request(origin+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},...(data!==undefined?{body:JSON.stringify(data)}:{})}));
+  const login=async(e,p)=>(await call('POST','/auth/login',{email:e,password:p})).headers.get('Set-Cookie').split(';')[0];
+  const a=await login(RECETTE_EMAIL,RECETTE_PASSWORD),chir=await login(RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD);
+  assert.equal((await call('POST','/api/workspace/seed',{documents:[{key:'stay/DEMO1/core',data:{id:'DEMO1',careTeamId:'demo-clinique',identity:{lastName:'FICTIF',firstName:'Test'}}}]},a)).status,200);
+  const put=(key,data,revision,cookie=a)=>call('PUT','/api/workspace/document',{key,revision,data,operation:crypto.randomUUID(),reason:'test verrous'},cookie);
+  let r=await put('stay/DEMO1/consult',{validated:true,asa:'2'},0);assert.equal(r.status,200);
+  r=await put('stay/DEMO1/consult',{validated:true,asa:'3'},1);assert.equal(r.status,403);assert.match((await r.json()).error,/révision/);
+  r=await put('stay/DEMO1/consult',{validated:false,asa:'2',versions:[{}]},1);assert.equal(r.status,200);
+  assert.equal((await pool.query("SELECT COUNT(*) AS n FROM professional_access_log WHERE action='revision-ouverte' AND target='stay/DEMO1/consult'")).rows[0].n,1);
+  assert.equal((await put('stay/DEMO1/peropRapide',{evenements:[]},0,chir)).status,403,'chirurgien : lecture seule');
+  r=await put('stay/DEMO1/rx',[{name:'Paracétamol',validated:true,executions:[{status:'Réalisée',at:'2026-01-01T08:00:00.000Z',author:'x'}]}],0);
+  const e=(await r.json()).document.data[0].executions[0];assert.ok(Date.parse(e.serverAt)>Date.parse('2026-11-01'));assert.ok(e.serverBy);
+ }finally{await db.close()}
+});
