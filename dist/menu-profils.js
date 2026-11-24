@@ -11,6 +11,8 @@ const MENUS={
  anesthesiste:['priorities','controle','patients','releve','regulation','ouvertureSalles','pharmacy','questionnaireSend','tasks','droits'],
  chirurgien:['priorities','controle','patients','regulation','pmsi','questionnaireSend','tasks','droits'],
  infirmier:['priorities','controle','patients','releve','identity','regulation','ouvertureSalles','pharmacy','tasks'],
+ // Infirmier(ère) d'étage : sans l'ouverture des salles (ni la check-list HAS, masquée dans le dossier).
+ infirmier_etage:['priorities','controle','patients','releve','identity','regulation','pharmacy','tasks'],
  secretariat:['priorities','controle','patients','identity','questionnaireSend','regulation','tasks'],
  pharmacien:['controle','patients','pharmacy','tasks'],
  dim:['patients','pmsi','activity','tasks'],
@@ -22,8 +24,8 @@ const MENUS={
 const ADMIN=['indicateurs','professionalAccess','pilotage','droits','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
-function menuPourProfil(profession,isAdmin){
- const base=MENUS[profession]||MENUS.unassigned;
+function menuPourProfil(profession,isAdmin,poste){
+ const base=MENUS[profession==='infirmier'&&poste!=='bloc'?'infirmier_etage':profession]||MENUS.unassigned;
  const vues=isAdmin?[...base,...ADMIN.filter(v=>!base.includes(v))]:[...base];
  return vues;
 }
@@ -37,7 +39,7 @@ function installer(doc){
  function appliquer(){
   if(enCours)return;const aside=doc.querySelector('aside');const job=doc.body.dataset.profession;if(!aside||!job)return;enCours=true;
   try{
-   const visibles=new Set(menuPourProfil(job,doc.body.dataset.admin==='true'));
+   const visibles=new Set(menuPourProfil(job,doc.body.dataset.admin==='true',doc.body.dataset.poste));
    aside.querySelectorAll('.nav, a.patientlink').forEach(el=>{const k=cle(el);if(!k||el.closest('.asidebottom'))return;el.classList.toggle('menu-masque',RETIREES.includes(k)||!visibles.has(k))});
    // Titres de section sans entrée visible.
    aside.querySelectorAll('.navtitle').forEach(t=>{let n=t.nextElementSibling,vu=false;while(n&&!n.classList.contains('navtitle')){if(n.matches('.nav, a.patientlink')&&!n.classList.contains('menu-masque')&&!n.hidden)vu=true;n=n.nextElementSibling}t.classList.toggle('menu-masque',!vu)});
@@ -50,7 +52,7 @@ function installer(doc){
    if(redirige!==job){redirige=job;if(!actif||actif.classList.contains('menu-masque')){const premier=[...visibles].map(v=>aside.querySelector('.nav[data-view="'+v+'"]')).find(b=>b&&!b.classList.contains('menu-masque')&&!b.hidden);if(premier)setTimeout(()=>premier.click(),0)}}
   }finally{enCours=false}
  }
- const go=()=>{const aside=doc.querySelector('aside');if(!aside)return;new MutationObserver(appliquer).observe(aside,{childList:true,subtree:true});new MutationObserver(appliquer).observe(doc.body,{attributes:true,attributeFilter:['data-profession','data-admin']});appliquer()};
+ const go=()=>{const aside=doc.querySelector('aside');if(!aside)return;new MutationObserver(appliquer).observe(aside,{childList:true,subtree:true});new MutationObserver(appliquer).observe(doc.body,{attributes:true,attributeFilter:['data-profession','data-admin','data-poste']});appliquer()};
  if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',go);else go();
 }
 return {MENUS,ADMIN,RETIREES,menuPourProfil,installer};

@@ -114,18 +114,20 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>240)return Response.json({error:'Adresse e-mail invalide.'},{status:400});
   if(!name||name.length>160)return Response.json({error:'Nom et prénom requis.'},{status:400});
   if(!PROFESSIONS.includes(profession))return Response.json({error:'Métier inconnu.'},{status:400});
+  // Infirmier(ère) : poste de bloc (check-list HAS, ouverture des salles) ou d'étage. Par défaut : étage.
+  const poste=profession==='infirmier'?String(d.poste||'etage'):'';if(poste&&!['bloc','etage'].includes(poste))return Response.json({error:'Poste infirmier inconnu : bloc ou étage.'},{status:400});
   if(rpps&&!/^\d{11}$/.test(rpps))return Response.json({error:'Le RPPS comporte 11 chiffres.'},{status:400});
   if(reason.length<5)return Response.json({error:'Indiquez un motif de cinq caractères au minimum.'},{status:400});
   if(teamId&&!(await pool.query('SELECT 1 FROM care_teams WHERE id=$1 AND active=1',[teamId])).rows.length)return Response.json({error:'Équipe de soins inconnue.'},{status:400});
   if((await pool.query('SELECT 1 FROM auth_users WHERE email=$1',[email])).rows.length)return Response.json({error:'Un compte existe déjà avec cette adresse.'},{status:409});
   const temporary=provisionalPassword();let id;try{id=await createAccount(pool,{email,name,passwordHash:await hashPassword(temporary)})}catch(e){return Response.json({error:/unique|duplicate/i.test(e.message)?'Un compte existe déjà avec cette adresse.':'Création impossible.'},{status:409})}
   await pool.query('UPDATE auth_users SET must_change_password=1 WHERE id=$1',[id]);
-  await pool.query('UPDATE professional_profiles SET profession=$2,rpps=$3,updated_at=$4,updated_by=$5 WHERE user_id=$1',[id,profession,rpps,at,staff.id]);
+  await pool.query('UPDATE professional_profiles SET profession=$2,rpps=$3,updated_at=$4,updated_by=$5,poste=$6 WHERE user_id=$1',[id,profession,rpps,at,staff.id,poste]);
   // Sans équipe choisie (cas du formulaire), le compte est rattaché à toutes les équipes de soins actives
   // pour voir les séjours dès sa première connexion ; l'administrateur peut ensuite révoquer un rattachement.
   const teams=teamId?[teamId]:(await pool.query('SELECT id FROM care_teams WHERE active=1 ORDER BY id')).rows.map(r=>r.id);
   for(const t of teams)await pool.query('INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,$2,$3)',[id,t,at]);
-  await log('allowed',id,reason,JSON.stringify({profession,teams,rppsDeclared:!!rpps}));
+  await log('allowed',id,reason,JSON.stringify({profession,poste,teams,rppsDeclared:!!rpps}));
   return Response.json({created:true,userId:id,email,temporaryPassword:temporary});
  }
  async function mustChangePassword(request){return !!(await pendingSession(request))?.must_change_password}
