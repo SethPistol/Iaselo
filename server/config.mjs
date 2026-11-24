@@ -3,6 +3,8 @@ import {randomBytes} from 'node:crypto';
 // Il évite toute manipulation technique : adresse déduite de l’application Clever Cloud,
 // secret de session tiré au démarrage, compte de test créé automatiquement (voir auth.mjs).
 export const RECETTE_EMAIL='demo@iaselo.test',RECETTE_PASSWORD='Recette IASELO 2026';
+// Compte chirurgien de test, créé uniquement en recette, pour essayer l'application avec ce profil.
+export const RECETTE_CHIRURGIEN_EMAIL='chirurgien@iaselo.test',RECETTE_CHIRURGIEN_PASSWORD='Chirurgien IASELO 2026';
 export function recette(env=process.env){return env.IASELO_RECETTE==='true'}
 function recetteEnv(env){
  if(!recette(env))return env;const out={...env};

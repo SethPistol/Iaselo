@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {PGlite} from '@electric-sql/pglite';
-import {migrate} from '../../server/database.mjs';import {bootstrap,verifyPassword,loginPage} from '../../server/auth.mjs';import {config,RECETTE_EMAIL,RECETTE_PASSWORD} from '../../server/config.mjs';import {cellarBinding} from '../../server/storage.mjs';
+import {migrate} from '../../server/database.mjs';import {bootstrap,verifyPassword,loginPage,hashPassword} from '../../server/auth.mjs';import {config,RECETTE_EMAIL,RECETTE_PASSWORD} from '../../server/config.mjs';import {cellarBinding} from '../../server/storage.mjs';
 function pgPool(db){const query=async(sql,values)=>{if(!values?.length&&/;\s*\S/.test(sql)){await db.exec(sql);return {rows:[],rowCount:0}}const r=await db.query(sql,values);return {...r,rows:r.rows,rowCount:r.affectedRows||0}};return {query,connect:async()=>({query,release(){}}),end:()=>db.close()}}
 const appId='app_0123abcd-0000-4000-8000-00000000beef';
 test('recette : configuration déduite de Clever Cloud, sans réglage manuel',()=>{
@@ -10,9 +10,9 @@ test('recette : configuration déduite de Clever Cloud, sans réglage manuel',()
 });
 test('recette : compte de test créé une seule fois, affiché uniquement en recette',async()=>{
  const db=new PGlite(),pool=pgPool(db);try{await migrate(pool);await bootstrap(pool,{IASELO_RECETTE:'true'});await bootstrap(pool,{IASELO_RECETTE:'true'});
- const {rows}=await pool.query('SELECT email,password_hash FROM auth_users');assert.equal(rows.length,1);assert.equal(rows[0].email,RECETTE_EMAIL);assert.equal(await verifyPassword(RECETTE_PASSWORD,rows[0].password_hash),true);
- const {rows:[member]}=await pool.query('SELECT role FROM workspace_members');assert.equal(member.role,'owner');
- const {rows:teams}=await pool.query('SELECT t.label FROM care_teams t JOIN professional_teams m ON m.team_id=t.id ORDER BY t.label');assert.deepEqual(teams.map(t=>t.label),['Chirurgie','Endoscopie','Séjour médical']);}finally{await db.close()}
+ const {rows}=await pool.query('SELECT email,password_hash FROM auth_users WHERE email<>$1',['chirurgien@iaselo.test']);assert.equal(rows.length,1);assert.equal(rows[0].email,RECETTE_EMAIL);assert.equal(await verifyPassword(RECETTE_PASSWORD,rows[0].password_hash),true);
+ const {rows:[member]}=await pool.query("SELECT role FROM workspace_members WHERE role='owner'");assert.equal(member.role,'owner');
+ const {rows:teams}=await pool.query('SELECT DISTINCT t.label FROM care_teams t JOIN professional_teams m ON m.team_id=t.id ORDER BY t.label');assert.deepEqual(teams.map(t=>t.label),['Chirurgie','Endoscopie','Séjour médical']);}finally{await db.close()}
  assert.match(loginPage('',true),/Serveur de recette/);assert.doesNotMatch(loginPage('',false),/Recette IASELO|demo@iaselo/);
 });
 test('recette : bucket privé nommé automatiquement',()=>{
@@ -33,4 +33,31 @@ test('recette : création du bucket sans LocationConstraint (refusé par Cellar)
  try{const bucket=cellarBinding({NODE_ENV:'test',IASELO_RECETTE:'true',S3_ENDPOINT:'http://127.0.0.1:'+server.address().port,CELLAR_ADDON_KEY_ID:'KEY1',CELLAR_ADDON_KEY_SECRET:'x'});await bucket.check();
   const create=seen.find(r=>r.method==='PUT');assert.ok(create,'bucket créé');assert.match(create.url,/^\/iaselo-recette-key1\/?$/);assert.doesNotMatch(create.body,/LocationConstraint/);}
  finally{server.close()}
+});
+import {makeApp} from '../../server/index.mjs';import {RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD} from '../../server/config.mjs';
+test('recette : compte chirurgien de test, profil chirurgien, jamais hors recette ni réactivé',async()=>{
+ const db=new PGlite(),pool=pgPool(db);try{await migrate(pool);
+  // Hors recette : seul l'administrateur prévu est créé.
+  await bootstrap(pool,{BOOTSTRAP_ADMIN_EMAIL:'admin@example.test',BOOTSTRAP_ADMIN_PASSWORD_HASH:await hashPassword('mot de passe administrateur')});assert.equal((await pool.query('SELECT id FROM auth_users WHERE email=$1',[RECETTE_CHIRURGIEN_EMAIL])).rows.length,0);
+  // Recette sur une base déjà peuplée : le compte est ajouté une seule fois.
+  await bootstrap(pool,{IASELO_RECETTE:'true'});await bootstrap(pool,{IASELO_RECETTE:'true'});
+  const {rows}=await pool.query('SELECT u.id,u.password_hash,p.profession,m.role FROM auth_users u JOIN professional_profiles p ON p.user_id=u.id JOIN workspace_members m ON m.user_id=u.id WHERE u.email=$1',[RECETTE_CHIRURGIEN_EMAIL]);
+  assert.equal(rows.length,1);assert.equal(rows[0].profession,'chirurgien');assert.equal(rows[0].role,'reader');assert.equal(await verifyPassword(RECETTE_CHIRURGIEN_PASSWORD,rows[0].password_hash),true);
+  assert.deepEqual((await pool.query('SELECT team_id FROM professional_teams WHERE user_id=$1',[rows[0].id])).rows.map(r=>r.team_id),['demo-clinique']);
+  // Désactivé par l'administrateur : reste désactivé au redémarrage.
+  await pool.query('UPDATE professional_profiles SET active=0 WHERE user_id=$1',[rows[0].id]);await bootstrap(pool,{IASELO_RECETTE:'true'});
+  assert.equal((await pool.query('SELECT active FROM professional_profiles WHERE user_id=$1',[rows[0].id])).rows[0].active,0);
+ }finally{await db.close()}
+ assert.match(loginPage('',true),/chirurgien@iaselo\.test/);assert.doesNotMatch(loginPage('',false),/chirurgien@iaselo|Chirurgien IASELO/);
+});
+test('recette : le chirurgien de test se connecte et voit les dossiers fictifs avec son profil',async()=>{
+ const db=new PGlite(),pool=pgPool(db),origin='http://localhost:8080',env={NODE_ENV:'test',BASE_URL:origin,SESSION_SECRET:'test-only-secret-with-at-least-32-characters',IASELO_RECETTE:'true'};
+ try{await migrate(pool);await bootstrap(pool,env);const app=await makeApp({pool,bucket:{async put(){},async get(){return null}},cfg:config(env)});
+  const call=(method,route,data,cookie)=>app(new Request(origin+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},...(data!==undefined?{body:JSON.stringify(data)}:{})}));
+  const login=async(e,p)=>(await call('POST','/auth/login',{email:e,password:p})).headers.get('Set-Cookie').split(';')[0];
+  const admin=await login(RECETTE_EMAIL,RECETTE_PASSWORD),chir=await login(RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD);
+  assert.equal((await call('POST','/api/workspace/seed',{documents:[{key:'stay/DEMO1/core',data:{id:'DEMO1',careTeamId:'demo-clinique',identity:{lastName:'FICTIF',firstName:'Test'}}}]},admin)).status,200);
+  const r=await (await call('GET','/api/workspace',undefined,chir)).json();
+  assert.equal(r.access.profile.profession,'chirurgien');assert.equal(r.role,'editor');assert.ok(r.documents.some(d=>/^stay\/.+\/core$/.test(d.key)),'dossiers fictifs visibles');
+ }finally{await db.close()}
 });
