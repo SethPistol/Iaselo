@@ -58,6 +58,53 @@ function transitionError(item,phase,rows,resources){
  if(rows.some(r=>r.id!==item.id&&r.state==='Occupée'&&currentResource(r)===id))return 'Transfert bloqué : la ressource est encore occupée. Vérifiez sa libération réelle.';
  return '';
 }
-root.PlanningCore={active,overlap,validTime,interval,minutes,addMinutes,kind,allocations,currentResource,busyAt,resourceError,vacationError,bookingError,transitionError};
+// Annonces chirurgicales → programme du bloc : chaque patient annoncé est placé (proposition, à confirmer) dans la
+// vacation (potentiel opératoire) du chirurgien le jour de l'intervention. Rien n'est écrit dans le programme :
+// une proposition ne déclenche ni convocation SMS ni réservation de ressource tant que la régulation ne l'a pas confirmée.
+const normName=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(dr|docteur|pr|professeur)\b\.?/g,' ').replace(/[^a-z0-9]+/g,' ').trim();
+const sameSurgeon=(a,b)=>{const x=normName(a),y=normName(b);if(!x||!y)return false;if(x===y)return true;const xs=x.split(' '),ys=y.split(' ');return xs.length===1&&ys.includes(xs[0])||ys.length===1&&xs.includes(ys[0])};
+const ANNONCE_DUREE=60,ANNONCE_REMISE=15;
+function announcementOf(stay){
+ const p=stay?.surgicalAnnouncement?.published;if(!p||!p.fields)return null;
+ const f=p.fields;return {stay:stay.id,state:p.state,revision:p.revision||1,sentAt:typeof p.sentAt==='string'?p.sentAt:'',procedure:f.procedure||'',surgeon:f.surgeon||'',date:/^\d{4}-\d\d-\d\d$/.test(f.date||'')?f.date:'',time:/^\d\d:\d\d$/.test(f.time||'')?f.time:'',duration:Number(f.duration)>0?Math.round(Number(f.duration)):0,urgency:f.urgency||'',laterality:f.laterality||'',mode:f.mode||''};
+}
+function programmed(stayId,reservations){return reservations.some(r=>r.patient===stayId&&active(r)&&(r.vacationId||r.source==='annonce'))}
+function placeAnnouncements(day,announcements,vacations,reservations){
+ const placed=[],unplaced=[],load=new Map();
+ const list=announcements.filter(a=>a&&a.state==='Transmise'&&a.date===day&&!programmed(a.stay,reservations));
+ // Ordre d'arrivée des annonces (urgences d'abord) ; l'heure souhaitée est respectée quand le créneau est libre.
+ list.sort((a,b)=>(a.urgency==='Urgente'?0:1)-(b.urgency==='Urgente'?0:1)||(a.sentAt||'~').localeCompare(b.sentAt||'~')||String(a.stay).localeCompare(String(b.stay)));
+ const busy=v=>[...reservations.filter(r=>active(r)&&r.resource===v.resource&&overlap(r,v)).map(r=>({start:r.start,end:r.end})),...placed.filter(p=>p.resource===v.resource).map(p=>({start:p.start,end:p.end}))].sort((a,b)=>a.start.localeCompare(b.start));
+ for(const a of list){
+  const vs=vacations.filter(v=>v.state!=='Annulée'&&v.start.slice(0,10)===day&&sameSurgeon(v.surgeon,a.surgeon)).sort((x,y)=>x.start.localeCompare(y.start));
+  if(!a.surgeon){unplaced.push({...a,reason:'Chirurgien non renseigné dans l’annonce.'});continue}
+  if(!vs.length){unplaced.push({...a,reason:'Aucune vacation de '+a.surgeon+' ce jour : à programmer manuellement.'});continue}
+  const duration=a.duration||ANNONCE_DUREE,need=duration+ANNONCE_REMISE,wish=a.time?day+'T'+a.time:'';
+  const fit=(v,from)=>{let c=from<v.start?v.start:from;for(const b of busy(v)){if(b.end<=c)continue;if(addMinutes(c,need)<=b.start)break;c=b.end>c?b.end:c}return addMinutes(c,need)<=v.end?c:null};
+  let spot=null;
+  if(wish)for(const v of vs){if(wish<v.end){const c=fit(v,wish);if(c){spot={v,start:c};break}}}
+  if(!spot)for(const v of vs){const c=fit(v,v.start);if(c){spot={v,start:c};break}}
+  let overflow=0;
+  if(!spot){const v=vs.at(-1),last=busy(v).reduce((m,b)=>b.end>m?b.end:m,v.start);spot={v,start:last};overflow=minutes(v.end,addMinutes(last,need))}
+  const p={...a,id:'ANN-'+a.stay,vacationId:spot.v.id,resource:spot.v.resource,start:spot.start,end:addMinutes(spot.start,need),duration,turnover:ANNONCE_REMISE,defaultDuration:!a.duration,overflow,staffIds:spot.v.staffIds||[]};
+  placed.push(p);
+ }
+ for(const v of vacations.filter(v=>v.state!=='Annulée'&&v.start.slice(0,10)===day)){
+  const cap=minutes(v.start,v.end),used=reservations.filter(r=>active(r)&&r.vacationId===v.id).reduce((n,r)=>n+minutes(r.start,r.end),0),announced=placed.filter(p=>p.vacationId===v.id).reduce((n,p)=>n+minutes(p.start,p.end),0);
+  load.set(v.id,{capacity:cap,used,announced,free:cap-used-announced});
+ }
+ return {placed,unplaced,load};
+}
+// Réservation à écrire quand la régulation confirme une proposition.
+function bookingFromAnnouncement(p){return {id:'RES-'+(globalThis.crypto?.randomUUID?.()||Date.now()),planningVersion:1,patient:p.stay,resource:p.resource,vacationId:p.vacationId,procedure:p.procedure+(p.laterality&&p.laterality!=='Non applicable'?' · '+p.laterality:''),start:p.start,end:p.end,duration:p.duration,turnover:p.turnover,staffIds:[...(p.staffIds||[])],equipmentIds:[],note:'Annonce chirurgicale v'+p.revision+' · '+p.surgeon,state:'Réservée',source:'annonce',annonceRevision:p.revision}}
+// Programme confirmé puis annonce annulée ou modifiée par le chirurgien : à revoir.
+function announcementDrift(r,announcement){
+ if(!r||r.source!=='annonce'||!active(r))return '';
+ if(!announcement)return '';
+ if(announcement.state!=='Transmise')return 'Annonce annulée par le chirurgien : déprogrammez ou faites confirmer.';
+ if(announcement.revision!==r.annonceRevision){if(announcement.date&&announcement.date!==r.start.slice(0,10))return 'Annonce modifiée (v'+announcement.revision+') : nouvelle date souhaitée le '+announcement.date.split('-').reverse().join('/')+'.';return 'Annonce modifiée par le chirurgien (v'+announcement.revision+') : vérifiez le programme.'}
+ return '';
+}
+root.PlanningCore={normName,sameSurgeon,announcementOf,placeAnnouncements,bookingFromAnnouncement,announcementDrift,active,overlap,validTime,interval,minutes,addMinutes,kind,allocations,currentResource,busyAt,resourceError,vacationError,bookingError,transitionError};
 if(typeof module!=='undefined')module.exports=root.PlanningCore;
 })(typeof window!=='undefined'?window:globalThis);

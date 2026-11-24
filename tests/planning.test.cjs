@@ -34,3 +34,27 @@ test('les réservations annulées ne bloquent plus les créneaux et les noms des
  assert.match(C.resourceError([...resources,resources[0]]),/double/);
  assert.match(C.bookingError(booking({staffIds:['staff2']}),[],resources,vacations),/personnels affectés/);
 });
+test('annonces chirurgicales : placées dans la vacation du chirurgien, à la suite du programme, dépassement signalé',()=>{
+ const day='2026-11-20',vac=[{id:'V',resource:'room',label:'Orthopédie',surgeon:'Dr Jean Dubois',start:t('08:00'),end:t('12:00'),staffIds:['staff']},{id:'V2',resource:'room2',label:'Digestif',surgeon:'Dr Martin',start:t('08:00'),end:t('10:00'),staffIds:['staff2']}];
+ const ann=(stay,f,state='Transmise',revision=1)=>({id:stay,surgicalAnnouncement:{published:{state,revision,fields:{procedure:'Geste '+stay,surgeon:'dr dubois',date:day,...f}}}});
+ const stays=[ann('A',{duration:'90'}),ann('B',{time:'10:30',duration:'45'}),ann('C',{}),ann('D',{surgeon:'Dr Martin',duration:'120'}),ann('E',{surgeon:'Dr Inconnu'}),ann('F',{date:'2026-11-21'}),ann('G',{},'Annulée')];
+ const booked=[{id:'R',patient:'Z',resource:'room',vacationId:'V',start:t('08:00'),end:t('09:00'),state:'Réservée'}];
+ const res=C.placeAnnouncements(day,stays.map(C.announcementOf),vac,booked);
+ const at=id=>res.placed.find(p=>p.stay===id);
+ assert.equal(at('A').start,t('09:00'));assert.equal(at('A').end,t('10:45'));assert.equal(at('A').vacationId,'V');
+ assert.equal(at('B').start,t('10:45'),'heure souhaitée prise, décalée après le patient précédent');
+ assert.equal(at('C').start,t('11:45'));assert.equal(at('C').overflow,60,'durée par défaut 60 min + 15 min de remise en état : fin 13 h, dépassement de 60 min');assert.equal(at('C').defaultDuration,true);
+ assert.equal(at('D').overflow,15);
+ assert.match(res.unplaced.find(u=>u.stay==='E').reason,/Aucune vacation de Dr Inconnu/);
+ assert.ok(!at('F')&&!at('G'),'autre jour ou annonce annulée : rien');
+ assert.equal(res.load.get('V').free,240-60-105-60-75);
+ // Une proposition confirmée devient une réservation valide (convocation possible ensuite) et n'est plus proposée.
+ const item=C.bookingFromAnnouncement(at('A'));assert.equal(C.bookingError(item,booked,resources,vacations.map(v=>v.id==='V'?{...v,end:t('12:00')}:v)),'');
+ assert.equal(item.source,'annonce');assert.equal(item.annonceRevision,1);
+ const again=C.placeAnnouncements(day,stays.map(C.announcementOf),vac,[...booked,item]);assert.ok(!again.placed.some(p=>p.stay==='A'));assert.equal(again.placed.find(p=>p.stay==='B').start,t('10:45'));
+ // Le chirurgien modifie ou annule ensuite son annonce : le programme confirmé le signale.
+ assert.equal(C.announcementDrift(item,C.announcementOf(ann('A',{}))),'');
+ assert.match(C.announcementDrift(item,C.announcementOf(ann('A',{date:'2026-11-23'},'Transmise',2))),/nouvelle date souhaitée le 23\/11\/2026/);
+ assert.match(C.announcementDrift(item,C.announcementOf(ann('A',{},'Annulée'))),/annulée/);
+ assert.equal(C.sameSurgeon('Dr Jean Dubois','dubois'),true);assert.equal(C.sameSurgeon('Dr Martin','Dr Dubois'),false);assert.equal(C.sameSurgeon('','Dr Dubois'),false);
+});

@@ -72,3 +72,17 @@ html body .bl-card h3 { margin: 0; font-size: 20px; font-weight: 620; letter-spa
 @media (max-width: 760px) { .bl-grid { --lane: 120px; } .bl-nav { width: 100%; } }
 html body .management .eyebrow { display: none; }
 .management.is-plan :is(.bl-intro, .bl-dates), .management.is-plan > .content > .management-toolbar { display: none; }
+/* Annonces chirurgicales placées dans la vacation du chirurgien (propositions à confirmer, sans convocation). */
+:is(.bl-case, .bl-legend i, .bl-tag).is-proposed { background: var(--i-s1); color: var(--i-acc-ink); border: 1.5px dashed var(--i-acc) !important; }
+.bl-case.is-proposed.is-overflow { background: var(--i-crit-soft); color: var(--i-crit); border-color: var(--i-crit) !important; }
+.bl-announced { margin-top: 24px; }
+.bl-potentiel { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; }
+.bl-potentiel small { display: block; margin-top: 5px; font-size: 12.5px; color: var(--i-mut); }
+.bl-bar i { display: flex; }
+.bl-bar b { flex: none; }
+.bl-bar b.is-announced { background: repeating-linear-gradient(135deg, var(--i-acc) 0 4px, transparent 4px 8px); border-radius: 0 4px 4px 0; }
+.bl-bar i.is-high b.is-announced { background: repeating-linear-gradient(135deg, var(--i-crit) 0 4px, transparent 4px 8px); }
+.bl-ann-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.bl-ann-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--i-line); border-radius: 10px; font-size: 14px; }
+.bl-ann-list li > span:not(.bl-tag) { color: var(--i-mut); flex: 1 1 220px; }
+.bl-tag.is-proposed { padding: 2px 8px; border-radius: 999px; }

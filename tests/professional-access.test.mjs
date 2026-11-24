@@ -126,3 +126,16 @@ test('visite pré-anesthésique : l’infirmier saisit le recueil, seul l’anes
  assert.equal((await f.call('owner','PUT','/document',change('stay/A/vpa',signed,2))).status,200);
  assert.equal((await f.call('nurse','PUT','/document',change('stay/A/vpa',{...signed,signed:null},3))).status,403);
 }finally{f.close()}});
+test('programme du bloc : le secrétariat reçoit les annonces du jour de son équipe, réduites aux champs de programmation',async()=>{
+ const f=fixture();try{
+  const ann=(procedure,date)=>({published:{state:'Transmise',revision:1,fields:{procedure,surgeon:'Dr Dubois',date,time:'09:00',duration:'45',urgency:'Programmée',mode:'Ambulatoire',laterality:'Droit',indication:'SECRET-INDICATION',notes:'SECRET-NOTES'}}});
+  f.put('stay/A/surgicalAnnouncement',ann('Geste A','2026-12-01'));f.put('stay/B/surgicalAnnouncement',ann('Geste B','2026-12-01'));
+  const r=await f.call('secretary','GET','/annonces-bloc?date=2026-12-01');assert.equal(r.status,200);
+  assert.deepEqual(r.data.annonces.map(a=>a.stay),['A']);assert.equal(r.data.annonces[0].surgeon,'Dr Dubois');assert.equal(r.data.annonces[0].duration,45);
+  assert.doesNotMatch(JSON.stringify(r.data),/SECRET/);
+  assert.equal((await f.call('secretary','GET','/annonces-bloc?date=2026-12-02')).data.annonces.length,0);
+  assert.equal((await f.call('secretary','GET','/annonces-bloc?date=demain')).status,400);
+  // Le secrétariat ne lit toujours pas l'annonce complète dans le dossier.
+  const all=await f.call('secretary','GET','');assert.ok(!all.data.documents.some(d=>d.key==='stay/A/surgicalAnnouncement'));
+ }finally{f.close()}
+});
