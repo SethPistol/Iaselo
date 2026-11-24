@@ -121,8 +121,11 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   const temporary=provisionalPassword();let id;try{id=await createAccount(pool,{email,name,passwordHash:await hashPassword(temporary)})}catch(e){return Response.json({error:/unique|duplicate/i.test(e.message)?'Un compte existe déjà avec cette adresse.':'Création impossible.'},{status:409})}
   await pool.query('UPDATE auth_users SET must_change_password=1 WHERE id=$1',[id]);
   await pool.query('UPDATE professional_profiles SET profession=$2,rpps=$3,updated_at=$4,updated_by=$5 WHERE user_id=$1',[id,profession,rpps,at,staff.id]);
-  if(teamId)await pool.query('INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,$2,$3)',[id,teamId,at]);
-  await log('allowed',id,reason,JSON.stringify({profession,team:teamId||null,rppsDeclared:!!rpps}));
+  // Sans équipe choisie (cas du formulaire), le compte est rattaché à toutes les équipes de soins actives
+  // pour voir les séjours dès sa première connexion ; l'administrateur peut ensuite révoquer un rattachement.
+  const teams=teamId?[teamId]:(await pool.query('SELECT id FROM care_teams WHERE active=1 ORDER BY id')).rows.map(r=>r.id);
+  for(const t of teams)await pool.query('INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,$2,$3)',[id,t,at]);
+  await log('allowed',id,reason,JSON.stringify({profession,teams,rppsDeclared:!!rpps}));
   return Response.json({created:true,userId:id,email,temporaryPassword:temporary});
  }
  async function mustChangePassword(request){return !!(await pendingSession(request))?.must_change_password}

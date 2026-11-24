@@ -25,6 +25,9 @@ test('créer un compte : administrateur seulement, mot de passe provisoire à ch
   const {rows:[u]}=await pool.query("SELECT u.must_change_password,u.password_hash,p.profession,m.role FROM auth_users u JOIN professional_profiles p ON p.user_id=u.id JOIN workspace_members m ON m.user_id=u.id WHERE u.email='jeanne.fictive@example.test'");
   assert.equal(u.must_change_password,1);assert.equal(u.profession,'infirmier');assert.equal(u.role,'reader');assert.doesNotMatch(u.password_hash,new RegExp(x.temporaryPassword));
   assert.equal((await call('POST','/api/admin/accounts',nouveau,admin)).status,409,'adresse déjà utilisée');
+  // Sans équipe choisie : rattaché à toutes les équipes actives.
+  const sans=await (await call('POST','/api/admin/accounts',{name:'Dr Sans Équipe',email:'sans.equipe@example.test',profession:'chirurgien',reason:'Test sans équipe'},admin)).json();
+  assert.deepEqual((await pool.query('SELECT team_id FROM professional_teams WHERE user_id=$1 ORDER BY team_id',[sans.userId])).rows.map(r=>r.team_id),['demo-clinique','endoscopie','sejour-medical']);
   // Première connexion : redirigé vers le changement de mot de passe, aucun dossier servi avant.
   const first=await login('jeanne.fictive@example.test',x.temporaryPassword);assert.equal(first.r.headers.get('Location'),'/mot-de-passe');
   assert.equal((await call('GET','/api/workspace',undefined,first.cookie)).status,401);
