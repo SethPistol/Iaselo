@@ -24,6 +24,11 @@ test('ouverture des salles : chaque partie signée par son métier, le jour mêm
   assert.equal((await signe(mar,'anesthesie',{comment:'RAS'})).status,200);
   const lu=await (await call('GET','/api/workspace/ouverture-salles?date='+today,undefined,mar)).json();
   assert.equal(R.etatSalle(lu.records,'S1').code,'ouverte');
+  assert.deepEqual(lu.parts,['infirmier','anesthesie']);assert.deepEqual(lu.records.map(r=>r.part).sort(),['anesthesie','infirmier'],'l’anesthésiste voit la partie infirmière');assert.equal(lu.canSign.infirmier,false,'en lecture seule');
+  // L'infirmière ne reçoit jamais la partie anesthésie.
+  const vuIde=await (await call('GET','/api/workspace/ouverture-salles?date='+today,undefined,ide)).json();
+  assert.deepEqual(vuIde.parts,['infirmier']);assert.deepEqual(vuIde.records.map(r=>r.part),['infirmier']);assert.ok(!JSON.stringify(vuIde).includes('RAS'),'remarques anesthésie absentes');
+  assert.equal(R.etatSalle(vuIde.records,'S1',vuIde.parts).code,'ouverte');assert.equal(R.etatSalle(vuIde.records,'S1',vuIde.parts).anesthesie,null);
   assert.equal((await call('GET','/api/workspace/ouverture-salles',undefined,sec)).status,403,'secrétariat hors bloc');
   assert.equal((await call('GET','/api/workspace/ouverture-salles',undefined,etage)).status,403,'infirmière d’étage hors bloc');
   assert.equal((await signe(etage,'infirmier')).status,403,'partie infirmière refusée à l’infirmière d’étage');

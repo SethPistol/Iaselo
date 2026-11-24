@@ -1,8 +1,9 @@
 // IASELO · ouverture des salles d'opération.
 //  GET  /api/workspace/ouverture-salles?date=AAAA-MM-JJ : salles du bloc et vérifications signées ce jour-là.
 //  POST /api/workspace/ouverture-salles : signe une partie (infirmière ou anesthésie) pour une salle, le jour même.
-//  Partie infirmière : infirmier(ère) de bloc (pas l'infirmier(ère) d'étage) ; partie anesthésie : profil anesthésiste. Lecture : soignants du bloc et
-//  administrateur. Les signatures ne sont jamais modifiées : une nouvelle vérification s'ajoute et fait foi.
+//  Partie infirmière : infirmier(ère) de bloc (pas l'infirmier(ère) d'étage) ; partie anesthésie : profil anesthésiste. Chacun ne signe que sa partie.
+//  Lecture : l'anesthésiste, le chirurgien et l'administrateur voient les deux parties (la partie infirmière en lecture seule pour
+//  l'anesthésiste) ; l'infirmier(ère) de bloc ne voit que la partie infirmière, la partie anesthésie ne lui est jamais envoyée. Les signatures ne sont jamais modifiées : une nouvelle vérification s'ajoute et fait foi.
 //  Aucune donnée patient. Chaque lecture et chaque signature sont tracées dans le journal des accès.
 import {randomUUID} from 'node:crypto';
 import regles from '../dist/ouverture-salles-regles.js';
@@ -10,6 +11,8 @@ import planningCore from '../dist/planning-core.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const LECTEURS=['anesthesiste','infirmier','chirurgien'];
 const TZ='Europe/Paris';
+// Parties qu'un profil peut lire : l'infirmier(ère) ne reçoit pas la partie anesthésie.
+export const partiesVisibles=acl=>!acl.isAdmin&&acl.job==='infirmier'?['infirmier']:['infirmier','anesthesie'];
 function aujourdhui(d=new Date()){const p=Object.fromEntries(new Intl.DateTimeFormat('fr-FR',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}`}
 async function salles(env){
  const row=await env.DB.prepare("SELECT data FROM workspace_documents WHERE key='management/planningResources'").first();
@@ -23,9 +26,10 @@ export async function staffOuvertureSallesApi(request,env,acl){
  const today=aujourdhui();
  if(request.method==='GET'){
   const date=url.searchParams.get('date')||today;if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return json({error:'Date invalide.'},400);
-  const records=((await env.DB.prepare('SELECT * FROM room_openings WHERE day=? ORDER BY at DESC').bind(date).all()).results||[]).map(ligne);
+  const parts=partiesVisibles(acl);
+  const records=((await env.DB.prepare('SELECT * FROM room_openings WHERE day=? ORDER BY at DESC').bind(date).all()).results||[]).filter(r=>parts.includes(r.part)).map(ligne);
   await acl.log('read','management/ouverture-salles','allowed','Ouverture des salles',date);
-  return json({date,today,rooms:await salles(env),records,canSign:{infirmier:acl.job==='infirmier'&&acl.bloc!==false,anesthesie:acl.job==='anesthesiste'}});
+  return json({date,today,rooms:await salles(env),records,parts,canSign:{infirmier:acl.job==='infirmier'&&acl.bloc!==false,anesthesie:acl.job==='anesthesiste'}});
  }
  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
  let d;try{d=await request.json()}catch{return json({error:'Requête illisible.'},400)}
