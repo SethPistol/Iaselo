@@ -1,4 +1,4 @@
-import {randomBytes,randomUUID,scrypt as scryptCb,timingSafeEqual,createHmac} from 'node:crypto';import {promisify} from 'node:util';import {recette,RECETTE_EMAIL,RECETTE_PASSWORD,RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD} from './config.mjs';
+import {randomBytes,randomUUID,scrypt as scryptCb,timingSafeEqual,createHmac} from 'node:crypto';import {promisify} from 'node:util';import {newSecret,verify as verifyTotp,mfaPage} from './mfa.mjs';import {recette,RECETTE_EMAIL,RECETTE_PASSWORD,RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD} from './config.mjs';
 const scrypt=promisify(scryptCb);
 export async function hashPassword(password){if(typeof password!=='string'||password.length<14||password.length>1024)throw Error('Mot de passe : entre 14 et 1024 caractères.');const salt=randomBytes(16).toString('hex'),key=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return 'scrypt$16384$'+salt+'$'+key.toString('hex')}
 export async function verifyPassword(password,hash){if(typeof password!=='string'||password.length>1024||!/^scrypt\$16384\$[a-f0-9]{32}\$[a-f0-9]{128}$/.test(hash||''))return false;const [,,salt,expected]=hash.split('$'),actual=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return timingSafeEqual(actual,Buffer.from(expected,'hex'))}
@@ -36,7 +36,7 @@ export async function createAuth(pool,cfg,{psc=null}={}){
  const fingerprint=v=>createHmac('sha256',cfg.sessionSecret).update(v).digest('hex'),cookieName=cfg.secure?'__Host-parcours_session':'parcours_session',dummy=await hashPassword(randomBytes(32).toString('hex'));
  const sessionCookie=(token,age)=>cookieName+'='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+age+(cfg.secure?'; Secure':'');
  function getToken(request){const value=(request.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);return /^[a-f0-9]{64}$/.test(value||'')?value:null}
- async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND u.enabled=1 AND p.active=1 AND u.must_change_password=0',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
+ async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND s.mfa_ok=1 AND u.enabled=1 AND p.active=1 AND u.must_change_password=0',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
  async function login(request){
   if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});
   const bytes=await request.arrayBuffer();if(bytes.byteLength>8192)return new Response('Requête trop volumineuse',{status:413});let d;try{const raw=new TextDecoder().decode(bytes);d=request.headers.get('Content-Type')?.includes('application/json')?JSON.parse(raw):Object.fromEntries(new URLSearchParams(raw))}catch{return new Response('Requête invalide',{status:400})}
@@ -46,10 +46,10 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   const passwordOK=await verifyPassword(d.password,account?.password_hash||dummy),ok=passwordOK&&account?.enabled===1&&account?.active===1;
   await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,ok?1:0]);
   if(!ok)return new Response(loginPage('Identifiants invalides ou compte désactivé.'),{status:401,headers:{'Content-Type':'text/html; charset=utf-8'}});
-  return openSession(account.id,'password',null,account.must_change_password?'/mot-de-passe':'/');
+  const mfa=mfaRequired(account.email);return openSession(account.id,'password',null,account.must_change_password?'/mot-de-passe':mfa?'/double-authentification':'/',mfa);
  }
- async function openSession(userId,method,idToken=null,location='/'){
-  const token=randomBytes(32).toString('hex'),at=new Date().toISOString();await pool.query('INSERT INTO auth_sessions(token_hash,user_id,expires_at,created_at,method,id_token) VALUES($1,$2,$3,$4,$5,$6)',[fingerprint(token),userId,new Date(Date.now()+cfg.sessionHours*3600000).toISOString(),at,method,idToken]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,userId,method==='psc'?'login-psc':'login']);
+ async function openSession(userId,method,idToken=null,location='/',mfaPending=false){
+  const token=randomBytes(32).toString('hex'),at=new Date().toISOString();await pool.query('INSERT INTO auth_sessions(token_hash,user_id,expires_at,created_at,method,id_token,mfa_ok) VALUES($1,$2,$3,$4,$5,$6,$7)',[fingerprint(token),userId,new Date(Date.now()+(mfaPending?Math.min(cfg.sessionHours,0.25):cfg.sessionHours)*3600000).toISOString(),at,method,idToken,mfaPending?0:1]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,userId,method==='psc'?'login-psc':'login']);
   return new Response(null,{status:303,headers:{Location:location,'Set-Cookie':sessionCookie(token,Math.floor(cfg.sessionHours*3600))}});
  }
  // Pro Santé Connect : le professionnel est reconnu par son RPPS, renseigné au préalable sur son compte
@@ -84,7 +84,7 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   return Response.json({unlocked:true});
  }
  // Changement de mot de passe (obligatoire à la première connexion d'un compte créé par l'administrateur).
- async function pendingSession(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT s.token_hash,s.user_id,u.password_hash,u.display_name,u.must_change_password FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
+ async function pendingSession(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT s.token_hash,s.user_id,s.mfa_ok,u.email,u.password_hash,u.display_name,u.must_change_password,u.totp_secret,u.totp_active,u.totp_last_step FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
  async function passwordPage(request){const s=await pendingSession(request);if(!s)return new Response(null,{status:303,headers:{Location:'/login'}});return html(changePasswordPage('',s.display_name,!!s.must_change_password))}
  const html=(body,status=200)=>new Response(body,{status,headers:{'Content-Type':'text/html; charset=utf-8'}});
  async function changePassword(request){
@@ -129,7 +129,43 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   return Response.json({created:true,userId:id,email,temporaryPassword:temporary});
  }
  async function mustChangePassword(request){return !!(await pendingSession(request))?.must_change_password}
- return {user,login,logout,lock,unlock,pscStart,pscCallback,passwordPage,mustChangePassword,changePassword,createAccountFromAdmin,pscEnabled:()=>!!psc?.enabled()};
+ // Étape suivante d'une connexion inachevée : mot de passe provisoire à changer, puis code à usage unique.
+ async function nextStep(request){const s=await pendingSession(request);return s?.must_change_password?'/mot-de-passe':s&&!s.mfa_ok?'/double-authentification':'/login'}
+ function mfaRequired(email){return !!cfg.mfa&&!(cfg.recette&&[RECETTE_EMAIL,RECETTE_CHIRURGIEN_EMAIL].includes(email))}
+ async function mfaStart(request){const s=await pendingSession(request);
+  if(!s)return new Response(null,{status:303,headers:{Location:'/login'}});if(s.must_change_password)return new Response(null,{status:303,headers:{Location:'/mot-de-passe'}});if(s.mfa_ok)return new Response(null,{status:303,headers:{Location:'/'}});
+  let secret=s.totp_secret;if(!s.totp_active&&!secret){secret=newSecret();await pool.query("UPDATE auth_users SET totp_secret=$1 WHERE id=$2 AND totp_active=0 AND totp_secret=''",[secret,s.user_id]);secret=(await pool.query('SELECT totp_secret FROM auth_users WHERE id=$1',[s.user_id])).rows[0].totp_secret}
+  return html(mfaPage({name:s.display_name,enroll:!s.totp_active,secret:s.totp_active?'':secret,email:s.email}))}
+ async function mfaVerify(request){
+  if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});
+  const s=await pendingSession(request);if(!s||s.must_change_password)return new Response(null,{status:303,headers:{Location:'/login'}});if(s.mfa_ok)return new Response(null,{status:303,headers:{Location:'/'}});
+  const bytes=await request.arrayBuffer();if(bytes.byteLength>2048)return new Response('Requête trop volumineuse',{status:413});
+  let d;try{d=Object.fromEntries(new URLSearchParams(new TextDecoder().decode(bytes)))}catch{return new Response('Requête invalide',{status:400})}
+  const identity=fingerprint('mfa:'+s.user_id),at=new Date().toISOString(),since=new Date(Date.now()-15*60000).toISOString(),page=(m,status)=>html(mfaPage({message:m,name:s.display_name,enroll:!s.totp_active,secret:s.totp_active?'':s.totp_secret,email:s.email}),status);
+  const step=verifyTotp(s.totp_secret,d.code,s.totp_last_step);
+  await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,step?1:0]);
+  if(!step){const n=Number((await pool.query('SELECT COUNT(*) AS n FROM auth_attempts WHERE identity_hash=$1 AND at>$2 AND success=0',[identity,since])).rows[0].n);
+   if(n>=5){await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'mfa-refused-logout']);return new Response(loginPage('Trop de codes erronés : reconnectez-vous.'),{status:401,headers:{'Content-Type':'text/html; charset=utf-8','Set-Cookie':sessionCookie('',0)}})}
+   return page('Code incorrect ou expiré ('+(5-n)+' essai'+(5-n>1?'s':'')+' restant'+(5-n>1?'s':'')+').',401)}
+  // Pas déjà consommé par une autre requête simultanée : refusé (rejeu).
+  const upd=await pool.query('UPDATE auth_users SET totp_active=1,totp_last_step=$1 WHERE id=$2 AND totp_last_step<$1',[step,s.user_id]);if(!upd.rowCount)return page('Code déjà utilisé : attendez le suivant.',401);
+  await pool.query('UPDATE auth_sessions SET mfa_ok=1,expires_at=$1 WHERE token_hash=$2',[new Date(Date.now()+cfg.sessionHours*3600000).toISOString(),s.token_hash]);
+  await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,s.totp_active?'login-mfa':'mfa-enrolled']);
+  return new Response(null,{status:303,headers:{Location:'/','Set-Cookie':sessionCookie(getToken(request),Math.floor(cfg.sessionHours*3600))}})}
+ // Réinitialisation par l'administrateur (téléphone perdu) : nouvelle inscription à la prochaine connexion, sessions fermées.
+ async function resetMfaFromAdmin(request){
+  if(!sameOrigin(request,cfg))return Response.json({error:'Origine refusée'},{status:403});
+  const staff=await user(request);if(!staff)return Response.json({error:'Connexion professionnelle requise.'},{status:401});
+  const at=new Date().toISOString(),admin=(await pool.query("SELECT 1 FROM workspace_members m JOIN professional_profiles p ON p.user_id=m.user_id WHERE m.user_id=$1 AND m.role='owner' AND p.active=1",[staff.id])).rows.length>0;
+  let d;try{d=await request.json()}catch{return Response.json({error:'Requête invalide'},{status:400})}
+  const target=String(d?.userId||''),reason=String(d?.reason||'').trim().slice(0,500);
+  const log=(result,why)=>pool.query('INSERT INTO professional_access_log(at,actor,action,target,result,reason) VALUES($1,$2,$3,$4,$5,$6)',[at,staff.id,'mfa-reset',target,result,why]);
+  if(!admin){await log('denied','Réinitialisation hors administration');return Response.json({error:'Réinitialisation réservée à l’administrateur.'},{status:403})}
+  if(reason.length<5)return Response.json({error:'Indiquez un motif de cinq caractères au minimum.'},{status:400});
+  const r=await pool.query("UPDATE auth_users SET totp_secret='',totp_active=0,totp_last_step=0 WHERE id=$1",[target]);if(!r.rowCount)return Response.json({error:'Compte introuvable.'},{status:404});
+  await pool.query('DELETE FROM auth_sessions WHERE user_id=$1',[target]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,target,'mfa-reset']);await log('allowed',reason);
+  return Response.json({reset:true})}
+ return {user,login,logout,lock,unlock,pscStart,pscCallback,passwordPage,mustChangePassword,nextStep,mfaStart,mfaVerify,resetMfaFromAdmin,changePassword,createAccountFromAdmin,pscEnabled:()=>!!psc?.enabled()};
 }
 export function changePasswordPage(message='',name='',required=true){const e=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mot de passe · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px;font:16px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif;color:#0C1A25;background:#F3F5F8}
@@ -176,4 +212,4 @@ button:hover{background:#0B3D49}button:focus-visible{outline:3px solid #0F4D5C;o
 <div><h1>Le parcours de chaque patient, d’un seul regard.</h1><p>De l’annonce chirurgicale au suivi, toute l’équipe travaille dans le même dossier : consultation, bloc, réveil, hospitalisation et sortie.</p>
 <ul class="etapes"><li>Annonce</li><li>Consultation</li><li>Préparation</li><li>Bloc</li><li>SSPI</li><li>Hospitalisation</li><li>Sortie</li><li>Suivi</li></ul></div>
 <p class="pied">Données de santé hébergées en France chez un hébergeur certifié HDS.</p></section>
-<div class="acces"><main><img class="etab" src="/assets/marque/etablissement.webp" alt="Clinique du Trocadéro" width="369" height="200"><div><h2>Connexion</h2><p class="sous">Espace des professionnels de l’établissement.</p></div><p class="error" role="alert">${message}</p>${test?`<p class="recette"><strong>Serveur de recette · patients fictifs uniquement.</strong> Compte de test : <code>${RECETTE_EMAIL}</code> · mot de passe <code>${RECETTE_PASSWORD}</code><br>Profil chirurgien : <code>${RECETTE_CHIRURGIEN_EMAIL}</code> · mot de passe <code>${RECETTE_CHIRURGIEN_PASSWORD}</code></p>`:''}<form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required${test?` value="${RECETTE_EMAIL}"`:''}></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form>${psc?`<a class="psc" href="/auth/psc/start">Se connecter avec Pro Santé Connect</a><p class="note">Carte CPS ou application e-CPS. Votre RPPS doit être renseigné sur votre compte.</p>`:''}<p class="note">Patients : utilisez le lien personnel qui vous a été remis. Prototype réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></div></body></html>`}
+<div class="acces"><main><img class="etab" src="/assets/marque/etablissement.webp" alt="Clinique du Trocadéro" width="369" height="200"><div><h2>Connexion</h2><p class="sous">Espace des professionnels de l’établissement.</p></div><p class="error" role="alert">${message}</p>${test?`<p class="recette"><strong>Serveur de recette · patients fictifs uniquement.</strong> Les identifiants de test sont communiqués par l’équipe IASELO.</p>`:''}<form method="post" action="/auth/login"><label>E-mail professionnel<input type="email" name="email" autocomplete="username" required></label><label>Mot de passe<input type="password" name="password" autocomplete="current-password" minlength="14" maxlength="1024" required></label><button>Se connecter</button></form>${psc?`<a class="psc" href="/auth/psc/start">Se connecter avec Pro Santé Connect</a><p class="note">Carte CPS ou application e-CPS. Votre RPPS doit être renseigné sur votre compte.</p>`:''}<p class="note">Patients : utilisez le lien personnel qui vous a été remis. Prototype réservé aux données fictives jusqu’à sa validation clinique et organisationnelle.</p></main></div></body></html>`}

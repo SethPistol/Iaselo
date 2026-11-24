@@ -15,7 +15,8 @@
     "password:hash": "node scripts/password-hash.mjs",
     "user:create": "node --env-file-if-exists=.env scripts/create-user.mjs",
     "user:password": "node --env-file-if-exists=.env scripts/reset-password.mjs",
-    "postinstall": "npm run build"
+    "postinstall": "npm run build",
+    "user:mfa-reset": "node --env-file-if-exists=.env scripts/reset-mfa.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1173.0",

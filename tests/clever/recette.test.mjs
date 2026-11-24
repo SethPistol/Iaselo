@@ -48,7 +48,7 @@ test('recette : compte chirurgien de test, profil chirurgien, jamais hors recett
   await pool.query('UPDATE professional_profiles SET active=0 WHERE user_id=$1',[rows[0].id]);await bootstrap(pool,{IASELO_RECETTE:'true'});
   assert.equal((await pool.query('SELECT active FROM professional_profiles WHERE user_id=$1',[rows[0].id])).rows[0].active,0);
  }finally{await db.close()}
- assert.match(loginPage('',true),/chirurgien@iaselo\.test/);assert.doesNotMatch(loginPage('',false),/chirurgien@iaselo|Chirurgien IASELO/);
+ assert.doesNotMatch(loginPage('',true),/chirurgien@iaselo|Chirurgien IASELO|demo@iaselo|Recette IASELO/,'audit 24/11 : aucun identifiant affiché sur la page publique');assert.doesNotMatch(loginPage('',false),/chirurgien@iaselo|Chirurgien IASELO/);
 });
 test('recette : le chirurgien de test se connecte et voit les dossiers fictifs avec son profil',async()=>{
  const db=new PGlite(),pool=pgPool(db),origin='http://localhost:8080',env={NODE_ENV:'test',BASE_URL:origin,SESSION_SECRET:'test-only-secret-with-at-least-32-characters',IASELO_RECETTE:'true'};
@@ -59,5 +59,22 @@ test('recette : le chirurgien de test se connecte et voit les dossiers fictifs a
   assert.equal((await call('POST','/api/workspace/seed',{documents:[{key:'stay/DEMO1/core',data:{id:'DEMO1',careTeamId:'demo-clinique',identity:{lastName:'FICTIF',firstName:'Test'}}}]},admin)).status,200);
   const r=await (await call('GET','/api/workspace',undefined,chir)).json();
   assert.equal(r.access.profile.profession,'chirurgien');assert.equal(r.role,'editor');assert.ok(r.documents.some(d=>/^stay\/.+\/core$/.test(d.key)),'dossiers fictifs visibles');
+ }finally{await db.close()}
+});
+test('audit 24/11 : une signature est toujours attribuée à la personne connectée',async()=>{
+ const db=new PGlite(),pool=pgPool(db),origin='http://localhost:8080',env={NODE_ENV:'test',BASE_URL:origin,SESSION_SECRET:'test-only-secret-with-at-least-32-characters',IASELO_RECETTE:'true'};
+ try{await migrate(pool);await bootstrap(pool,env);const app=await makeApp({pool,bucket:{async put(){},async get(){return null}},cfg:config(env)});
+  const call=(method,route,data,cookie)=>app(new Request(origin+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},...(data!==undefined?{body:JSON.stringify(data)}:{})}));
+  const login=async(e,p)=>(await call('POST','/auth/login',{email:e,password:p})).headers.get('Set-Cookie').split(';')[0];
+  const admin=await login(RECETTE_EMAIL,RECETTE_PASSWORD),chir=await login(RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD);
+  assert.equal((await call('POST','/api/workspace/seed',{documents:[{key:'stay/DEMO1/core',data:{id:'DEMO1',careTeamId:'demo-clinique',identity:{lastName:'FICTIF',firstName:'Test'}}}]},admin)).status,200);
+  const anesth=(await (await call('GET','/api/workspace',undefined,admin)).json()).access.profile,me=(await (await call('GET','/api/workspace',undefined,chir)).json()).access.profile;
+  const usurpe={draft:{x:1},signed:{at:'2026-11-24T08:00:00.000Z',name:anesth.display_name,userId:anesth.user_id,rpps:'10000000000',hash:'abc'}};
+  const r=await call('PUT','/api/workspace/document',{key:'stay/DEMO1/prescriptionsPreop',revision:0,data:usurpe,operation:crypto.randomUUID(),reason:'test audit'},chir);assert.equal(r.status,200);
+  const signed=(await r.json()).document.data.signed;
+  assert.equal(signed.userId,me.user_id);assert.equal(signed.name,me.display_name);assert.equal(signed.rpps,me.rpps||'');assert.equal(signed.hash,'abc');
+  // CRO validé : le nom du valideur est celui du compte connecté.
+  const c=await call('PUT','/api/workspace/document',{key:'stay/DEMO1/cro',revision:0,data:{text:'x',status:'validé',validatedBy:'Dr Quelqu’un d’autre',validatedAt:'2026-11-24T08:00:00.000Z'},operation:crypto.randomUUID(),reason:'test audit'},chir);
+  assert.equal((await c.json()).document.data.validatedBy,me.display_name);
  }finally{await db.close()}
 });

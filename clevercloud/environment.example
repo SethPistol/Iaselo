@@ -10,3 +10,4 @@ ENABLE_DEMO_SEED=false
 # Le reste est automatique (adresse validée dans Brevo, nom SMS déduit de l'établissement).
 # Facultatif : BREVO_SENDER_EMAIL, BREVO_SENDER_NAME, BREVO_SMS_SENDER, ETABLISSEMENT_NOM,
 # MESSAGING_ALLOWED_RECIPIENTS (restreint les envois à une liste).
+# Double authentification : toujours exigée en production. En recette, MFA_OBLIGATOIRE=true pour l'essayer.
