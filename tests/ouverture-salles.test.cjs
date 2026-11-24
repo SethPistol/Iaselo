@@ -28,4 +28,7 @@ test('ouverture : état de la salle selon la dernière signature de chaque parti
  assert.equal(R.etatSalle(refait,'S1').code,'ouverte','la vérification refaite fait foi');
  assert.equal(R.etatSalle([r('S1','anesthesie','non-operationnelle','2026-11-24T06:10')],'S1').code,'non-operationnelle');
  const s=R.resume(refait,[{id:'S1'},{id:'S2'}]);assert.equal(s.ouvertes,1);assert.equal(s.total,2);
+ // Vue infirmière : l'état ne porte que sur la partie infirmière.
+ assert.equal(R.etatSalle([r('S1','infirmier','operationnelle','2026-11-24T06:00')],'S1',['infirmier']).code,'ouverte');
+ assert.equal(R.etatSalle([],'S1',['infirmier']).label,'Partie infirmière à faire');
 });

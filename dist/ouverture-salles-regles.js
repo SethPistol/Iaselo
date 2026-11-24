@@ -29,13 +29,15 @@ function erreur(part,saisie){
  return '';
 }
 // État d'une salle pour une journée, à partir des signatures (la plus récente de chaque partie compte).
-function etatSalle(records,room){
+// parts : parties visibles par le profil (l'infirmier(ère) ne voit que la partie infirmière : l'état ne porte alors que sur elle).
+function etatSalle(records,room,parts){
  const dernier=part=>records.filter(r=>r.room===room&&r.part===part).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0]||null;
  const inf=dernier('infirmier'),ane=dernier('anesthesie');
  const ko=[inf,ane].some(r=>r&&r.conclusion==='non-operationnelle');
+ if(Array.isArray(parts)&&!parts.includes('anesthesie')){const code=ko?'non-operationnelle':inf?'ouverte':'a-faire';return {code,label:{ouverte:'Partie infirmière signée','non-operationnelle':'Salle non opérationnelle','a-faire':'Partie infirmière à faire'}[code],infirmier:inf,anesthesie:null}}
  const code=ko?'non-operationnelle':inf&&ane?'ouverte':inf||ane?'partielle':'a-faire';
  return {code,label:{ouverte:'Salle ouverte','non-operationnelle':'Salle non opérationnelle',partielle:'Ouverture en cours','a-faire':'À ouvrir'}[code],infirmier:inf,anesthesie:ane};
 }
-function resume(records,rooms){const etats=rooms.map(r=>({room:r,...etatSalle(records,r.id)}));return {etats,ouvertes:etats.filter(e=>e.code==='ouverte').length,bloquees:etats.filter(e=>e.code==='non-operationnelle').length,total:rooms.length}}
+function resume(records,rooms,parts){const etats=rooms.map(r=>({room:r,...etatSalle(records,r.id,parts)}));return {etats,ouvertes:etats.filter(e=>e.code==='ouverte').length,bloquees:etats.filter(e=>e.code==='non-operationnelle').length,total:rooms.length}}
 return {PARTIES,ETATS,CONCLUSIONS,erreur,etatSalle,resume};
 });
