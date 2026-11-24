@@ -206,7 +206,9 @@ function surgeryAnnouncement(){
  const saved=stay.surgicalAnnouncement||{};
  const published=saved.published;
  const write=role==='Chirurgien';
- const initial={mode:stay.mode,surgeon:activeDoctor==='med-c'?'Dr Dubois':''};
+ const me=(()=>{try{return professionalWorkspace?.getAccess?.()?.profile}catch{return null}})();
+ const initial={mode:stay.mode,surgeon:me?.profession==='chirurgien'&&me.display_name?me.display_name:activeDoctor==='med-c'?'Dr Dubois':''};
+ const bloc=(()=>{try{return clinicManagement}catch{return null}})();
  const draft=saved.draft||published?.fields||initial;
  const transmitted=published?`<section class="surgery-announcement-summary">
    <div class="row"><h4>Annonce ${published.state.toLowerCase()}</h4><span class="pill ${published.state==='Transmise'?'good':'warn'}">${esc(published.state)}</span></div>
@@ -217,9 +219,15 @@ function surgeryAnnouncement(){
     return `<div class="answer"><dt>${esc(label)}</dt><dd class="preserve">${esc(value)}</dd></div>`;
    }).join('')}</dl>
   </section>`:'<p class="muted">Aucune annonce transmise pour ce séjour.</p>';
+ const pl=published?.state==='Transmise'&&bloc?.placement?bloc.placement(stay.id):null,hm=v=>String(v||'').slice(11,16);
+ const programme=published?.state!=='Transmise'?'':!published.fields.date?'<p class="notice">Programme du bloc : indiquez la date opératoire souhaitée pour que le patient apparaisse dans votre vacation.</p>'
+  :pl?.booked?`<p class="notice good">Programme du bloc : confirmé le ${esc(frDate(pl.booked.start.slice(0,10)))} à ${esc(hm(pl.booked.start))} · ${esc(pl.room(pl.booked.resource))}.</p>`
+  :pl?.placed?`<p class="notice ${pl.placed.overflow>0?'warn':''}">Programme du bloc : placé dans la vacation de ${esc(pl.placed.surgeon)} le ${esc(frDate(pl.placed.start.slice(0,10)))} vers ${esc(hm(pl.placed.start))} · ${esc(pl.room(pl.placed.resource))}${pl.placed.overflow>0?` · <strong>la vacation est pleine (dépassement de ${pl.placed.overflow} min)</strong>`:''}. En attente de confirmation par la régulation du bloc.</p>`
+  :pl?.unplaced?`<p class="notice warn">Programme du bloc : ${esc(pl.unplaced.reason)}</p>`:'';
  $('#content').innerHTML=`<h3>Annonce chirurgicale</h3>
  <p class="muted">Séjour ${esc(stay.id)} · ${esc(stay.specialty)}. Les annonces transmises sont visibles par l’équipe dans le dossier de démonstration de démonstration.</p>
  ${transmitted}
+ ${programme}
  ${write?`<form id="surgical-form" class="workflow-form">
   <h4>${saved.draft?'Brouillon enregistré':published?'Préparer une nouvelle version':'Préparer l’annonce'}</h4>
   <p class="muted">Pour transmettre l’annonce, renseignez l’intervention, le chirurgien, la latéralité, l’urgence et le mode de prise en charge. La date et l’heure sont souhaitées.</p>
@@ -232,6 +240,8 @@ function surgeryAnnouncement(){
  <form id="cancel-surgical-form"><label>Motif de l’annulation<input name="reason" required maxlength="250"></label><button class="secondary">Confirmer l’annulation</button></form>
  </details>`:''}`:'<p class="muted">Lecture seule · la saisie de l’annonce est réservée au profil chirurgien.</p>'}`;
  if(!write)return;
+ const sIn=$('#surgical-form input[name="surgeon"]'),names=bloc?.surgeonNames?.()||[];
+ if(sIn&&names.length){sIn.setAttribute('list','surgical-surgeons');sIn.insertAdjacentHTML('afterend',`<datalist id="surgical-surgeons">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`)}
  $('#surgical-form').onsubmit=e=>{
   e.preventDefault();
   if(role!=='Chirurgien'||p()!==stay)return;
@@ -248,13 +258,14 @@ function surgeryAnnouncement(){
   }
   if(sending){
    const revision=(published?.revision||0)+1;
-   stay.surgicalAnnouncement={published:{fields,state:'Transmise',at:new Date().toLocaleString('fr-FR'),revision}};
+   stay.surgicalAnnouncement={published:{fields,state:'Transmise',at:new Date().toLocaleString('fr-FR'),sentAt:published?.sentAt||new Date().toISOString(),revision}};
    event(`Annonce chirurgicale transmise (v${revision}) · ${fields.procedure} · ${fields.surgeon}`,'Annonce chirurgicale');
   }else{
    stay.surgicalAnnouncement={...saved,draft:fields};
   }
   surgeryAnnouncement();
-  toast(sending?'Annonce visible par l’équipe dans le dossier de démonstration':'Brouillon chirurgical enregistré');
+  const after=sending&&bloc?.placement?bloc.placement(stay.id):null;
+  toast(!sending?'Brouillon chirurgical enregistré':after?.placed?'Annonce transmise · patient placé au programme du bloc ('+after.placed.start.slice(11,16)+'), à confirmer par la régulation':after?.unplaced?'Annonce transmise · '+after.unplaced.reason:'Annonce transmise à l’équipe');
  };
  const cancel=$('#cancel-surgical-form');
  if(cancel)cancel.onsubmit=e=>{
