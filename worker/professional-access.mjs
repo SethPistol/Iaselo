@@ -31,6 +31,8 @@ export async function professionalAccess(env,request,user,member,at){
  const teams=(await DB.prepare('SELECT t.id,t.label,m.valid_from,m.valid_until FROM care_teams t JOIN professional_teams m ON m.team_id=t.id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?) ORDER BY t.label').bind(user,at,at).all()).results;
  const stays=(await DB.prepare('SELECT DISTINCT s.stay_id FROM stay_teams s JOIN professional_teams m ON s.team_id=m.team_id JOIN care_teams t ON t.id=s.team_id WHERE m.user_id=? AND t.active=1 AND m.valid_from<=? AND (m.valid_until IS NULL OR m.valid_until>?) AND s.valid_from<=? AND (s.valid_until IS NULL OR s.valid_until>?)').bind(user,at,at,at,at).all()).results;
  const allowed=new Set(stays.map(x=>x.stay_id)),job=profile.profession,active=!!profile.active,clinical=['anesthesiste','chirurgien','infirmier','pharmacien','dim'].includes(job);
+ // Infirmier(ère) : poste « bloc » (check-list HAS, ouverture des salles) ou « étage » (sans ces deux éléments). Sans poste renseigné : étage.
+ const poste=job==='infirmier'?(profile.poste==='bloc'?'bloc':'etage'):'',bloc=job!=='infirmier'||poste==='bloc';
  if(!active||['unassigned','administration'].includes(job))allowed.clear();
  const epoch=(await DB.prepare('SELECT revision FROM professional_policy_revision WHERE id=1').first()).revision;
  const globalRead={planningResources:['anesthesiste','chirurgien','infirmier','secretariat'],vacations:['anesthesiste','chirurgien','infirmier','secretariat'],reservations:['anesthesiste','chirurgien','infirmier','secretariat'],acts:['anesthesiste','chirurgien','dim','facturation'],lots:['anesthesiste','chirurgien','infirmier','pharmacien'],movements:['anesthesiste','chirurgien','infirmier','pharmacien'],pmsi:['dim','anesthesiste','chirurgien'],invoices:['facturation'],patientDrafts:[]};
@@ -60,7 +62,7 @@ export async function professionalAccess(env,request,user,member,at){
    if(module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='droitsRgpd')return (['anesthesiste','chirurgien'].includes(job)||isAdmin)&&Array.isArray(data);
    // Modules issus de la veille marché : statut bloc, check-list HAS, suivi J+1 (soignants) ; aide CPA (anesthésiste) ; envois DMP/MSSanté (médecins).
-   if(['checklistBloc','blocStatut','suiviAmbu','bionettoyage'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   if(['checklistBloc','blocStatut','suiviAmbu','bionettoyage'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&(module!=='checklistBloc'||bloc)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    // Prescriptions préopératoires de la consultation : rédigées et signées par un médecin du séjour.
    if(module==='prescriptionsPreop')return ['anesthesiste','chirurgien'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    // Visite pré-anesthésique : l'anesthésiste remplit, conclut et signe ; l'infirmier saisit le recueil sans toucher à la conclusion, à la signature ni aux versions.
@@ -146,7 +148,7 @@ export async function professionalAccess(env,request,user,member,at){
  }
  function planningOccupancy(rows){return canRead('management/planningResources')?(rows||[]).filter(r=>planningCore.active(r)&&!allowed.has(r.patient)).flatMap(r=>planningCore.allocations(r).filter(planningCore.interval).map(a=>({resource:a.resource,start:a.start,end:a.end,current:r.state==='Occupée'&&planningCore.currentResource(r)===a.resource}))):[];}
  function policyGuard(){return DB.prepare('INSERT INTO workspace_write_checks(operation,valid) VALUES(?,CASE WHEN (SELECT revision FROM professional_policy_revision WHERE id=1)=? THEN 1 ELSE 0 END)').bind('policy-'+crypto.randomUUID(),epoch);}
- return {get planningError(){return nursingError||planningError},profile:{...profile,isAdmin},teams,allowed,epoch,active,job,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,policyGuard,log,fileReferences};
+ return {get planningError(){return nursingError||planningError},profile:{...profile,poste,isAdmin},teams,allowed,epoch,active,job,poste,bloc,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,policyGuard,log,fileReferences};
 }
 export {professions};
 export async function professionalRoutes(acl,request,env,json,body){
@@ -178,9 +180,10 @@ export async function professionalRoutes(acl,request,env,json,body){
  if(path==='/api/workspace/access/account'){
   const existing=await DB.prepare('SELECT * FROM professional_profiles WHERE user_id=?').bind(d.userId||'').first();
   if(!existing||!Object.hasOwn(professions,d.profession)||typeof d.active!=='boolean'||d.userId===user&&!d.active)return json({error:'Compte, métier ou état invalide. Le propriétaire ne peut pas désactiver son propre compte.'},400);
+  const poste=d.profession==='infirmier'?String(d.poste||existing.poste||'etage'):'';if(poste&&!['bloc','etage'].includes(poste))return json({error:'Poste infirmier invalide : bloc ou étage.'},400);
   const rpps=String(d.rpps||'').trim();if(rpps&&!/^1\d{10}$/.test(rpps))return json({error:'RPPS déclaratif invalide : onze chiffres commençant par 1 attendus.'},400);
   if(rpps&&await DB.prepare('SELECT user_id FROM professional_profiles WHERE rpps=? AND user_id<>?').bind(rpps,d.userId).first())return json({error:'Ce RPPS est déjà renseigné sur un autre compte.'},409);
-  await DB.prepare('UPDATE professional_profiles SET profession=?,active=?,rpps=?,updated_at=?,updated_by=? WHERE user_id=?').bind(d.profession,d.active?1:0,rpps,now,user,d.userId).run();await acl.log('account-permissions',d.userId,'allowed',reason,JSON.stringify({before:{profession:existing.profession,active:!!existing.active,rppsDeclared:!!existing.rpps},after:{profession:d.profession,active:d.active,rppsDeclared:!!rpps}}));return json({saved:true});
+  await DB.prepare('UPDATE professional_profiles SET profession=?,active=?,rpps=?,updated_at=?,updated_by=? WHERE user_id=?').bind(d.profession,d.active?1:0,rpps,now,user,d.userId).run();if(Object.hasOwn(existing,'poste'))await DB.prepare('UPDATE professional_profiles SET poste=? WHERE user_id=?').bind(poste,d.userId).run();await acl.log('account-permissions',d.userId,'allowed',reason,JSON.stringify({before:{profession:existing.profession,poste:existing.poste||'',active:!!existing.active,rppsDeclared:!!existing.rpps},after:{profession:d.profession,poste,active:d.active,rppsDeclared:!!rpps}}));return json({saved:true});
  }
  if(path==='/api/workspace/access/team'){
   const label=String(d.label||'').trim();if(label.length<3||label.length>120)return json({error:'Nom d’équipe requis.'},400);const id=crypto.randomUUID();await DB.prepare('INSERT INTO care_teams(id,label,active) VALUES(?,?,1)').bind(id,label).run();await acl.log('team-create',id,'allowed',reason,label);return json({saved:true,id});

@@ -11,19 +11,20 @@ test('créer un compte : administrateur seulement, mot de passe provisoire à ch
   const call=(method,route,data,cookie,{o=origin,form=false}={})=>app(new Request(origin+route,{method,redirect:'manual',headers:{Origin:o,'Content-Type':form?'application/x-www-form-urlencoded':'application/json',...(cookie?{Cookie:cookie}:{})},...(data!==undefined?{body:form?new URLSearchParams(data).toString():JSON.stringify(data)}:{})}));
   const login=async(email,password)=>{const r=await call('POST','/auth/login',{email,password});return {r,cookie:r.headers.get('Set-Cookie')?.split(';')[0]}};
   const admin=(await login(RECETTE_EMAIL,RECETTE_PASSWORD)).cookie,chir=(await login(RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD)).cookie;
-  const nouveau={name:'Dr Jeanne Fictive',email:'Jeanne.Fictive@example.test',profession:'infirmier',teamId:'demo-clinique',reason:'Arrivée dans le service'};
+  const nouveau={name:'Dr Jeanne Fictive',email:'Jeanne.Fictive@example.test',profession:'infirmier',poste:'bloc',teamId:'demo-clinique',reason:'Arrivée dans le service'};
   // Refus : sans connexion, non administrateur, autre origine, données invalides.
   assert.equal((await call('POST','/api/admin/accounts',nouveau)).status,401);
   assert.equal((await call('POST','/api/admin/accounts',nouveau,chir)).status,403);
   assert.equal((await call('POST','/api/admin/accounts',nouveau,admin,{o:'https://pirate.example'})).status,403);
   assert.equal((await call('POST','/api/admin/accounts',{...nouveau,profession:'owner'},admin)).status,400);
   assert.equal((await call('POST','/api/admin/accounts',{...nouveau,reason:''},admin)).status,400);
+  assert.equal((await call('POST','/api/admin/accounts',{...nouveau,poste:'reanimation'},admin)).status,400,'poste infirmier inconnu');
   assert.equal((await call('POST','/api/admin/accounts',{...nouveau,teamId:'inconnue'},admin)).status,400);
   assert.equal((await pool.query("SELECT COUNT(*) AS n FROM professional_access_log WHERE action='account-create' AND result='denied'")).rows[0].n,1);
   // Création.
   let r=await call('POST','/api/admin/accounts',nouveau,admin);const x=await r.json();assert.equal(r.status,200,JSON.stringify(x));assert.equal(x.email,'jeanne.fictive@example.test');assert.match(x.temporaryPassword,/^[a-z2-9-]{23}$/);
-  const {rows:[u]}=await pool.query("SELECT u.must_change_password,u.password_hash,p.profession,m.role FROM auth_users u JOIN professional_profiles p ON p.user_id=u.id JOIN workspace_members m ON m.user_id=u.id WHERE u.email='jeanne.fictive@example.test'");
-  assert.equal(u.must_change_password,1);assert.equal(u.profession,'infirmier');assert.equal(u.role,'reader');assert.doesNotMatch(u.password_hash,new RegExp(x.temporaryPassword));
+  const {rows:[u]}=await pool.query("SELECT u.must_change_password,u.password_hash,p.profession,p.poste,m.role FROM auth_users u JOIN professional_profiles p ON p.user_id=u.id JOIN workspace_members m ON m.user_id=u.id WHERE u.email='jeanne.fictive@example.test'");
+  assert.equal(u.must_change_password,1);assert.equal(u.profession,'infirmier');assert.equal(u.poste,'bloc');assert.equal(u.role,'reader');assert.doesNotMatch(u.password_hash,new RegExp(x.temporaryPassword));
   assert.equal((await call('POST','/api/admin/accounts',nouveau,admin)).status,409,'adresse déjà utilisée');
   // Sans équipe choisie : rattaché à toutes les équipes actives.
   const sans=await (await call('POST','/api/admin/accounts',{name:'Dr Sans Équipe',email:'sans.equipe@example.test',profession:'chirurgien',reason:'Test sans équipe'},admin)).json();
@@ -37,7 +38,7 @@ test('créer un compte : administrateur seulement, mot de passe provisoire à ch
   assert.equal((await call('POST','/auth/password',{current:x.temporaryPassword,password:'trop court',confirm:'trop court'},first.cookie,{form:true})).status,400);
   assert.equal((await call('POST','/auth/password',{current:x.temporaryPassword,password:'Nouveau mot de passe 2026',confirm:'Autre mot de passe 2026'},first.cookie,{form:true})).status,400);
   r=await call('POST','/auth/password',{current:x.temporaryPassword,password:'Nouveau mot de passe 2026',confirm:'Nouveau mot de passe 2026'},first.cookie,{form:true});assert.equal(r.status,303);assert.equal(r.headers.get('Location'),'/');
-  const ws=await (await call('GET','/api/workspace',undefined,first.cookie)).json();assert.equal(ws.access.profile.profession,'infirmier');
+  const ws=await (await call('GET','/api/workspace',undefined,first.cookie)).json();assert.equal(ws.access.profile.profession,'infirmier');assert.equal(ws.access.profile.poste,'bloc');
   assert.equal((await login('jeanne.fictive@example.test',x.temporaryPassword)).r.status,401,'ancien mot de passe provisoire refusé');
   assert.equal((await login('jeanne.fictive@example.test','Nouveau mot de passe 2026')).r.headers.get('Location'),'/');
   const {rows:[trace]}=await pool.query("SELECT reason,detail FROM professional_access_log WHERE action='account-create' AND result='allowed'");assert.equal(trace.reason,'Arrivée dans le service');assert.doesNotMatch(trace.detail,new RegExp(x.temporaryPassword));
