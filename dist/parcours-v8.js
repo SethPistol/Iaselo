@@ -2252,6 +2252,10 @@ if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule
 // Feuille d’anesthésie : sans droit de saisie (chirurgien, autres profils), on n’affiche pas un formulaire grisé.
 {const detailBeforePeriEntry=detail;detail=function(){detailBeforePeriEntry();if(tab!=='perop'||periCanWrite('Surveillance'))return;const entry=document.querySelector('#content .peri-entry');if(entry)entry.outerHTML='<p class="notice no-print peri-readonly">Feuille d’anesthésie en lecture seule pour votre profil : la saisie est réservée à l’anesthésiste, et aux constantes pour l’infirmier.</p>'}}
 
+// Activité & occupation (dist/indicateurs.js) : chiffres agrégés pour l'administration, calculés par le serveur.
+const indicateursModule=window.createIndicateurs?.({$,esc,toast,sectors:serviceSectors,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(view==='indicateurs'){closeCroDictation();indicateursModule.render();return}renderBeforeIndicateurs()}}
+
 // Accès direct au plan de soins du séjour sélectionné.
 if($('#open-nursing-record'))$('#open-nursing-record').onclick=()=>{
  if(view==='patients'&&tab==='consult'&&p())captureConsult();

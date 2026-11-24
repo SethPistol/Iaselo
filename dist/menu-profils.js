@@ -15,11 +15,11 @@ const MENUS={
  pharmacien:['controle','patients','pharmacy','tasks'],
  dim:['patients','pmsi','activity','tasks'],
  facturation:['patients','activity','billing'],
- administration:['professionalAccess','droits'],
+ administration:['indicateurs','professionalAccess','droits'],
  unassigned:['professionalAccess']
 };
 // Administrateur des habilitations : gestion de la clinique en plus de son métier.
-const ADMIN=['professionalAccess','pilotage','droits','activity','billing'];
+const ADMIN=['indicateurs','professionalAccess','pilotage','droits','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
 function menuPourProfil(profession,isAdmin){
@@ -47,7 +47,7 @@ function installer(doc){
    if(lien&&visibles.has('professionalAccess'))lien.remove();
    // Écran courant retiré du menu : ouvrir la première entrée du profil (une seule fois par profil).
    const actif=aside.querySelector('.nav.active');
-   if(redirige!==job){redirige=job;if(!actif||actif.classList.contains('menu-masque')){const premier=[...aside.querySelectorAll('.nav[data-view]')].find(b=>!b.classList.contains('menu-masque')&&!b.hidden&&visibles.has(b.dataset.view));if(premier)setTimeout(()=>premier.click(),0)}}
+   if(redirige!==job){redirige=job;if(!actif||actif.classList.contains('menu-masque')){const premier=[...visibles].map(v=>aside.querySelector('.nav[data-view="'+v+'"]')).find(b=>b&&!b.classList.contains('menu-masque')&&!b.hidden);if(premier)setTimeout(()=>premier.click(),0)}}
   }finally{enCours=false}
  }
  const go=()=>{const aside=doc.querySelector('aside');if(!aside)return;new MutationObserver(appliquer).observe(aside,{childList:true,subtree:true});new MutationObserver(appliquer).observe(doc.body,{attributes:true,attributeFilter:['data-profession','data-admin']});appliquer()};
