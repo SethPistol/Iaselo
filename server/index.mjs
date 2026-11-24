@@ -21,6 +21,9 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(pathname==='/auth/logout'&&request.method==='POST')return auth.logout(request);
   if(pathname==='/auth/lock'&&request.method==='POST')return auth.lock(request);
   if(pathname==='/auth/unlock'&&request.method==='POST')return auth.unlock(request);
+  if(pathname==='/mot-de-passe'&&request.method==='GET')return auth.passwordPage(request);
+  if(pathname==='/auth/password'&&request.method==='POST')return auth.changePassword(request);
+  if(pathname==='/api/admin/accounts'&&request.method==='POST')return auth.createAccountFromAdmin(request);
   if(pathname==='/api/questionnaire/submit'||pathname==='/api/questionnaire/resolve'||pathname==='/api/prescriptions/open'||pathname==='/api/prescriptions/view')return workspaceApi(request,{DB,BUCKET:bucket,ENABLE_DEMO_SEED:cfg.enableDemoSeed});
   // Espace patient (lien personnel) : seul le nom de l'établissement de la messagerie est transmis, aucun envoi possible.
   // Lettre de liaison (lien personnel du patient) : lecture seule, aucun envoi possible.
@@ -41,7 +44,7 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
    const file=path.join(modelesRoot,pathname.slice('/modeles/'.length));
    try{const stat=await fs.stat(file);return new Response(request.method==='HEAD'?null:Readable.toWeb(createReadStream(file)),{headers:{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Content-Length':String(stat.size),'Cache-Control':'private, max-age=2592000, immutable'}})}catch{return new Response('Module de transcription non installé',{status:404})}
   }
-  if(['/', '/index.html','/consultation-modele.html'].includes(pathname)&&!staff)return new Response(null,{status:303,headers:{Location:'/login'}});
+  if(['/', '/index.html','/consultation-modele.html'].includes(pathname)&&!staff)return new Response(null,{status:303,headers:{Location:await auth.mustChangePassword(request)?'/mot-de-passe':'/login'}});
   let name;try{name=decodeURIComponent(pathname)}catch{return new Response('Chemin invalide',{status:400})}if(name==='/')name='/index.html';
   if(name.split('/').some(x=>x.startsWith('.'))||name.startsWith('/server/'))return new Response('Introuvable',{status:404});
   const file=path.resolve(root,'.'+name);if(!file.startsWith(root+path.sep))return new Response('Introuvable',{status:404});

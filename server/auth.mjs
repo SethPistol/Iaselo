@@ -2,6 +2,9 @@ import {randomBytes,randomUUID,scrypt as scryptCb,timingSafeEqual,createHmac} fr
 const scrypt=promisify(scryptCb);
 export async function hashPassword(password){if(typeof password!=='string'||password.length<14||password.length>1024)throw Error('Mot de passe : entre 14 et 1024 caractères.');const salt=randomBytes(16).toString('hex'),key=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return 'scrypt$16384$'+salt+'$'+key.toString('hex')}
 export async function verifyPassword(password,hash){if(typeof password!=='string'||password.length>1024||!/^scrypt\$16384\$[a-f0-9]{32}\$[a-f0-9]{128}$/.test(hash||''))return false;const [,,salt,expected]=hash.split('$'),actual=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return timingSafeEqual(actual,Buffer.from(expected,'hex'))}
+export const PROFESSIONS=['anesthesiste','chirurgien','infirmier','secretariat','pharmacien','dim','facturation','administration','unassigned'];
+// Mot de passe provisoire lisible (sans caractères ambigus), environ 100 bits d'entropie.
+export function provisionalPassword(){const a='abcdefghjkmnpqrstuvwxyz23456789',b=randomBytes(20);const c=[...b].map(x=>a[x%a.length]).join('');return c.slice(0,5)+'-'+c.slice(5,10)+'-'+c.slice(10,15)+'-'+c.slice(15,20)}
 export async function createAccount(pool,{email,name,passwordHash,admin=false}){
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email||'')||!name?.trim()||name.length>160||!/^scrypt\$16384\$[a-f0-9]{32}\$[a-f0-9]{128}$/.test(passwordHash||''))throw Error('E-mail, nom et empreinte scrypt valides requis.');
  const client=await pool.connect(),id=randomUUID(),at=new Date().toISOString();try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(73621591)');
@@ -33,7 +36,7 @@ export async function createAuth(pool,cfg,{psc=null}={}){
  const fingerprint=v=>createHmac('sha256',cfg.sessionSecret).update(v).digest('hex'),cookieName=cfg.secure?'__Host-parcours_session':'parcours_session',dummy=await hashPassword(randomBytes(32).toString('hex'));
  const sessionCookie=(token,age)=>cookieName+'='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+age+(cfg.secure?'; Secure':'');
  function getToken(request){const value=(request.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);return /^[a-f0-9]{64}$/.test(value||'')?value:null}
- async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
+ async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND u.enabled=1 AND p.active=1 AND u.must_change_password=0',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
  async function login(request){
   if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});
   const bytes=await request.arrayBuffer();if(bytes.byteLength>8192)return new Response('Requête trop volumineuse',{status:413});let d;try{const raw=new TextDecoder().decode(bytes);d=request.headers.get('Content-Type')?.includes('application/json')?JSON.parse(raw):Object.fromEntries(new URLSearchParams(raw))}catch{return new Response('Requête invalide',{status:400})}
@@ -43,11 +46,11 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   const passwordOK=await verifyPassword(d.password,account?.password_hash||dummy),ok=passwordOK&&account?.enabled===1&&account?.active===1;
   await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,ok?1:0]);
   if(!ok)return new Response(loginPage('Identifiants invalides ou compte désactivé.'),{status:401,headers:{'Content-Type':'text/html; charset=utf-8'}});
-  return openSession(account.id,'password');
+  return openSession(account.id,'password',null,account.must_change_password?'/mot-de-passe':'/');
  }
- async function openSession(userId,method,idToken=null){
+ async function openSession(userId,method,idToken=null,location='/'){
   const token=randomBytes(32).toString('hex'),at=new Date().toISOString();await pool.query('INSERT INTO auth_sessions(token_hash,user_id,expires_at,created_at,method,id_token) VALUES($1,$2,$3,$4,$5,$6)',[fingerprint(token),userId,new Date(Date.now()+cfg.sessionHours*3600000).toISOString(),at,method,idToken]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,userId,method==='psc'?'login-psc':'login']);
-  return new Response(null,{status:303,headers:{Location:'/', 'Set-Cookie':sessionCookie(token,Math.floor(cfg.sessionHours*3600))}});
+  return new Response(null,{status:303,headers:{Location:location,'Set-Cookie':sessionCookie(token,Math.floor(cfg.sessionHours*3600))}});
  }
  // Pro Santé Connect : le professionnel est reconnu par son RPPS, renseigné au préalable sur son compte
  // par un administrateur (écran Accès professionnels). Aucun compte n'est créé automatiquement.
@@ -80,8 +83,60 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   await pool.query('UPDATE auth_sessions SET locked_at=NULL WHERE token_hash=$1',[s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'unlock']);
   return Response.json({unlocked:true});
  }
- return {user,login,logout,lock,unlock,pscStart,pscCallback,pscEnabled:()=>!!psc?.enabled()};
+ // Changement de mot de passe (obligatoire à la première connexion d'un compte créé par l'administrateur).
+ async function pendingSession(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT s.token_hash,s.user_id,u.password_hash,u.display_name,u.must_change_password FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND u.enabled=1 AND p.active=1',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
+ async function passwordPage(request){const s=await pendingSession(request);if(!s)return new Response(null,{status:303,headers:{Location:'/login'}});return html(changePasswordPage('',s.display_name,!!s.must_change_password))}
+ const html=(body,status=200)=>new Response(body,{status,headers:{'Content-Type':'text/html; charset=utf-8'}});
+ async function changePassword(request){
+  if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});
+  const s=await pendingSession(request);if(!s)return new Response(null,{status:303,headers:{Location:'/login'}});
+  const bytes=await request.arrayBuffer();if(bytes.byteLength>8192)return new Response('Requête trop volumineuse',{status:413});let d;try{d=Object.fromEntries(new URLSearchParams(new TextDecoder().decode(bytes)))}catch{return new Response('Requête invalide',{status:400})}
+  const fail=m=>html(changePasswordPage(m,s.display_name,!!s.must_change_password),400),identity=fingerprint('password:'+s.user_id),at=new Date().toISOString(),since=new Date(Date.now()-15*60000).toISOString();
+  if(Number((await pool.query('SELECT COUNT(*) AS n FROM auth_attempts WHERE identity_hash=$1 AND at>$2 AND success=0',[identity,since])).rows[0].n)>=5)return html(changePasswordPage('Trop de tentatives. Réessayez dans 15 minutes.',s.display_name,!!s.must_change_password),429);
+  const ok=await verifyPassword(String(d.current||''),s.password_hash);await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,ok?1:0]);
+  if(!ok)return fail('Mot de passe actuel incorrect.');
+  const next=String(d.password||'');if(next.length<14||next.length>1024)return fail('Le nouveau mot de passe doit contenir au moins 14 caractères.');if(next!==String(d.confirm||''))return fail('Les deux saisies du nouveau mot de passe sont différentes.');if(next===String(d.current))return fail('Choisissez un mot de passe différent du mot de passe provisoire.');
+  await pool.query('UPDATE auth_users SET password_hash=$1,must_change_password=0 WHERE id=$2',[await hashPassword(next),s.user_id]);
+  // Les autres sessions de ce compte sont fermées ; celle-ci reste ouverte.
+  await pool.query('DELETE FROM auth_sessions WHERE user_id=$1 AND token_hash<>$2',[s.user_id,s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'password-changed']);
+  return new Response(null,{status:303,headers:{Location:'/'}});
+ }
+ // Création d'un compte depuis Accès professionnels : réservée au propriétaire (administrateur) actif, contrôlée ici côté serveur.
+ // Le mot de passe provisoire est tiré par le serveur, affiché une seule fois à l'administrateur, jamais stocké en clair.
+ async function createAccountFromAdmin(request){
+  if(!sameOrigin(request,cfg))return Response.json({error:'Origine refusée'},{status:403});
+  const staff=await user(request);if(!staff)return Response.json({error:'Connexion professionnelle requise.'},{status:401});
+  const at=new Date().toISOString(),log=(result,target,reason='',detail='')=>pool.query('INSERT INTO professional_access_log(at,actor,action,target,result,reason,detail) VALUES($1,$2,$3,$4,$5,$6,$7)',[at,staff.id,'account-create',target,result,reason,detail]);
+  const admin=(await pool.query("SELECT 1 FROM workspace_members m JOIN professional_profiles p ON p.user_id=m.user_id WHERE m.user_id=$1 AND m.role='owner' AND p.active=1",[staff.id])).rows.length>0;
+  if(!admin){await log('denied','auth_users','Création de compte hors administration');return Response.json({error:'Création de compte réservée à l’administrateur.'},{status:403})}
+  const bytes=await request.arrayBuffer();if(bytes.byteLength>8192)return Response.json({error:'Requête trop volumineuse'},{status:413});let d;try{d=JSON.parse(new TextDecoder().decode(bytes))}catch{return Response.json({error:'Requête invalide'},{status:400})}
+  const email=String(d.email||'').trim().toLowerCase(),name=String(d.name||'').trim(),profession=String(d.profession||''),teamId=String(d.teamId||''),reason=String(d.reason||'').trim().slice(0,500),rpps=String(d.rpps||'').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>240)return Response.json({error:'Adresse e-mail invalide.'},{status:400});
+  if(!name||name.length>160)return Response.json({error:'Nom et prénom requis.'},{status:400});
+  if(!PROFESSIONS.includes(profession))return Response.json({error:'Métier inconnu.'},{status:400});
+  if(rpps&&!/^\d{11}$/.test(rpps))return Response.json({error:'Le RPPS comporte 11 chiffres.'},{status:400});
+  if(reason.length<5)return Response.json({error:'Indiquez un motif de cinq caractères au minimum.'},{status:400});
+  if(teamId&&!(await pool.query('SELECT 1 FROM care_teams WHERE id=$1 AND active=1',[teamId])).rows.length)return Response.json({error:'Équipe de soins inconnue.'},{status:400});
+  if((await pool.query('SELECT 1 FROM auth_users WHERE email=$1',[email])).rows.length)return Response.json({error:'Un compte existe déjà avec cette adresse.'},{status:409});
+  const temporary=provisionalPassword();let id;try{id=await createAccount(pool,{email,name,passwordHash:await hashPassword(temporary)})}catch(e){return Response.json({error:/unique|duplicate/i.test(e.message)?'Un compte existe déjà avec cette adresse.':'Création impossible.'},{status:409})}
+  await pool.query('UPDATE auth_users SET must_change_password=1 WHERE id=$1',[id]);
+  await pool.query('UPDATE professional_profiles SET profession=$2,rpps=$3,updated_at=$4,updated_by=$5 WHERE user_id=$1',[id,profession,rpps,at,staff.id]);
+  if(teamId)await pool.query('INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,$2,$3)',[id,teamId,at]);
+  await log('allowed',id,reason,JSON.stringify({profession,team:teamId||null,rppsDeclared:!!rpps}));
+  return Response.json({created:true,userId:id,email,temporaryPassword:temporary});
+ }
+ async function mustChangePassword(request){return !!(await pendingSession(request))?.must_change_password}
+ return {user,login,logout,lock,unlock,pscStart,pscCallback,passwordPage,mustChangePassword,changePassword,createAccountFromAdmin,pscEnabled:()=>!!psc?.enabled()};
 }
+export function changePasswordPage(message='',name='',required=true){const e=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mot de passe · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 16px;font:16px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif;color:#0C1A25;background:#F3F5F8}
+main{width:100%;max-width:440px;background:#fff;border:1px solid #DCE3E9;border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px}
+h1{margin:0;font-size:26px;letter-spacing:-.02em}p{margin:0;color:#4C5D6C}form{display:flex;flex-direction:column;gap:14px}
+label{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:550}input{font:inherit;min-height:48px;padding:0 14px;border:1px solid #C3CDD6;border-radius:12px}
+input:focus{outline:none;border-color:#0F4D5C;box-shadow:0 0 0 4px #E1EFF1}button{font:600 16px system-ui,sans-serif;min-height:50px;border:0;border-radius:12px;background:#0F4D5C;color:#fff;cursor:pointer}
+.error{padding:12px 14px;border-radius:12px;background:#FDEBEC;color:#B21F2A;font-weight:550}.error:empty{display:none}
+@media (prefers-color-scheme:dark){body{background:#0B1419;color:#E6EEF2}main{background:#111D24;border-color:#24343E}p{color:#A9BAC5}input{background:#0B1419;color:#E6EEF2;border-color:#33464F}}
+</style></head><body><main><h1>${required?'Choisissez votre mot de passe':'Changer de mot de passe'}</h1><p>${e(name)}${required?' : votre compte a été créé avec un mot de passe provisoire. Choisissez un mot de passe personnel pour accéder aux dossiers.':''}</p><p class="error" role="alert">${e(message)}</p><form method="post" action="/auth/password"><label>Mot de passe ${required?'provisoire':'actuel'}<input type="password" name="current" autocomplete="current-password" required maxlength="1024"></label><label>Nouveau mot de passe (14 caractères minimum)<input type="password" name="password" autocomplete="new-password" minlength="14" maxlength="1024" required></label><label>Confirmer le nouveau mot de passe<input type="password" name="confirm" autocomplete="new-password" minlength="14" maxlength="1024" required></label><button>Enregistrer et continuer</button></form></main></body></html>`}
 export function loginPage(message='',test=recette(),psc=false){return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connexion · IASELO</title><link rel="icon" type="image/png" href="/assets/marque/favicon.png"><style>
 @font-face{font-family:Geist;font-weight:100 900;font-display:swap;src:url(/assets/fonts/geist-latin-wght-normal.woff2) format('woff2-variations')}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%}

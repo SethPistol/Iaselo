@@ -110,7 +110,9 @@ Pour un serveur de test séparé de la production, sans aucune manipulation tech
 
 Les sessions professionnelles sont gérées par le serveur, avec mot de passe scrypt, cookie HttpOnly/SameSite/Secure en HTTPS, expiration et limitation des tentatives. Les en-têtes d’identité entrants de l’ancien hébergeur sont supprimés. Les droits métier et les équipes de soins restent contrôlés côté serveur.
 
-Créer un professionnel depuis un terminal disposant des variables de la base cible, de préférence sur le poste d’administration sécurisé :
+**Depuis l’application (recommandé)** : l’administrateur ouvre **Accès professionnels → Créer un compte**, saisit le nom, l’e-mail, le métier, l’équipe de soins et un motif. Le serveur vérifie qu’il s’agit bien de l’administrateur, tire un mot de passe provisoire affiché une seule fois et trace la création dans le journal des accès. Le professionnel se connecte avec ce mot de passe provisoire et doit en choisir un nouveau (`/mot-de-passe`) avant d’accéder à un dossier.
+
+**Depuis un terminal** (sans interface), disposant des variables de la base cible, de préférence sur le poste d’administration sécurisé :
 
 ```sh
 NEW_USER_EMAIL='professionnel@example.org' NEW_USER_NAME='Nom du professionnel' npm run user:create
