@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS workspace_item_versions (sequence INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT NOT NULL, item TEXT NOT NULL, revision INTEGER NOT NULL, data TEXT, actor TEXT NOT NULL, updated_at TEXT NOT NULL, operation TEXT NOT NULL, reason TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS workspace_item_versions_item ON workspace_item_versions(key,item,revision DESC);
+CREATE TRIGGER workspace_item_versions_no_update BEFORE UPDATE ON workspace_item_versions BEGIN SELECT RAISE(ABORT,'Historical versions are immutable'); END;
+CREATE TRIGGER workspace_item_versions_no_delete BEFORE DELETE ON workspace_item_versions BEGIN SELECT RAISE(ABORT,'Historical versions are immutable'); END;
+DROP TRIGGER workspace_document_insert;
+DROP TRIGGER workspace_document_update;
+CREATE TRIGGER workspace_document_insert AFTER INSERT ON workspace_documents BEGIN INSERT INTO workspace_versions(key,data,revision,actor,updated_at,operation,reason) VALUES(NEW.key,CASE WHEN NEW.key IN ('identities/records','identities/reviews','management/pmsi','management/invoices','management/reservations','management/acts','management/movements','management/patientDrafts') THEN '{"$items":1}' ELSE NEW.data END,NEW.revision,NEW.actor,NEW.updated_at,NEW.operation,NEW.reason); END;
+CREATE TRIGGER workspace_document_update AFTER UPDATE ON workspace_documents BEGIN INSERT INTO workspace_versions(key,data,revision,actor,updated_at,operation,reason) VALUES(NEW.key,CASE WHEN NEW.key IN ('identities/records','identities/reviews','management/pmsi','management/invoices','management/reservations','management/acts','management/movements','management/patientDrafts') THEN '{"$items":1}' ELSE NEW.data END,NEW.revision,NEW.actor,NEW.updated_at,NEW.operation,NEW.reason); END;

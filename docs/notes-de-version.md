@@ -1,3 +1,9 @@
+# IASELO · refonte du stockage (24 novembre 2026, audit point 4)
+
+- **Listes partagées fusionnées patient par patient** : identités, réservations du bloc, actes, mouvements, PMSI, factures et brouillons de séjour. Deux postes qui modifient deux patients différents ne se bloquent plus ; seul un même patient modifié des deux côtés est un conflit (`worker/items.mjs`).
+- **Historique par élément** : l'historique de ces listes ne recopie plus la liste entière à chaque ajout (croissance quadratique), seul l'élément modifié est gardé (`workspace_item_versions`, migration 014). L'écran « Comparer les versions » reconstitue la liste à n'importe quelle révision.
+- **Chargement à la demande** : un séjour sorti, sans activité depuis 60 jours et sans réservation de bloc récente ou à venir n'est plus chargé à l'ouverture. Options › « Séjours archivés » le retrouve (nom, prénom, naissance, numéro) et le rouvre ; recherche et réouverture sont tracées (`worker/archives.mjs`).
+
 # IASELO · lot sécurité de l'audit (24 novembre 2026)
 
 Suite de l'audit du 24/11 (points critiques 1 à 3) :

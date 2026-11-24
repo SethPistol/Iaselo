@@ -146,7 +146,9 @@ export async function professionalAccess(env,request,user,member,at){
  }
  function planningOccupancy(rows){return canRead('management/planningResources')?(rows||[]).filter(r=>planningCore.active(r)&&!allowed.has(r.patient)).flatMap(r=>planningCore.allocations(r).filter(planningCore.interval).map(a=>({resource:a.resource,start:a.start,end:a.end,current:r.state==='Occupée'&&planningCore.currentResource(r)===a.resource}))):[];}
  function policyGuard(){return DB.prepare('INSERT INTO workspace_write_checks(operation,valid) VALUES(?,CASE WHEN (SELECT revision FROM professional_policy_revision WHERE id=1)=? THEN 1 ELSE 0 END)').bind('policy-'+crypto.randomUUID(),epoch);}
- return {get planningError(){return nursingError||planningError},profile:{...profile,isAdmin},teams,allowed,epoch,active,job,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,policyGuard,log,fileReferences};
+ // Périmètre d'un élément de liste partagée (même règle que merge) : voir worker/items.mjs.
+ function inScope(row,key,id){const [group,name]=key.split('/');if(name==='patientDrafts')return allowed.has(id);if(group==='identities'||['pmsi','invoices'].includes(name))return Array.isArray(row)&&(name==='reviews'?String(row[0]).split('|').every(x=>allowed.has(x)):allowed.has(row[0]));return allowed.has(row?.patient)}
+ return {get planningError(){return nursingError||planningError},profile:{...profile,isAdmin},teams,allowed,epoch,active,job,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,inScope,policyGuard,log,fileReferences};
 }
 export {professions};
 export async function professionalRoutes(acl,request,env,json,body){
