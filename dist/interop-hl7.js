@@ -160,6 +160,21 @@ function dftActes({patient={},nda='',actes=[],emetteur='IASELO',destinataire='GA
  return construire(segsOut);
 }
 
+// BAR^P12 : résumé PMSI du séjour (diagnostics CIM-10 en DG1, actes CCAM en PR1) vers le logiciel PMSI de la clinique.
+// DG1-6 : DP, DR ou DAS ; PR1-3 : code^libellé^CCAM ; PR1-4 : activité^phase^modificateurs^extension documentaire.
+// Profil inspiré des échanges PMSI d'Interop'Santé : à valider avec l'éditeur du logiciel PMSI avant la production.
+function barPmsi({patient={},nda='',entree='',sortie='',modeEntree='',provenance='',modeSortie='',destination='',diagnostics=[],actes=[],emetteur='IASELO',destinataire='PMSI',id=''}){
+ const now=versDateHl7(new Date().toISOString()),mid=id||'IAS'+now+Math.floor(Math.random()*1000);
+ const pv1=['PV1','1','I','','','','','','','','','','','','','','','','',nda];while(pv1.length<46)pv1.push('');pv1[36]=[modeSortie,destination].filter(Boolean).join('^');pv1[44]=versDateHl7(entree).slice(0,8);pv1[45]=versDateHl7(sortie).slice(0,8);
+ const segsOut=[['MSH','^~\\&',emetteur,'CLINIQUE',destinataire,'CLINIQUE',now,'',[['BAR','P12','BAR_P12']],mid,'P','2.5','','','','','FRA','UNICODE UTF-8'],
+  ['EVN','',now],
+  ['PID','1','',[[patient.ipp||'','','','IASELO','PI'],...(patient.ins?[[patient.ins,'','',['ASIP-SANTE-INS-NIR',OID_INS_NIR,'ISO'],'INS']]:[])],'',[[patient.nom||'',patient.prenom||'','','','','','L']],'',versDateHl7(patient.naissance||'').slice(0,8),{Féminin:'F',Masculin:'M'}[patient.sexe]||'U'],
+  pv1,['ZFM',modeEntree,modeSortie,provenance,destination]];
+ diagnostics.forEach((d,i)=>segsOut.push(['DG1',String(i+1),'',[[d.code||'',d.libelle||'','CIM10']],'','','',d.type||'DAS']));
+ actes.forEach((a,i)=>segsOut.push(['PR1',String(i+1),'',[[a.code||'',a.libelle||'','CCAM']],[[a.activite||'1',a.phase||'0',a.modificateurs||'',a.extension||'']],versDateHl7(a.date||'').slice(0,12)]));
+ return construire(segsOut);
+}
+
 /* ---------- Moniteurs (constantes) ---------- */
 // Codes MDC (IEEE 11073-10101) les plus utilisés par les passerelles Philips, Dräger, GE, Mindray.
 const MDC={'147842':'hr','149530':'hr','150456':'spo2','150037':'sbp','150038':'dbp','150039':'map','150301':'sbp','150302':'dbp','150303':'map','151708':'etco2','151716':'etco2','150344':'temp','150364':'temp','150392':'temp','151562':'rr','151594':'rr','152196':'fio2','151980':'vt','151976':'peep','151973':'pip','152212':'halogenEnd','152216':'halogenEnd'};
@@ -174,5 +189,5 @@ function lireMoniteur(msg){
  return {format:'HL7 v2 ORU^R01 (moniteur)',salle,appareil,date:h.date,mesures};
 }
 return {OID_INS_NIR,OID_INS_NIA,OID_INS_TEST,lireHl7,val,reps,segs,seg,dateHl7,versDateHl7,identite,entete,ack,construire,echapper,
- interpreter,critique,CRITIQUES,biologieDepuisHl7,biologieDepuisHprim,lireBiologie,rapprocher,norm,EVENEMENTS_ADT,lireAdt,dftActes,MDC,cleMoniteur,lireMoniteur};
+ interpreter,critique,CRITIQUES,biologieDepuisHl7,biologieDepuisHprim,lireBiologie,rapprocher,norm,EVENEMENTS_ADT,lireAdt,dftActes,barPmsi,MDC,cleMoniteur,lireMoniteur};
 });

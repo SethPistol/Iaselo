@@ -92,3 +92,12 @@
 .mk .content{max-width:none}
 .mk-table td small,.mk-table th small{display:block;font-weight:400;color:var(--muted)}
 .mk-card>button,.mk-card form>button{justify-self:start}
+/* Assurance maladie (dist/assurance-maladie.js) */
+.am-compteurs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:12px 0}
+.am-compteurs .mk-card{display:flex;flex-direction:column;gap:2px;padding:10px 12px;margin:0}
+.am-compteurs b{font-size:1.5rem;line-height:1}
+.am-compteurs span{font-size:.85rem;opacity:.8}
+.am-entete{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.am-entete small{display:block;opacity:.75}
+.am-constats li{margin:4px 0}
+.am-large{grid-column:1/-1}

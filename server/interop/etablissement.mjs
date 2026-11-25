@@ -6,6 +6,7 @@
 //   COURRIERS  documents reçus (passerelle MSSanté de l'établissement, scanner) sur /api/interop/entrant/courrier ;
 //   EFS        commandes de produits sanguins (logiciel de l'EFS ou du dépôt de sang) vers INTEROP_EFS_URL ;
 //   SESAM      feuilles de soins électroniques des praticiens libéraux, via un logiciel agréé SESAM-Vitale (INTEROP_SESAM_URL) ;
+//   PMSI, FACTURATION, ADRI, ROC  transmission à l'Assurance maladie (25/11/2026, voir docs/assurance-maladie.md) ;
 //   PAIEMENT   paiement en ligne (Stripe Checkout : INTEROP_PAIEMENT_STRIPE_KEY, INTEROP_PAIEMENT_WEBHOOK_SECRET).
 // Mode par INTEROP_<ID>_MODE = simulation (défaut) | test | production, comme les connecteurs nationaux (modes.mjs).
 // Les flux entrants exigent un jeton d'accès propre à chaque émetteur : INTEROP_<ID>_JETON (32 caractères au moins),
@@ -20,6 +21,10 @@ export const CONNECTEURS={
  courriers:{label:'Courriers reçus (MSSanté, scanner)',sens:'entrant',besoin:[],doc:'Boîte organisationnelle MSSanté de la clinique ou dossier de numérisation, relayés vers IASELO.'},
  efs:{label:'Établissement français du sang (commandes)',sens:'sortant',besoin:['INTEROP_EFS_URL'],doc:'Commande de PSL vers le logiciel de distribution de l’EFS ou du dépôt de sang (convention de cession).'},
  sesam:{label:'Feuilles de soins SESAM-Vitale',sens:'sortant',besoin:['INTEROP_SESAM_URL'],doc:'Un logiciel agréé SESAM-Vitale (GIE) établit et télétransmet la FSE ; IASELO lui transmet les actes et honoraires.'},
+ pmsi:{label:'Logiciel PMSI du DIM (groupage, fichiers ATIH)',sens:'sortant',besoin:['INTEROP_PMSI_URL'],doc:'Résumé PMSI validé par le DIM (diagnostics CIM-10, actes CCAM, modes d’entrée et de sortie) envoyé en HL7 BAR^P12 ; le logiciel PMSI groupe (GHM/GHS) et transmet RSS, VID-HOSP et FICHCOMP sur e-PMSI.'},
+ facturation:{label:'Logiciel de facturation (norme B2, retours NOEMIE)',sens:'deux sens',besoin:['INTEROP_FACTURATION_URL'],doc:'Facture du séjour (GHS, forfaits, implants en sus, honoraires) envoyée au logiciel agréé qui télétransmet en B2 ; paiements et rejets NOEMIE reçus sur /api/interop/entrant/retours.'},
+ adri:{label:'Droits de l’assuré en ligne (ADRi)',sens:'sortant',besoin:['INTEROP_ADRI_URL'],doc:'Interrogation des droits à l’Assurance maladie par le logiciel administratif (service ADRi, carte CPE ou certificat d’établissement).'},
+ roc:{label:'Complémentaires santé (ROC)',sens:'sortant',besoin:['INTEROP_ROC_URL'],doc:'Remboursement des organismes complémentaires : identification des droits (IDB) et accord de prise en charge, via le logiciel de facturation ROC-compatible.'},
  paiement:{label:'Paiement en ligne',sens:'deux sens',besoin:['INTEROP_PAIEMENT_STRIPE_KEY','INTEROP_PAIEMENT_WEBHOOK_SECRET'],doc:'Stripe Checkout (ou prestataire de la clinique) ; aucune donnée de santé dans le libellé du paiement.'}
 };
 export function etatConnecteur(id,env={}){

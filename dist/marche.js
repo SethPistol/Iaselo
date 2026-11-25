@@ -20,6 +20,7 @@ const TUILES=[
  {id:'honoraires',titre:'Honoraires & paiements',texte:'Devis signé par le patient, feuille de soins SESAM-Vitale, paiement en ligne de la chambre ou des compléments.',jobs:['anesthesiste','chirurgien','secretariat','facturation']},
  {id:'logistique',titre:'Logistique du bloc',texte:'Brancardage, stérilisation des boîtes d’instruments, planning des équipes et des gardes.',jobs:['anesthesiste','chirurgien','infirmier','pharmacien','secretariat']},
  {id:'qualite',titre:'Qualité & sécurité',texte:'Déclarer un événement indésirable, suivi par la qualité, RMM, mode dégradé et classeur de secours.',jobs:['anesthesiste','chirurgien','infirmier','pharmacien','secretariat','dim','facturation','administration']},
+ {id:'assurance',titre:'Assurance maladie',texte:'Droits du patient (ADRi, ROC), résumé PMSI validé par le DIM, facture du séjour, retours de paiement et rejets.',jobs:['secretariat','facturation','dim','anesthesiste','chirurgien']},
  {id:'interfaces',titre:'Interfaces & connecteurs',texte:'Mouvements du logiciel administratif, envoi des actes, état des connexions (labos, moniteurs, EFS, paiement).',jobs:['anesthesiste','secretariat','dim','facturation']}
 ];
 root.createMarche=function(ctx){
@@ -28,7 +29,7 @@ root.createMarche=function(ctx){
  const etat={};// par outil : onglet, séjour choisi, données
  const job=()=>ctx.job()||'';const admin=()=>document.body.dataset.admin==='true';
  const peut=jobs=>admin()||jobs.includes(job());
- const style=document.createElement('link');style.rel='stylesheet';style.href='marche.css?v=1';document.head.append(style);
+ const style=document.createElement('link');style.rel='stylesheet';style.href='marche.css?v=2';document.head.append(style);
 
  /* ---------- Socle ---------- */
  async function api(module,{q='',body,sous=''}={}){
@@ -99,6 +100,7 @@ root.createMarche=function(ctx){
   const pose=(id,n,ton='')=>{const b=host.querySelector(`[data-mk-n="${id}"]`);if(b&&n){b.hidden=false;b.textContent=n;b.className='mk-tile-n '+ton}};
   if(peut(['anesthesiste','chirurgien','infirmier']))api('biologie').then(j=>pose('biologie',j.aRattacher.length+j.resultats.filter(r=>r.status==='nouveau').length,j.resultats.some(r=>r.status==='nouveau'&&r.data.critiques)?'crit':'')).catch(()=>{});
   if(peut(['anesthesiste','chirurgien','infirmier']))api('transfusion').then(j=>pose('transfusion',j.tracabilite.filter(p=>p.retard).length,'warn')).catch(()=>{});
+  if(peut(['secretariat','facturation','dim','anesthesiste','chirurgien']))api('assurance').then(j=>pose('assurance',j.liste.filter(x=>x.etape.cle==='rejete').length||j.liste.filter(x=>x.etape.cle==='pret').length,j.liste.some(x=>x.etape.cle==='rejete')?'crit':'')).catch(()=>{});
   api('evenements').then(j=>pose('qualite',j.gestion?j.ei.filter(e=>e.status!=='clos').length:0)).catch(()=>{});
  }
  /* ---------- Bandeau dans le dossier du patient ---------- */

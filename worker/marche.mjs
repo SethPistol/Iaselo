@@ -11,6 +11,7 @@ import {randomUUID,createHash,randomBytes} from 'node:crypto';
 import H from '../dist/interop-hl7.js';
 import M from '../dist/marche-regles.js';
 import planningCore from '../dist/planning-core.js';
+import {creerModuleAssurance} from './assurance-maladie.mjs';
 import {etatConnecteurs,etatConnecteur,jetonValide,envoyer,sessionPaiement,signatureStripe} from '../server/interop/etablissement.mjs';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const t=v=>typeof v==='string'?v.trim():v===undefined||v===null?'':String(v).trim();
@@ -98,11 +99,11 @@ async function importerMoniteur(env,acteur,contenu,source){
 }
 
 /* ---------- Flux entrants des logiciels de la clinique ---------- */
-const FLUX={biologie:'labo',adt:'gam',moniteur:'moniteurs',courrier:'courriers'};
+const FLUX={biologie:'labo',adt:'gam',moniteur:'moniteurs',courrier:'courriers',retours:'facturation'};
 export async function interopEntrantApi(request,env){
  const url=new URL(request.url),flux=url.pathname.split('/').pop(),id=FLUX[flux];
  if(!id||request.method!=='POST')return json({error:'Flux inconnu.'},404);
- const ienv=env.INTEROP_ENV||{},hl7=flux!=='courrier';
+ const ienv=env.INTEROP_ENV||{},hl7=!['courrier','retours'].includes(flux);
  const reponse=(code,msg,contenu)=>hl7?new Response(H.ack(contenu||'',code,msg),{status:code==='AA'?200:code==='AE'?400:403,headers:{'Content-Type':'application/hl7-v2; charset=utf-8','Cache-Control':'no-store'}}):json(code==='AA'?{ok:true}:{error:msg},code==='AA'?200:403);
  const journal=(result,reason)=>env.DB.prepare("INSERT INTO professional_access_log(at,actor,action,target,result,reason) VALUES(?,?,'interop-entrant',?,?,?)").bind(maintenant(),'flux:'+id,'interop/'+flux,result,reason).run();
  if(!jetonValide(id,request,ienv)){await journal('denied','Jeton absent ou invalide');return reponse('AR','Jeton d’accès refusé.')}
@@ -113,6 +114,10 @@ export async function interopEntrantApi(request,env){
   if(flux==='biologie'){const r=await importerBiologie(env,acteur,contenu,'flux');detail=r.length+' compte(s) rendu(s), '+r.filter(x=>x.status==='a-rattacher').length+' à rattacher'}
   else if(flux==='adt'){const r=await importerAdt(env,acteur,contenu,'flux');detail=r.data.evenement+' '+(r.status==='integre'?'intégré':'à rattacher')}
   else if(flux==='moniteur'){const r=await importerMoniteur(env,acteur,contenu,'flux');detail=r?r.data.mesures.length+' mesure(s)':'aucune mesure'}
+  else if(flux==='retours'){let d;try{d=JSON.parse(contenu)}catch{return reponse('AE','JSON attendu : {reference,statut,montant,motif,libelle}.')}
+   const rec=(await lire(env,'assurance',{kind:'dossier',ref:t(d.reference)}))[0];if(!t(d.reference)||!rec){await journal('denied','Facture inconnue');return json({error:'Facture inconnue.'},404)}
+   if(rec.status!=='transmise'){await journal('denied','Facture non en attente');return json({error:'Facture non en attente de retour.'},409)}
+   const r=await HANDLERS.assurance.enregistrerRetour(env,acteur,rec,d,'flux');detail='Retour '+r.status+' '+rec.ref}
   else {let d;try{d=JSON.parse(contenu)}catch{return reponse('AE','JSON attendu : {nom,type,base64,texte,objet,expediteur}.')}const r=await deposerCourrier(env,acteur,d,'mssante');detail=r.data.classement.label}
   await journal('allowed',detail);return reponse('AA','',contenu);
  }catch(e){await journal('denied',court(e.message,200));return reponse('AE',court(e.message,80),contenu)}
@@ -413,6 +418,7 @@ const HANDLERS={
    if(action==='lu'){const msgs=await lire(env,'messagerie',{ref:fil,limit:300});let n=0;for(const m of msgs)if(!(m.data.lus||[]).includes(moi)){await env.DB.prepare('UPDATE marche_records SET data=? WHERE id=?').bind(JSON.stringify({...m.data,lus:[...(m.data.lus||[]),moi]}),m.id).run();n++}return json({lus:n})}
    return json({error:'Action inconnue.'},400)}}
 };
+HANDLERS.assurance=creerModuleAssurance({json,t,court,lire,un,creer,modifier,docData,est,voitSejour,cliniqueSejour,maintenant,aujourdhui,etatConnecteur,envoyer,sejours});
 const EQUIPES=[{id:'bloc',label:'Équipe du bloc'},{id:'anesthesie',label:'Anesthésie'},{id:'etage',label:'Services d’hospitalisation'},{id:'tous',label:'Toute la clinique'}];
 function accesFil(acl,fil){if(!acl.active)return false;
  if(fil.startsWith('sejour:'))return voitSejour(acl,fil.slice(7))&&[...CLIN,'secretariat'].includes(acl.job);
