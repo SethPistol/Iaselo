@@ -25,6 +25,8 @@ test('ouverture des salles : chaque partie signée par son métier, le jour mêm
   const lu=await (await call('GET','/api/workspace/ouverture-salles?date='+today,undefined,mar)).json();
   assert.equal(R.etatSalle(lu.records,'S1').code,'ouverte');
   assert.deepEqual(lu.parts,['infirmier','anesthesie']);assert.deepEqual(lu.records.map(r=>r.part).sort(),['anesthesie','infirmier'],'l’anesthésiste voit la partie infirmière');assert.equal(lu.canSign.infirmier,false,'en lecture seule');
+  const lendemain=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
+  assert.equal((await (await call('GET','/api/workspace/ouverture-salles?date='+lendemain,undefined,mar)).json()).precedente,today,'journée vide : dernière journée signée proposée');
   // L'infirmière ne reçoit jamais la partie anesthésie.
   const vuIde=await (await call('GET','/api/workspace/ouverture-salles?date='+today,undefined,ide)).json();
   assert.deepEqual(vuIde.parts,['infirmier']);assert.deepEqual(vuIde.records.map(r=>r.part),['infirmier']);assert.ok(!JSON.stringify(vuIde).includes('RAS'),'remarques anesthésie absentes');

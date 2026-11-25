@@ -28,8 +28,10 @@ export async function staffOuvertureSallesApi(request,env,acl){
   const date=url.searchParams.get('date')||today;if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return json({error:'Date invalide.'},400);
   const parts=partiesVisibles(acl);
   const records=((await env.DB.prepare('SELECT * FROM room_openings WHERE day=? ORDER BY at DESC').bind(date).all()).results||[]).filter(r=>parts.includes(r.part)).map(ligne);
+  // Dernière journée signée avant celle affichée : l'écran propose d'y aller quand la journée est vide.
+  const prec=records.length?null:(await env.DB.prepare("SELECT MAX(day) AS day FROM room_openings WHERE day<? AND part IN ('"+parts.join("','")+"')").bind(date).first())?.day||null;
   await acl.log('read','management/ouverture-salles','allowed','Ouverture des salles',date);
-  return json({date,today,rooms:await salles(env),records,parts,canSign:{infirmier:acl.job==='infirmier'&&acl.bloc!==false,anesthesie:acl.job==='anesthesiste'}});
+  return json({date,today,rooms:await salles(env),records,parts,precedente:prec,canSign:{infirmier:acl.job==='infirmier'&&acl.bloc!==false,anesthesie:acl.job==='anesthesiste'}});
  }
  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
  let d;try{d=await request.json()}catch{return json({error:'Requête illisible.'},400)}
