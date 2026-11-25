@@ -1,3 +1,10 @@
+# IASELO · dix modules issus de la comparaison au marché (25 novembre 2026)
+
+- **Outils** et **Messagerie** en bas du menu, selon le métier : biologie et courriers reçus (HL7, HPRIM, MSSanté), interfaces avec le logiciel administratif (ADT, actes DFT), transfusion (groupe, RAI, commande EFS, contrôle ultime, EIR), qualité (EI, EIGS, RMM, mode dégradé et classeur de secours), agenda des consultations, honoraires (devis signé, FSE, paiement en ligne), logistique (brancardage, stérilisation, planning), messagerie interne.
+- **Dans le dossier** : constantes du moniteur relues puis validées sur la feuille d'anesthésie ; assistant de consultation (dictée transcrite sur le poste, propositions à valider) ; bandeau « résultat non vu ».
+- **Pages patient** : prise de rendez-vous, devis à signer, paiement ; toutes les pages patient en anglais (bouton FR / EN).
+- Connecteurs extérieurs en simulation tant que la clinique n'a pas fourni ses accès. Migration 016. Détail et liste de ce qu'il faut fournir : docs/modules-marche.md.
+
 # IASELO · documents validés figés et heure serveur des soins (24 novembre 2026, audit points 5 et 6)
 
 - **Documents validés figés par le serveur** (`worker/verrous.mjs`) : consultation validée, CRO validé, VPA et prescriptions signées ne peuvent plus être modifiés en restant validés ou signés. Il faut ouvrir une révision (tracée « revision-ouverte » dans le journal), puis valider ou signer la nouvelle version.

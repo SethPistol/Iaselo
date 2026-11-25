@@ -1,0 +1,16 @@
+.lp-jour{border:1px solid var(--border);border-radius:12px;padding:8px 12px;margin:0 0 10px}
+.lp-jour legend{font-weight:700;text-transform:capitalize;padding:0 4px}
+.lp-creneaux{display:flex;flex-wrap:wrap;gap:8px}
+.lp-creneaux button{display:grid;gap:2px;min-width:92px;padding:8px 10px;font-weight:700}
+.lp-creneaux small{font-weight:400;font-size:.75rem;opacity:.8}
+.lp-table{border-collapse:collapse;width:100%;font-size:.92rem;margin:8px 0}
+.lp-table th,.lp-table td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:right}
+.lp-table th:first-child,.lp-table td:first-child{text-align:left}
+.lp-table tfoot th{font-weight:800}
+.lp-check{display:flex;gap:8px;align-items:flex-start;margin:8px 0}.lp-check input{width:auto}
+.lp-montant{font-size:2rem;font-weight:800;margin:6px 0 12px}
+.v-actions{display:flex;gap:10px;flex-wrap:wrap}
+.lang-switch{position:fixed;top:10px;right:10px;z-index:20;display:flex;gap:2px;border:1px solid var(--border);border-radius:999px;padding:2px;background:var(--bg)}
+.lang-switch button{border:0;background:none;padding:4px 10px;border-radius:999px;cursor:pointer;font-weight:700;color:inherit}
+.lang-switch button[aria-pressed=true]{background:var(--blue);color:#fff}
+@media print{.lang-switch{display:none}}

@@ -2270,6 +2270,18 @@ if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(
 const ouvertureSalles=window.createOuvertureSalles?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(ouvertureSalles){const renderBeforeOuverture=render;render=function(){if(view==='ouvertureSalles'){closeCroDictation();ouvertureSalles.render();return}renderBeforeOuverture()};const detailBeforeOuverture=detail;detail=function(){if(blocInterdit(tab))tab='perop';detailBeforeOuverture();if(tab==='perop'&&['anesthesiste','infirmier','chirurgien'].includes(jobNow())&&!infirmierEtage())ouvertureSalles.bandeauPerop($('#content'))}}
 
+// Modules issus de la comparaison au marché (dist/marche.js, dist/marche-gestion.js) : outils, messagerie, biologie, moniteurs, dictée.
+const marcheModule=window.createMarche?.({$,esc,toast,patients:()=>patients,current:p,job:jobNow,
+ go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()},
+ peutPerop:()=>periCanWrite('Surveillance'),peutConsult:()=>role==='Anesthésiste'&&!!p()?.consult&&!p().consult.validated,
+ libelle:id=>consultModele?.libelle?.(id)||id,
+ addPerop:(lignes,salle)=>{const x=p();if(!x||!periCanWrite('Surveillance'))return 0;const d=periData(),auteur=professionalWorkspace?.getAccess?.()?.profile?.display_name||role,maintenant=new Date().toISOString();let n=0;
+  for(const l of lignes){if(d.records.some(r=>r.kind==='Surveillance'&&!r.voided&&r.at===l.at&&r.source==='moniteur'))continue;d.records.push({id:'PERI-'+(crypto.randomUUID?.()||Date.now().toString(36)+n),kind:'Surveillance',at:l.at,author:auteur,created:maintenant,role,source:'moniteur',values:l.values});n++}
+  if(n){event(n+' relevé'+(n>1?'s':'')+' du moniteur '+(salle||'')+' validé'+(n>1?'s':'')+' sur la feuille d’anesthésie','Feuille d’anesthésie');if(sharedWorkspace||durableWorkspace)x.sharedDirty=true;durableWorkspace?.flush?.();detail()}return n},
+ applyConsult:(fn,texte)=>{const x=p();if(!x?.consult||x.consult.validated||role!=='Anesthésiste')return false;captureConsult();consultModele?.preparer?.(x);fn(x.consult);consultModele?.deriver?.(x);event(texte||'Consultation complétée par dictée','Consultation');x.sharedDirty=true;durableWorkspace?.flush?.();detail();return true}})||null;
+if(marcheModule){const renderBeforeMarche=render;render=function(){if(marcheModule.vues.includes(view)){closeCroDictation();marcheModule.render(view);return}renderBeforeMarche()};
+ const detailBeforeMarche=detail;detail=function(){detailBeforeMarche();if(view!=='patients'||!p())return;marcheModule.bandeauDossier(p());if(tab==='perop')marcheModule.panneauMoniteur(p());if(tab==='consult')marcheModule.panneauDictee(p())}}
+
 // Accès direct au plan de soins du séjour sélectionné.
 if($('#open-nursing-record'))$('#open-nursing-record').onclick=()=>{
  if(view==='patients'&&tab==='consult'&&p())captureConsult();
