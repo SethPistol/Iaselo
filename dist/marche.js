@@ -21,6 +21,7 @@ const TUILES=[
  {id:'logistique',titre:'Logistique du bloc',texte:'Brancardage, stérilisation des boîtes d’instruments, planning des équipes et des gardes.',jobs:['anesthesiste','chirurgien','infirmier','pharmacien','secretariat']},
  {id:'qualite',titre:'Qualité & sécurité',texte:'Déclarer un événement indésirable, suivi par la qualité, RMM, mode dégradé et classeur de secours.',jobs:['anesthesiste','chirurgien','infirmier','pharmacien','secretariat','dim','facturation','administration']},
  {id:'assurance',titre:'Assurance maladie',texte:'Droits du patient (ADRi, ROC), résumé PMSI validé par le DIM, facture du séjour, retours de paiement et rejets.',jobs:['secretariat','facturation','dim','anesthesiste','chirurgien']},
+ {id:'codage',titre:'Codage transmis',texte:'Actes codés par les médecins ou le DIM, transmis au secrétariat, à l’accueil, à la facturation ou à un autre service.',jobs:['secretariat','facturation','dim','administration','anesthesiste','chirurgien']},
  {id:'interfaces',titre:'Interfaces & connecteurs',texte:'Mouvements du logiciel administratif, envoi des actes, état des connexions (labos, moniteurs, EFS, paiement).',jobs:['anesthesiste','secretariat','dim','facturation']}
 ];
 root.createMarche=function(ctx){
@@ -101,6 +102,7 @@ root.createMarche=function(ctx){
   if(peut(['anesthesiste','chirurgien','infirmier']))api('biologie').then(j=>pose('biologie',j.aRattacher.length+j.resultats.filter(r=>r.status==='nouveau').length,j.resultats.some(r=>r.status==='nouveau'&&r.data.critiques)?'crit':'')).catch(()=>{});
   if(peut(['anesthesiste','chirurgien','infirmier']))api('transfusion').then(j=>pose('transfusion',j.tracabilite.filter(p=>p.retard).length,'warn')).catch(()=>{});
   if(peut(['secretariat','facturation','dim','anesthesiste','chirurgien']))api('assurance').then(j=>pose('assurance',j.liste.filter(x=>x.etape.cle==='rejete').length||j.liste.filter(x=>x.etape.cle==='pret').length,j.liste.some(x=>x.etape.cle==='rejete')?'crit':'')).catch(()=>{});
+  if(peut(['secretariat','facturation','dim','administration','anesthesiste','chirurgien']))api('codage').then(j=>pose('codage',j.recues.filter(x=>j.services.some(s=>x.data.destinataires.includes(s)&&(x.data.services?.[s]?.etat||'transmis')==='transmis')).length+j.envoyees.filter(x=>x.status==='a-corriger').length,j.envoyees.some(x=>x.status==='a-corriger')?'crit':'')).catch(()=>{});
   api('evenements').then(j=>pose('qualite',j.gestion?j.ei.filter(e=>e.status!=='clos').length:0)).catch(()=>{});
  }
  /* ---------- Bandeau dans le dossier du patient ---------- */

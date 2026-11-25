@@ -2123,7 +2123,7 @@ const professionalWorkspace=window.createProfessionalWorkspace({esc,toast,setPro
  const old=$('#care-team-new');if(old)old.remove();
  if(teams.length){const label=document.createElement('label');label.id='care-team-new';label.textContent='Équipe de soins du nouveau séjour';const select=document.createElement('select');select.name='careTeamId';select.required=true;for(const team of teams){const option=document.createElement('option');option.value=team.id;option.textContent=team.label;select.append(option)}label.append(select);$('#newform').insertBefore(label,$('#newform button[type=submit]'));}
 }});
-let durableWorkspace=null;
+let durableWorkspace=null;window.IaseloEnregistrerDossier=()=>durableWorkspace?.flush();
 const questionnaireSender=window.createPatientInvitation({$,esc,toast,patients,current:p,access:()=>professionalWorkspace.getAccess(),teams:()=>careTeams,canPrepare:()=>['anesthesiste','chirurgien','secretariat'].includes(accessJob)&&careTeams.length>0,save:async()=>{if(!durableWorkspace)throw Error('Dossier partagé indisponible.');await durableWorkspace.flush()},create:(contact,team)=>{
  const stay={id:'DÉMO-'+crypto.randomUUID().slice(0,12),identity:{lastName:contact.lastName,firstName:contact.firstName,birthDate:contact.birthDate},careTeamId:team,specialty:'À renseigner',mode:'Ambulatoire',stage:'Consultation',task:'Questionnaire patient attendu',done:false,consult:{asa:'Non renseigné',history:'',allergies:'À vérifier',treatments:'',plan:'',checks:[],validated:false},notes:[],rx:[],discharge:{summary:'',instructions:'',validated:false},events:[]};patients.unshift(stay);selected=stay.id;return stay;
 }});

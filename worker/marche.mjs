@@ -12,6 +12,7 @@ import H from '../dist/interop-hl7.js';
 import M from '../dist/marche-regles.js';
 import planningCore from '../dist/planning-core.js';
 import {creerModuleAssurance} from './assurance-maladie.mjs';
+import {creerModuleCodage} from './codage-transmis.mjs';
 import {etatConnecteurs,etatConnecteur,jetonValide,envoyer,sessionPaiement,signatureStripe} from '../server/interop/etablissement.mjs';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const t=v=>typeof v==='string'?v.trim():v===undefined||v===null?'':String(v).trim();
@@ -419,6 +420,7 @@ const HANDLERS={
    return json({error:'Action inconnue.'},400)}}
 };
 HANDLERS.assurance=creerModuleAssurance({json,t,court,lire,un,creer,modifier,docData,est,voitSejour,cliniqueSejour,maintenant,aujourdhui,etatConnecteur,envoyer,sejours});
+HANDLERS.codage=creerModuleCodage({json,t,court,lire,un,creer,modifier,docData,est,cliniqueSejour,aujourdhui,maintenant});
 const EQUIPES=[{id:'bloc',label:'Équipe du bloc'},{id:'anesthesie',label:'Anesthésie'},{id:'etage',label:'Services d’hospitalisation'},{id:'tous',label:'Toute la clinique'}];
 function accesFil(acl,fil){if(!acl.active)return false;
  if(fil.startsWith('sejour:'))return voitSejour(acl,fil.slice(7))&&[...CLIN,'secretariat'].includes(acl.job);
