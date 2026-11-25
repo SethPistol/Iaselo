@@ -29,7 +29,7 @@ root.createMarche=function(ctx){
  const etat={};// par outil : onglet, séjour choisi, données
  const job=()=>ctx.job()||'';const admin=()=>document.body.dataset.admin==='true';
  const peut=jobs=>admin()||jobs.includes(job());
- const style=document.createElement('link');style.rel='stylesheet';style.href='marche.css?v=2';document.head.append(style);
+ const style=document.createElement('link');style.rel='stylesheet';style.href='marche.css?v=3';document.head.append(style);
 
  /* ---------- Socle ---------- */
  async function api(module,{q='',body,sous=''}={}){

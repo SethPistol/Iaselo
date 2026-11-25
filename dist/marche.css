@@ -101,3 +101,8 @@
 .am-entete small{display:block;opacity:.75}
 .am-constats li{margin:4px 0}
 .am-large{grid-column:1/-1}
+.am-encaisse{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
+.am-encaisse input{max-width:9rem}
+.am-encaisse select{max-width:13rem}
+.am-actions summary{cursor:pointer;font-weight:600;white-space:nowrap}
+.am-actions[open]{min-width:15rem}

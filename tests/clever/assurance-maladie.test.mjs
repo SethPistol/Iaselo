@@ -11,13 +11,13 @@ test('Assurance maladie : droits, PMSI, facture, retours',async()=>{
  const db=new PGlite(),pool=pgPool(db);
  try{
   await migrate(pool);await bootstrap(pool,env);_testCcam(new Map([['NEKA020',{libelle:'Remplacement de l’articulation coxofémorale par prothèse totale',tarif:470.49}]]));
-  const app=await makeApp({pool,bucket:{async put(){},async get(){return null}},cfg:config(env),interopEnv:{INTEROP_FACTURATION_JETON:JETON,IASELO_RECETTE:'true'}});
+  const app=await makeApp({pool,bucket:{async put(){},async get(){return null}},cfg:config(env),interopEnv:{INTEROP_FACTURATION_JETON:JETON,INTEROP_FINESS:'750000000',IASELO_RECETTE:'true'}});
   const call=async(method,route,data,cookie,headers={})=>app(new Request(origin+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{}),...headers},...(data!==undefined?{body:typeof data==='string'?data:JSON.stringify(data)}:{})}));
   const login=async(e,p)=>(await call('POST','/auth/login',{email:e,password:p})).headers.get('Set-Cookie').split(';')[0];
   await login(RECETTE_EMAIL,RECETTE_PASSWORD);
   const api=async(cookie,method,route,data)=>{const r=await call(method,'/api/workspace'+route,data,cookie);return {status:r.status,data:await r.json()}};
   const at=new Date().toISOString(),password='Mot de passe de test 2026',c={};
-  for(const job of ['secretariat','facturation','dim','anesthesiste','infirmier']){
+  for(const job of ['secretariat','facturation','dim','anesthesiste','infirmier','chirurgien']){
    const id=await createAccount(pool,{email:job+'@example.test',name:'Nom '+job,passwordHash:await hashPassword(password)});await pool.query('UPDATE professional_profiles SET profession=$2,updated_at=$3 WHERE user_id=$1',[id,job,at]);
    await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);await pool.query('UPDATE auth_users SET must_change_password=0 WHERE id=$1',[id]);c[job]=await login(job+'@example.test',password)}
   const doc=(key,data)=>pool.query("INSERT INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES($1,$2,1,'test',$3,$4,'test') ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data",[key,JSON.stringify(data),at,crypto.randomUUID()]);
@@ -33,7 +33,7 @@ test('Assurance maladie : droits, PMSI, facture, retours',async()=>{
   // Droits : NIR contrôlé côté serveur.
   assert.equal((await api(sec,'POST','/marche/assurance',{action:'droits',stay:'AM1',droits:{nir:'285027512345673'}})).status,400,'clé du NIR fausse');
   assert.equal((await api(dim,'POST','/marche/assurance',{action:'droits',stay:'AM1',droits:{nir:'285027512345672'}})).status,403,'DIM : pas la saisie des droits');
-  let r=await api(sec,'POST','/marche/assurance',{action:'droits',stay:'AM1',droits:{nir:'2 85 02 75 123 456 72',qualite:'assure',regime:'general',caisse:'751',nature:'10',exoneration:'aucune',amc:'oui',amcNumero:'12345678'}});assert.equal(r.status,200);
+  let r=await api(sec,'POST','/marche/assurance',{action:'droits',stay:'AM1',droits:{nir:'2 85 02 75 123 456 72',qualite:'assure',regime:'general',caisse:'751',nature:'10',exoneration:'aucune',amc:'oui',amcNumero:'12345678',codePostal:'75016'}});assert.equal(r.status,200);
   r=await api(sec,'POST','/marche/assurance',{action:'adri',stay:'AM1'});assert.equal(r.data.dossier.droits.adri.ouverts,true);assert.equal(r.data.dossier.droits.acquisition,'adri');
   r=await api(sec,'POST','/marche/assurance',{action:'roc',stay:'AM1'});assert.match(r.data.dossier.droits.roc.reference,/^SIM-ROC-/);
   // Minimisation : le secrétariat ne reçoit ni diagnostics, ni ASA, ni pré-facture.
@@ -48,7 +48,11 @@ test('Assurance maladie : droits, PMSI, facture, retours',async()=>{
   const envois=(await api(dim,'GET','/marche/assurance?stay=AM1')).data.envois;assert.match(envois[0].data.message,/BAR\^P12[\s\S]*DG1\|1\|\|M16\.1/);
   // Facture : bloquée sans GHS, puis transmise ; pas de diagnostic dans la facture.
   let t1=await api(fac,'POST','/marche/assurance',{action:'transmettre',stay:'AM1'});assert.equal(t1.status,400);assert.ok(t1.data.erreurs.some(e=>/GHS/.test(e)));
-  r=await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{ghm:'08C48',ghs:'0821',ghsTarif:'4100'}});assert.equal(r.status,200);
+  // Tarifs de l'arrêté importés : le tarif du GHS se remplit seul.
+  assert.equal((await api(sec,'POST','/marche/assurance',{action:'tarifs',texte:'821;4100'})).status,403,'tarifs : facturation seulement');
+  assert.equal((await api(fac,'POST','/marche/assurance',{action:'tarifs',annee:'2026',texte:'GHS;tarif;bb;bh;exh\n821;4100,00;2;12;210\n'})).data.nombre,1);
+  r=await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{ghm:'08C48',ghs:'821',chambreNuits:'3',chambrePrix:'90',amcChambreParNuit:'60'}});assert.equal(r.status,200);
+  assert.equal(r.data.dossier.facture.tarifAuto.tarif,4100);assert.deepEqual([r.data.dossier.repartition.amo,r.data.dossier.repartition.amc,r.data.dossier.repartition.patient],[r.data.dossier.preFacture.amo,284,90]);
   const pf=r.data.dossier.preFacture;assert.equal(pf.participation,24);assert.equal(pf.forfaitJournalier,80);assert.equal(pf.baseSejour,5600,'GHS + implant en sus');
   assert.equal(r.data.dossier.contexte.diagnostics,undefined,'facturation : pas de diagnostic');
   t1=await api(fac,'POST','/marche/assurance',{action:'transmettre',stay:'AM1'});assert.equal(t1.status,200,JSON.stringify(t1.data));
@@ -63,6 +67,25 @@ test('Assurance maladie : droits, PMSI, facture, retours',async()=>{
   t1=await api(fac,'POST','/marche/assurance',{action:'transmettre',stay:'AM1'});assert.equal(t1.status,200);
   r=await api(fac,'POST','/marche/assurance',{action:'simuler-retour',stay:'AM1',issue:'paye'});assert.equal(r.data.dossier.statut,'paye');
   l=(await api(fac,'GET','/marche/assurance')).data;assert.equal(l.liste.find(x=>x.stay==='AM1').etape.cle,'paye');
+  // Factures numérotées : 1re émission annulée par avoirs après le rejet, 2e émission lettrée par le paiement NOEMIE.
+  let fv=(await api(fac,'GET','/marche/assurance?vue=factures')).data;
+  assert.deepEqual(fv.factures.map(f=>f.data.numero).sort(),['A2026-000001','A2026-000002','A2026-000003','F2026-000001','F2026-000002','F2026-000003','F2026-000004','F2026-000005','F2026-000006']);
+  const amo2=fv.factures.find(f=>f.data.numero==='F2026-000004'),pat=fv.factures.find(f=>f.data.numero==='F2026-000006');
+  assert.equal(amo2.data.debiteur,'amo');assert.equal(amo2.data.etat,'soldee');assert.equal(pat.data.debiteur,'patient');assert.equal(pat.data.montant,90);
+  assert.equal(fv.factures.find(f=>f.data.numero==='F2026-000001').data.etat,'annulee');
+  assert.equal((await api(sec,'GET','/marche/assurance?vue=factures')).status,403);
+  assert.equal((await api(fac,'POST','/marche/assurance',{action:'encaissement',id:pat.id,montant:'100',mode:'carte'})).status,400,'au-delà du solde');
+  r=await api(fac,'POST','/marche/assurance',{action:'encaissement',id:pat.id,montant:'90',mode:'carte'});assert.equal(r.data.facture.status,'soldee');
+  const amc=fv.factures.find(f=>f.data.numero==='F2026-000005');
+  assert.equal((await api(fac,'POST','/marche/assurance',{action:'avoir',id:amc.id,motif:'non'})).status,400,'motif trop court');
+  r=await api(fac,'POST','/marche/assurance',{action:'avoir',id:amc.id,motif:'Erreur de complémentaire'});assert.equal(r.data.avoir.data.numero,'A2026-000004');
+  assert.equal((await api(fac,'POST','/marche/assurance',{action:'lot-b2'})).status,400,'aucune facture AMO en attente');
+  const csv=(await api(fac,'GET','/marche/assurance?vue=export')).data.csv;assert.match(csv,/F2026-000006;4113/);assert.match(csv,/BQ;.*F2026-000006;512/);
+  // Espace DIM : tableau du mois de sortie et fichier RSS.
+  assert.equal((await api(fac,'GET','/marche/assurance?vue=dim')).status,403);
+  const dv=(await api(dim,'GET','/marche/assurance?vue=dim&mois=2026-11')).data;assert.equal(dv.tableau.sortis,1);assert.equal(dv.tableau.valides,1);
+  const lot=await api(dim,'POST','/marche/assurance',{action:'lot-pmsi',mois:'2026-11'});assert.equal(lot.status,200,JSON.stringify(lot.data));
+  assert.equal(lot.data.lot.data.nombre,1);const rum=lot.data.fichier.split('\r\n')[0];assert.equal(rum.slice(0,12),'750000000018');assert.match(rum,/M161/);assert.equal(rum.slice(97,102),'75016');
   // Journal d'accès.
   const log=(await pool.query("SELECT count(*) AS n FROM professional_access_log WHERE target LIKE 'marche/assurance%'")).rows[0];assert.ok(Number(log.n)>5);
  }finally{await pool.end()}
