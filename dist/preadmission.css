@@ -1,0 +1,99 @@
+/* IASELO · préadmission du patient (page preadmission.html) et écran des admissions (preadmissions.js). */
+.pa-patient{--pa-act:#0F4D5C;--pa-act2:#41AD95;--pa-ok:#0F6E55;--pa-warn:#8F4500;--pa-crit:#B21F2A;--pa-bg:#F3F5F8;--pa-line:#dfe5ea;--pa-mut:#5b6b73}
+.pa .content{max-width:860px;margin:0 auto}
+.pa-hero{display:flex;gap:20px;align-items:center;justify-content:space-between;padding:22px 24px;border-radius:18px;background:linear-gradient(135deg,#0F4D5C 0%,#176a7c 60%,#2a8f8a 100%);color:#fff;margin:0 0 18px}
+.pa-hero h2{color:#fff;margin:4px 0 8px;font-size:1.35rem}
+.pa-hero p{margin:0 0 6px;color:#e5f4f6;line-height:1.5}
+.pa-kicker{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:#bfe6ea!important}
+.pa-hero .pa-ok{background:rgba(255,255,255,.14);color:#fff;border:0}
+.pa-hero-g{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto;font-size:.85rem;color:#e5f4f6}
+.pa-ring{width:92px;height:92px}
+.pa-ring circle{fill:none;stroke-width:7}
+.pa-ring-bg{stroke:rgba(255,255,255,.22)}
+.pa-ring-fg{stroke:#9fe3c9;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .5s}
+.pa-ring text{fill:#fff;font-size:15px;font-weight:700}
+.pa-filtres{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
+.pa-filtres button{border-radius:999px;padding:8px 16px;border:1.5px solid var(--pa-act);background:#fff;color:var(--pa-act);font-weight:600;min-height:40px}
+.pa-filtres button[aria-selected=true]{background:var(--pa-act);color:#fff}
+.pa-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.pa-step{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-radius:14px;background:#fff;border:1px solid var(--pa-line);border-left:5px solid #b9c6cd;box-shadow:0 1px 2px rgba(16,58,69,.05)}
+.pa-step.obligatoire{border-left-color:var(--pa-act)}
+.pa-step.importante{border-left-color:var(--pa-act2)}
+.pa-step.is-done{opacity:.8;border-left-color:var(--pa-ok)}
+.pa-step-t{margin:0 0 6px;font-weight:600;color:#12404c}
+.pa-step button{flex:0 0 auto;min-height:44px;border-radius:999px;padding:0 18px;display:inline-flex;align-items:center;gap:6px}
+.pa-step button svg{width:18px;height:18px}
+.pa-empty{padding:16px;color:var(--pa-mut);text-align:center}
+.pa-tags{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+.pa-tag{display:inline-flex;align-items:center;gap:4px;font-size:.74rem;font-weight:700;padding:2px 9px;border-radius:6px;border:1px solid var(--pa-line);color:var(--pa-mut);background:#fff}
+.pa-tag svg{width:13px;height:13px}
+.pa-tag.obligatoire{color:#fff;background:var(--pa-act);border-color:var(--pa-act)}
+.pa-tag.importante{color:#0c5a4a;background:#e2f4ee;border-color:#bfe5d8}
+.pa-ok{display:flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px;background:#e3f3ec;color:var(--pa-ok);font-weight:600;border:1px solid #bfe3d1}
+.pa-ok svg{width:18px;height:18px;flex:0 0 auto}
+.pa-alert{padding:12px 14px;border-radius:10px;background:#fdecea;color:var(--pa-crit);border:1px solid #f2c4c0;margin:0 0 12px}
+.pa-back{display:inline-flex;align-items:center;gap:4px;background:none;border:0;color:var(--pa-act);font-weight:700;padding:6px 0;margin:0 0 8px;min-height:40px;cursor:pointer}
+.pa-back svg{width:20px;height:20px}
+.pa-card{background:#fff;border:1px solid var(--pa-line);border-radius:16px;padding:20px 22px}
+.pa-card h2{margin:8px 0 12px}
+.pa-card h3{margin:18px 0 6px;font-size:1rem;color:#12404c}
+.pa-intro{font-size:1.02rem;line-height:1.55}
+.pa-note{color:var(--pa-mut);font-size:.88rem;line-height:1.45}
+.pa-big{min-height:50px;font-size:1rem;padding:0 22px;border-radius:999px}
+.pa-texte{padding:14px 16px;background:var(--pa-bg);border-radius:10px;line-height:1.55;margin:0 0 12px}
+.pa fieldset{border:1px solid var(--pa-line);border-radius:14px;padding:14px 16px 16px;margin:0 0 14px}
+.pa legend{font-weight:700;color:var(--pa-act);padding:0 6px}
+.pa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px 14px;margin:8px 0}
+.pa-grid label,.pa label.pa-wide{display:flex;flex-direction:column;gap:4px;font-size:.9rem;font-weight:600;color:#12404c}
+.pa-grid .pa-wide{grid-column:1/-1}
+.pa-grid input,.pa-grid select,.pa textarea{min-height:44px;font-weight:400;font-size:1rem}
+.pa small{font-weight:400;color:var(--pa-mut)}
+.pa-radio,.pa-check{display:flex;align-items:flex-start;gap:8px;padding:8px 0;font-weight:500;line-height:1.4}
+.pa-radio input,.pa-check input{width:20px;height:20px;flex:0 0 auto;margin-top:1px}
+.pa-q{font-weight:700;margin:12px 0 2px}
+.pa-id{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 16px;margin:4px 0 8px}
+.pa-id dt{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--pa-mut)}
+.pa-id dd{margin:2px 0 0;font-weight:700}
+.pa-verif{margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--pa-bg)}
+.pa-verif ul{list-style:none;margin:4px 0 8px;padding:0}
+.pa-verif li{display:flex;align-items:center;gap:6px;font-weight:600}
+.pa-verif svg{width:18px;height:18px;color:var(--pa-ok)}
+.pa-pieces h3{margin-top:4px}
+.pa-pieces ul{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.pa-pieces li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px dashed #c6d2d9;border-radius:12px;background:#fff}
+.pa-pieces li.is-ok{border-style:solid;border-color:#bfe3d1;background:#f2faf6}
+.pa-pieces li.is-ko{border-style:solid;border-color:#f2c4c0;background:#fdf3f2}
+.pa-pieces li div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pa-pieces small{overflow-wrap:anywhere}
+.pa-file{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--pa-act);color:var(--pa-act);font-weight:700;cursor:pointer;flex:0 0 auto;background:#fff}
+.pa-file input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.pa-file.is-busy{opacity:.5;pointer-events:none}
+.pa-file:focus-within{outline:3px solid #51bbd6}
+.pa-form-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.pa .is-missing{outline:2px solid var(--pa-crit);outline-offset:3px;border-radius:8px}
+.pa-date{display:flex;flex-direction:column;gap:4px;max-width:260px;margin:6px 0 10px;font-weight:600}
+@media (max-width:640px){
+ .pa-hero{flex-direction:column;align-items:flex-start;padding:18px}
+ .pa-hero-g{flex-direction:row;gap:12px}
+ .pa-step{flex-direction:column;align-items:stretch}
+ .pa-step button{justify-content:center}
+ .pa-pieces li{flex-direction:column;align-items:stretch}
+ .pa-card{padding:16px}
+}
+/* Récapitulatif imprimé (patient et admissions) */
+#pa-print{display:none}
+body.pa-printing>*:not(#pa-print){display:none!important}
+body.pa-printing #pa-print{display:block}
+.pa-recap{font:13px/1.45 Geist,system-ui,sans-serif;color:#111;max-width:760px;margin:0 auto}
+.pa-recap h1{font-size:20px;margin:0 0 4px}
+.pa-recap h2{font-size:14px;margin:16px 0 6px;padding-bottom:3px;border-bottom:1.5px solid #0F4D5C;color:#0F4D5C;text-transform:uppercase;letter-spacing:.04em}
+.pa-recap table{width:100%;border-collapse:collapse}
+.pa-recap th,.pa-recap td{text-align:left;vertical-align:top;padding:3px 8px 3px 0;border-bottom:1px solid #e6e6e6}
+.pa-recap th{width:34%;font-weight:600;color:#444}
+.pa-recap footer{margin-top:18px;color:#666;font-size:11px}
+@media print{body.pa-printing{background:#fff}}
+/* Fin du questionnaire (patient.html) : invitation à la préadmission */
+.pa-suite{margin-top:18px;padding:18px 20px;border-radius:16px;background:linear-gradient(135deg,#0F4D5C,#2a8f8a);color:#fff}
+.pa-suite h3{margin:0 0 6px;color:#fff}
+.pa-suite p{color:#e5f4f6;line-height:1.5}
+.pa-suite a.primary{display:inline-flex;align-items:center;min-height:48px;padding:0 22px;border-radius:999px;background:#fff;color:#0F4D5C;font-weight:700;text-decoration:none}

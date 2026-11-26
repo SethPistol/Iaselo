@@ -12,6 +12,7 @@ import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
 import {patientEspacePatientApi,staffEspacePatientApi,consentAvant,consentDeclencher} from './espace-patient.mjs';
+import {patientPreadmissionApi,staffPreadmissionApi} from './preadmission.mjs';
 import {patientLettreLiaisonApi,staffLettreLiaisonApi,lettresAvant,declencher} from './lettre-liaison.mjs';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const validKey=k=>typeof k==='string'&&k.length<180&&/^(stay\/[^/]{1,80}\/[a-zA-Z][a-zA-Z0-9]*|management\/[a-zA-Z]+|identities\/(records|reviews))$/.test(k);
@@ -23,6 +24,7 @@ export async function workspaceApi(request,env){
  if(path.startsWith('/api/prescriptions/'))return env.DB?patientPrescriptionsApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/lettre-liaison/'))return env.DB?patientLettreLiaisonApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/suivi-j1/'))return env.DB?patientSuiviJ1Api(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
+ if(path.startsWith('/api/preadmission/'))return env.DB?patientPreadmissionApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/espace-patient/'))return env.DB?patientEspacePatientApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(!path.startsWith('/api/workspace'))return null;
  if(!env.DB)return json({error:'Stockage serveur indisponible.'},503);
@@ -62,6 +64,7 @@ export async function workspaceApi(request,env){
   const veilleResponse=await veilleApi(request,env,acl);if(veilleResponse)return veilleResponse;
   const prescriptionsResponse=await staffPrescriptionsApi(request,env,acl);if(prescriptionsResponse)return prescriptionsResponse;
   const espaceResponse=await staffEspacePatientApi(request,env,acl);if(espaceResponse)return espaceResponse;
+  const preadmissionResponse=await staffPreadmissionApi(request,env,acl);if(preadmissionResponse)return preadmissionResponse;
   const suiviJ1Response=await staffSuiviJ1Api(request,env,acl);if(suiviJ1Response)return suiviJ1Response;
   const convocationsResponse=await staffConvocationsApi(request,env,acl);if(convocationsResponse)return convocationsResponse;
   const annoncesResponse=await staffAnnoncesBlocApi(request,env,acl);if(annoncesResponse)return annoncesResponse;

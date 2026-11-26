@@ -27,7 +27,11 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(pathname==='/api/admin/accounts/mfa-reset'&&request.method==='POST')return auth.resetMfaFromAdmin(request);
   if(pathname==='/auth/password'&&request.method==='POST')return auth.changePassword(request);
   if(pathname==='/api/admin/accounts'&&request.method==='POST')return auth.createAccountFromAdmin(request);
-  if(pathname==='/api/questionnaire/submit'||pathname==='/api/questionnaire/resolve'||pathname==='/api/prescriptions/open'||pathname==='/api/prescriptions/view')return workspaceApi(request,{DB,BUCKET:bucket,ENABLE_DEMO_SEED:cfg.enableDemoSeed});
+  // Fin du questionnaire : le lien de préadmission part par SMS et e-mail (messagerie transmise pour ce seul envoi).
+  if(pathname==='/api/questionnaire/submit')return workspaceApi(request,{DB,BUCKET:bucket,ENABLE_DEMO_SEED:cfg.enableDemoSeed,MESSAGING:messaging});
+  if(pathname==='/api/questionnaire/resolve'||pathname==='/api/prescriptions/open'||pathname==='/api/prescriptions/view')return workspaceApi(request,{DB,BUCKET:bucket,ENABLE_DEMO_SEED:cfg.enableDemoSeed});
+  // Préadmission (lien personnel) : formulaire, pièces, étapes ; aucun envoi possible.
+  if(pathname.startsWith('/api/preadmission/'))return workspaceApi(request,{DB,BUCKET:bucket,ESTABLISHMENT:messaging?.establishment||'',TELEPHONE_ADMISSIONS:process.env.TELEPHONE_ADMISSIONS||''});
   // Espace patient (lien personnel) : seul le nom de l'établissement de la messagerie est transmis, aucun envoi possible.
   // Lettre de liaison (lien personnel du patient) : lecture seule, aucun envoi possible.
   if(pathname.startsWith('/api/lettre-liaison/'))return workspaceApi(request,{DB});

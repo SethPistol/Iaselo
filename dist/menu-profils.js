@@ -8,12 +8,12 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else{root.IaseloMenu=api;api.installer(root.document)}})(typeof self!=='undefined'?self:this,function(){
 'use strict';
 const MENUS={
- anesthesiste:['priorities','controle','patients','releve','regulation','ouvertureSalles','pharmacy','questionnaireSend','tasks','droits'],
- chirurgien:['priorities','controle','patients','regulation','pmsi','questionnaireSend','tasks','droits'],
+ anesthesiste:['priorities','controle','patients','releve','regulation','ouvertureSalles','pharmacy','questionnaireSend','preadmissions','tasks','droits'],
+ chirurgien:['priorities','controle','patients','regulation','pmsi','questionnaireSend','preadmissions','tasks','droits'],
  infirmier:['priorities','controle','patients','releve','identity','regulation','ouvertureSalles','pharmacy','tasks'],
  // Infirmier(ère) d'étage : sans l'ouverture des salles (ni la check-list HAS, masquée dans le dossier).
  infirmier_etage:['priorities','controle','patients','releve','identity','regulation','pharmacy','tasks'],
- secretariat:['priorities','controle','patients','identity','questionnaireSend','regulation','tasks'],
+ secretariat:['priorities','controle','patients','preadmissions','identity','questionnaireSend','regulation','tasks'],
  // Pharmacien et préparateur en pharmacie : même menu ; les droits (validation) diffèrent côté serveur.
  pharmacien:['controle','patients','pharmacy','commandesPharmacie','tasks'],
  dim:['patients','pmsi','activity','tasks'],

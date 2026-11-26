@@ -163,9 +163,18 @@ async function submitPatientQuestionnaire(form){
  const button=form.querySelector('button.primary');
  button.disabled=true;
  try{
-  await qrApi('submit',{token:invitation,answers,confirmed:confirmed==='on'});
+  const result=await qrApi('submit',{token:invitation,answers,confirmed:confirmed==='on'});
   for(const key of Object.keys(patientDrafts))delete patientDrafts[key];
-  message('Questionnaire transmis','Merci. Vos réponses ont été transmises à l’équipe d’anesthésie, qui les relira avec vous lors de la consultation. Vous pouvez fermer cette page.');
+  // Étape suivante : la préadmission de la clinique (endoscopie ou chirurgie), lien personnel aussi envoyé par SMS ou e-mail.
+  const pre=result?.preadmission;
+  if(pre?.lien&&/^https?:\/\/[^\s"<>]+\/preadmission\.html#acces=[a-f0-9]{64}$/.test(pre.lien)){
+   message('Questionnaire transmis','Merci. Vos réponses ont été transmises à l’équipe d’anesthésie, qui les relira avec vous lors de la consultation.');
+   const box=document.createElement('div');box.className='pa-suite';
+   const envoye=(pre.envoye||[]).map(c=>c==='sms'?'SMS':'e-mail');
+   box.innerHTML='<h3>Étape suivante : votre préadmission'+(pre.type==='endoscopie'?' pour votre endoscopie':pre.type==='chirurgie'?' pour votre chirurgie':'')+'</h3><p>Réalisez dès maintenant votre préadmission à la clinique : formulaire administratif, pièces justificatives (pièce d’identité, carte Vitale, mutuelle, justificatif de domicile) et informations utiles. Environ 15 minutes ; vous pouvez la terminer plus tard.'+(envoye.length?' Le lien vous a aussi été envoyé par '+envoye.join(' et ')+'.':'')+'</p>';
+   const a=document.createElement('a');a.className='primary';a.href=pre.lien;a.rel='noreferrer';a.textContent='Commencer ma préadmission';box.append(a);
+   ($('#workspace .content')||$('#workspace')).append(box);
+  }else message('Questionnaire transmis','Merci. Vos réponses ont été transmises à l’équipe d’anesthésie, qui les relira avec vous lors de la consultation. Vous pouvez fermer cette page.');
  }catch(err){
   toast(err.message);
   button.disabled=false;

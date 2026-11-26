@@ -2337,6 +2337,9 @@ if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(
 
 // Ouverture des salles (dist/ouverture-salles.js) : vérifications quotidiennes infirmière et anesthésie, rappel sur la feuille d’anesthésie.
 const ouvertureSalles=window.createOuvertureSalles?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+// Préadmissions des patients (admissions, anesthésistes, chirurgiens) : écran dist/preadmissions.js.
+const preadmissionsEcran=window.createPreadmissions?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(preadmissionsEcran){const renderBeforePreadmissions=render;render=function(){if(view==='preadmissions'){closeCroDictation();preadmissionsEcran.render();return}renderBeforePreadmissions()}}
 if(ouvertureSalles){const renderBeforeOuverture=render;render=function(){if(view==='ouvertureSalles'){closeCroDictation();ouvertureSalles.render();return}renderBeforeOuverture()};const detailBeforeOuverture=detail;detail=function(){if(blocInterdit(tab))tab='perop';detailBeforeOuverture();if(tab==='perop'&&['anesthesiste','infirmier','chirurgien'].includes(jobNow())&&!infirmierEtage())ouvertureSalles.bandeauPerop($('#content'))}}
 
 // Modules issus de la comparaison au marché (dist/marche.js, dist/marche-gestion.js) : outils, messagerie, biologie, moniteurs, dictée.

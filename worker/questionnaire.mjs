@@ -1,3 +1,4 @@
+import {apresQuestionnaire} from './preadmission.mjs';
 const invitationJson=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
 const invitationHash=async token=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))),b=>b.toString(16).padStart(2,'0')).join('');
 async function invitationBody(request){const bytes=await request.arrayBuffer();if(bytes.byteLength>120000)throw Error('size');return JSON.parse(new TextDecoder().decode(bytes))}
@@ -29,7 +30,9 @@ export async function patientQuestionnaireApi(request,env){
   env.DB.prepare('UPDATE questionnaire_invitations SET used_at=? WHERE token_hash=?').bind(at,hash),
   env.DB.prepare('DELETE FROM workspace_write_checks WHERE operation=?').bind(op)
  ])}catch{return invitationJson({error:'Invitation déjà utilisée ou questionnaire reçu. Aucun nouvel envoi enregistré.'},409)}
- return invitationJson({received:true},201);
+ // Fin du questionnaire : lien vers la préadmission de la clinique (endoscopie ou chirurgie), affiché et envoyé.
+ const preadmission=await apresQuestionnaire(env,row.stay_id,url.origin);
+ return invitationJson({received:true,...(preadmission?.lien?{preadmission:{lien:preadmission.lien,type:preadmission.type,envoye:preadmission.envoye}}:{})},201);
  }catch{return invitationJson({error:'Service questionnaire indisponible.'},503)}
 }
 const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);

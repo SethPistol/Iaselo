@@ -12,7 +12,8 @@ test('rappels automatiques : J-2 / J-1 si le consentement n’est pas revenu, J+
  const db=new PGlite(),pool=pgPool(db);
  try{
   await migrate(pool);await bootstrap(pool,env);const sent=[];
-  const messaging={channels:{sms:true,email:true},establishment:'Clinique test',sms:async m=>{sent.push({sms:m});return 'S1'},email:async m=>{sent.push({email:m});return 'E1'}};
+  // Les rappels de préadmission (J-7, J-3, J-1) ont leur propre test (preadmission.test.mjs) : écartés ici.
+  const preadm=[],messaging={channels:{sms:true,email:true},establishment:'Clinique test',sms:async m=>{(m.tag==='iaselo-preadmission'?preadm:sent).push({sms:m});return 'S1'},email:async m=>{(m.tag==='iaselo-preadmission'?preadm:sent).push({email:m});return 'E1'}};
   const app=await makeApp({pool,bucket:{async put(){},async get(){return null}},cfg:config(env),messaging});
   const call=async(method,route,data,cookie)=>app(new Request(origin+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},...(data!==undefined?{body:JSON.stringify(data)}:{})}));
   const cookie=(await call('POST','/auth/login',{email:RECETTE_EMAIL,password:RECETTE_PASSWORD})).headers.get('Set-Cookie').split(';')[0];

@@ -11,8 +11,10 @@ import {envoyer,updateSpace} from './espace-patient.mjs';
 import {suiviMessages} from './veille.mjs';
 import {creerLienJ1} from './suivi-j1.mjs';
 import {tourneeConvocations} from './convocations.mjs';
+import P from '../dist/preadmission-regles.js';
+import {contexte,envoyerLien,updatePre} from './preadmission.mjs';
 export const ACTEUR='iaselo-automatique',NOM='Envoi automatique IASELO',HEURE_DEBUT=10,HEURE_FIN=20;
-export const LIBELLES={'convocation':'Convocation','consentement-j-2':'Rappel du consentement à J-2','consentement-j-1':'Rappel du consentement à J-1','suivi-j+1':'SMS de suivi à J+1'};
+export const LIBELLES={'convocation':'Convocation','consentement-j-2':'Rappel du consentement à J-2','consentement-j-1':'Rappel du consentement à J-1','suivi-j+1':'SMS de suivi à J+1','preadmission-j-7':'Rappel de préadmission à J-7','preadmission-j-3':'Rappel de préadmission à J-3','preadmission-j-1':'Rappel de préadmission à J-1'};
 const mask=v=>{v=String(v||'');return v.length>4?v.slice(0,3)+'*'.repeat(v.length-5)+v.slice(-2):'***'};
 async function docData(env,key){const row=await env.DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(key).first();return row?JSON.parse(row.data):null}
 export function heureParis(now=new Date()){
@@ -75,6 +77,30 @@ async function suiviJ1(env,acl,stay,date,origin){
  return {stay,kind,ok,detail};
 }
 
+// Préadmission non faite à J-7, J-3 puis J-1 : nouveau lien par SMS et e-mail (coordonnées vérifiées).
+// Trace dans la rubrique preadmissionPatient (rappels), visible par les admissions ; jamais deux fois le même rappel.
+async function rappelPreadmission(env,acl,stay,date,kind,origin){
+ const ctx=await contexte(env,stay);
+ if(['faite','verifiee'].includes(ctx.etat.code))return {stay,kind,sansObjet:'préadmission faite'};
+ const trace=async entry=>{await updatePre(env,stay,ACTEUR,LIBELLES[kind],d=>{d.rappels=[...(d.rappels||[]).filter(e=>!(e.kind===kind&&e.date===date)),entry].slice(-20)})};
+ const sansEnvoi=async raison=>{
+  const prev=(ctx.data.rappels||[]).find(e=>e.kind===kind&&e.date===date);
+  if(!(prev&&!prev.ok&&prev.raison===raison)){await acl.log(kind,'stay/'+stay+'/preadmissionPatient','denied',LIBELLES[kind]+' non envoyé',raison);await trace({kind,date,at:new Date().toISOString(),ok:false,raison})}
+  return {stay,kind,alerte:raison};
+ };
+ const contact=ctx.contact,messaging=env.MESSAGING;
+ if(!contact||(!contact.phone&&!contact.email))return sansEnvoi('Aucune coordonnée vérifiée : rappel de préadmission impossible. Enregistrez-les dans « Questionnaire patient ».');
+ if(!P.isDate(contact.birthDate))return sansEnvoi('Date de naissance absente des coordonnées vérifiées : lien de préadmission impossible.');
+ if(!messaging)return sansEnvoi('Envoi SMS et e-mail non configuré sur ce serveur (Brevo).');
+ if(!await claim(env,stay,kind,date))return {stay,kind,deja:true};
+ let r;try{r=await envoyerLien(env,acl,origin,{stay,motif:kind,rappel:true})}catch(e){r={status:500,body:{error:String(e.message||e)}}}
+ const ok=r.status===200,res=r.body.results||[];
+ const detail=ok?res.filter(x=>x.sent).map(x=>(x.channel==='sms'?'SMS':'E-mail')+' envoyé à '+x.to).join(' · '):(r.body.error||res.map(x=>x.error).filter(Boolean).join(' · ')||'Envoi impossible.');
+ await record(env,stay,kind,date,ok?'envoye':'echec',detail);
+ await trace({kind,date,at:new Date().toISOString(),ok,...(ok?{detail}:{raison:detail})});
+ return {stay,kind,ok,detail};
+}
+
 // Un passage : à lancer régulièrement (toutes les 10 minutes) ; sans effet hors de la plage 10 h – 20 h.
 let enCours=null;
 export function tourneeRappels(env,opts={}){if(!enCours)enCours=tournee(env,opts).finally(()=>{enCours=null});return enCours}
@@ -93,6 +119,8 @@ async function tournee(env,{now=new Date(),origin=''}={}){
    if(date===decale(jour,2))resultats.push(await rappelConsentement(env,acl,stay,date,'consentement-j-2',origin));
    else if(date===decale(jour,1))resultats.push(await rappelConsentement(env,acl,stay,date,'consentement-j-1',origin));
    else if(date===decale(jour,-1))resultats.push(await suiviJ1(env,acl,stay,date,origin));
+   const avant=P.RAPPELS.find(n=>date===decale(jour,n));
+   if(avant)resultats.push(await rappelPreadmission(env,acl,stay,date,'preadmission-j-'+avant,origin));
   }catch(e){console.error('rappels_auto',stay,e?.message||e)}
  }
  return {jour,resultats};
