@@ -34,13 +34,17 @@ export async function professionalAccess(env,request,user,member,at){
  const allowed=new Set(stays.map(x=>x.stay_id)),job=profile.profession,active=!!profile.active,clinical=['anesthesiste','chirurgien','infirmier','pharmacien','dim'].includes(job);
  // Infirmier(ère) : poste « bloc » (check-list HAS, ouverture des salles) ou « étage » (sans ces deux éléments). Sans poste renseigné : étage.
  // Cadre de bloc : infirmier(ère) au poste « cadre » = droits du bloc + création de séjour et rédaction de l'annonce chirurgicale.
- const poste=job==='infirmier'?(['bloc','cadre'].includes(profile.poste)?profile.poste:'etage'):'',bloc=job!=='infirmier'||poste!=='etage',cadre=job==='infirmier'&&poste==='cadre';
+ // Pharmacie (26/11/2026) : poste « pharmacien » (titulaire, adjoint) ou « preparateur ». Le préparateur ne fait ni
+ // l'analyse ni la validation pharmaceutique des prescriptions, et ne valide pas les commandes aux fournisseurs.
+ const poste=job==='infirmier'?(['bloc','cadre'].includes(profile.poste)?profile.poste:'etage'):job==='pharmacien'?(profile.poste==='preparateur'?'preparateur':'pharmacien'):'',bloc=job!=='infirmier'||poste!=='etage',cadre=job==='infirmier'&&poste==='cadre';
  // Annonce chirurgicale (24/11/2026, demande de Romain) : chirurgien, anesthésiste, secrétariat et cadre de bloc ; ils peuvent aussi créer le séjour d'un nouveau patient.
  const annonceJob=['chirurgien','anesthesiste','secretariat'].includes(job)||cadre,createJob=['anesthesiste','chirurgien','secretariat'].includes(job)||cadre;
  if(!active||['unassigned','administration'].includes(job))allowed.clear();
  const epoch=(await DB.prepare('SELECT revision FROM professional_policy_revision WHERE id=1').first()).revision;
  const globalRead={planningResources:['anesthesiste','chirurgien','infirmier','secretariat'],vacations:['anesthesiste','chirurgien','infirmier','secretariat'],reservations:['anesthesiste','chirurgien','infirmier','secretariat'],acts:['anesthesiste','chirurgien','dim','facturation'],lots:['anesthesiste','chirurgien','infirmier','pharmacien'],movements:['anesthesiste','chirurgien','infirmier','pharmacien'],pmsi:['dim','anesthesiste','chirurgien'],invoices:['facturation'],patientDrafts:[]};
- function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact'||module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job);if(module==='surgicalAnnouncement'&&job==='secretariat')return true;return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||allowed.size>0&&(globalRead[id]||[]).includes(job));return false;}
+ // Stock de la pharmacie (lots) : commun à l'établissement, sans lien avec un séjour ; la pharmacie y accède même sans séjour dans son périmètre.
+ const lotsPharmacie=id=>id==='lots'&&job==='pharmacien';
+ function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact'||module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job);if(module==='surgicalAnnouncement'&&job==='secretariat')return true;return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||(allowed.size>0||lotsPharmacie(id))&&(globalRead[id]||[]).includes(job));return false;}
  function filter(key,data){if(data===null||data===undefined)return data;const [group,name,module]=key.split('/');
   if(group==='stay'&&module==='core'&&!clinical)return Object.fromEntries(Object.entries(data).filter(([k])=>['id','specialty','mode','stage','sector','identity','careTeamId','origin'].includes(k)));
   if(group==='management'){
@@ -60,7 +64,7 @@ export async function professionalAccess(env,request,user,member,at){
    if(module==='surgicalAnnouncement')return annonceJob&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='invitationContact')return ['anesthesiste','chirurgien','secretariat'].includes(job);
    if(module==='nursingRecord')return ['anesthesiste','chirurgien','infirmier'].includes(job)&&appendOnly(old||[],data);
-   if(module==='medicationCircuit')return ['anesthesiste','chirurgien','pharmacien'].includes(job)&&appendOnly(old||[],data)&&data.slice((old||[]).length).every(e=>['analysis','reconciliation','validation'].includes(e.kind)&&(e.kind!=='validation'||job==='pharmacien')&&e.author?.trim()&&e.note?.trim()&&Number.isFinite(Date.parse(e.at)));
+   if(module==='medicationCircuit')return ['anesthesiste','chirurgien','pharmacien'].includes(job)&&appendOnly(old||[],data)&&data.slice((old||[]).length).every(e=>['analysis','reconciliation','validation'].includes(e.kind)&&(e.kind==='reconciliation'||poste!=='preparateur')&&(e.kind!=='validation'||job==='pharmacien')&&e.author?.trim()&&e.note?.trim()&&Number.isFinite(Date.parse(e.at)));
    if(module==='events')return clinical&&Array.isArray(data)&&additions(old||[],data);
    // Saisie rapide au bloc : anesthésiste et infirmier (IADE) seulement, le chirurgien la lit (audit du 24/11, point 5).
    if(module==='peropRapide')return ['anesthesiste','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
@@ -92,7 +96,7 @@ export async function professionalAccess(env,request,user,member,at){
   }
   if(group==='identities')return allowed.size>0&&(isAdmin||job==='secretariat');
   if(group==='management'&&id==='planningResources')return isAdmin&&Array.isArray(data);
-  if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||({reservations:['anesthesiste','chirurgien','secretariat'],vacations:['anesthesiste','chirurgien','secretariat'],acts:['anesthesiste','chirurgien'],lots:['pharmacien'],movements:['pharmacien'],pmsi:['dim'],invoices:['facturation']}[id]||[]).includes(job)&&allowed.size>0);
+  if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||({reservations:['anesthesiste','chirurgien','secretariat'],vacations:['anesthesiste','chirurgien','secretariat'],acts:['anesthesiste','chirurgien'],lots:['pharmacien'],movements:['pharmacien'],pmsi:['dim'],invoices:['facturation']}[id]||[]).includes(job)&&(allowed.size>0||lotsPharmacie(id)));
   return false;
  }
  function merge(key,old,data){const [group,name,module]=key.split('/');if(group==='stay'&&module==='core'&&!clinical)return {...old,...data};
@@ -193,7 +197,7 @@ export async function professionalRoutes(acl,request,env,json,body){
  if(path==='/api/workspace/access/account'){
   const existing=await DB.prepare('SELECT * FROM professional_profiles WHERE user_id=?').bind(d.userId||'').first();
   if(!existing||!Object.hasOwn(professions,d.profession)||typeof d.active!=='boolean'||d.userId===user&&!d.active)return json({error:'Compte, métier ou état invalide. Le propriétaire ne peut pas désactiver son propre compte.'},400);
-  const poste=d.profession==='infirmier'?String(d.poste||existing.poste||'etage'):'';if(poste&&!['bloc','etage','cadre'].includes(poste))return json({error:'Poste infirmier invalide : bloc, étage ou cadre de bloc.'},400);
+  const poste=d.profession==='infirmier'?String(d.poste||(existing.profession==='infirmier'&&existing.poste)||'etage'):d.profession==='pharmacien'?String(d.poste||(existing.profession==='pharmacien'&&existing.poste)||'pharmacien'):'';if(poste&&!(d.profession==='infirmier'?['bloc','etage','cadre']:['pharmacien','preparateur']).includes(poste))return json({error:'Poste invalide : bloc, étage ou cadre de bloc pour un(e) infirmier(ère), pharmacien ou préparateur pour la pharmacie.'},400);
   const rpps=String(d.rpps||'').trim();if(rpps&&!/^1\d{10}$/.test(rpps))return json({error:'RPPS déclaratif invalide : onze chiffres commençant par 1 attendus.'},400);
   if(rpps&&await DB.prepare('SELECT user_id FROM professional_profiles WHERE rpps=? AND user_id<>?').bind(rpps,d.userId).first())return json({error:'Ce RPPS est déjà renseigné sur un autre compte.'},409);
   await DB.prepare('UPDATE professional_profiles SET profession=?,active=?,rpps=?,updated_at=?,updated_by=? WHERE user_id=?').bind(d.profession,d.active?1:0,rpps,now,user,d.userId).run();if(Object.hasOwn(existing,'poste'))await DB.prepare('UPDATE professional_profiles SET poste=? WHERE user_id=?').bind(poste,d.userId).run();await acl.log('account-permissions',d.userId,'allowed',reason,JSON.stringify({before:{profession:existing.profession,poste:existing.poste||'',active:!!existing.active,rppsDeclared:!!existing.rpps},after:{profession:d.profession,poste,active:d.active,rppsDeclared:!!rpps}}));return json({saved:true});

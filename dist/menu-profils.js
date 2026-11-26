@@ -14,14 +14,15 @@ const MENUS={
  // Infirmier(ère) d'étage : sans l'ouverture des salles (ni la check-list HAS, masquée dans le dossier).
  infirmier_etage:['priorities','controle','patients','releve','identity','regulation','pharmacy','tasks'],
  secretariat:['priorities','controle','patients','identity','questionnaireSend','regulation','tasks'],
- pharmacien:['controle','patients','pharmacy','tasks'],
+ // Pharmacien et préparateur en pharmacie : même menu ; les droits (validation) diffèrent côté serveur.
+ pharmacien:['controle','patients','pharmacy','commandesPharmacie','tasks'],
  dim:['patients','pmsi','activity','tasks'],
  facturation:['patients','activity','billing'],
  administration:['indicateurs','professionalAccess','droits'],
  unassigned:['professionalAccess']
 };
 // Administrateur des habilitations : gestion de la clinique en plus de son métier.
-const ADMIN=['indicateurs','professionalAccess','pilotage','droits','protocoles','activity','billing'];
+const ADMIN=['indicateurs','professionalAccess','pilotage','droits','protocoles','commandesPharmacie','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
 function menuPourProfil(profession,isAdmin,poste){

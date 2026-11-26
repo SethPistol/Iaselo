@@ -2156,7 +2156,7 @@ function saveSharedConsult(button,prospective){
 
 let accessJob='',careTeams=[];
 const professionalWorkspace=window.createProfessionalWorkspace({esc,toast,setProfile:(profile,teams)=>{
- accessJob=profile.profession;careTeams=teams;document.body.dataset.admin=profile.isAdmin===true?'true':'false';document.body.dataset.poste=accessJob==='infirmier'?(['bloc','cadre'].includes(profile.poste)?'bloc':'etage'):'';document.body.dataset.cadre=accessJob==='infirmier'&&profile.poste==='cadre'?'true':'false';document.body.dataset.profession=accessJob;
+ accessJob=profile.profession;careTeams=teams;document.body.dataset.admin=profile.isAdmin===true?'true':'false';document.body.dataset.poste=accessJob==='infirmier'?(['bloc','cadre'].includes(profile.poste)?'bloc':'etage'):accessJob==='pharmacien'?(profile.poste==='preparateur'?'preparateur':'pharmacien'):'';document.body.dataset.cadre=accessJob==='infirmier'&&profile.poste==='cadre'?'true':'false';document.body.dataset.profession=accessJob;
  role=({anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier'})[accessJob]||'Infirmier';
  $('#role').value=role;$('#role').disabled=true;if($('#doctor'))$('#doctor').disabled=true;
  const details=document.querySelector('.art-profile');if(details)details.hidden=true;
@@ -2299,6 +2299,10 @@ if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule
 // Protocoles de prescription (dist/protocoles-prescription.js) : gestion par l'administrateur.
 const protocolesModule=window.createProtocolesPrescription?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(protocolesModule){const renderBeforeProtocoles=render;render=function(){if(view==='protocoles'){closeCroDictation();protocolesModule.render();return}renderBeforeProtocoles()}}
+// Commandes de la pharmacie aux fournisseurs (dist/commandes-pharmacie.js) : préparateur et pharmacien ; les lots reçus entrent dans le stock.
+const commandesPharmacie=window.createCommandesPharmacie?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()},
+ lots:()=>clinicManagement.exportState().lots,canWriteLots:()=>professionalWorkspace.getAccess()?professionalWorkspace.canWrite('management/lots'):false,saveLots:()=>durableWorkspace?.flush()});
+if(commandesPharmacie){const renderBeforeCommandes=render;render=function(){if(view==='commandesPharmacie'){closeCroDictation();commandesPharmacie.render();return}renderBeforeCommandes()}}
 // Activité & occupation (dist/indicateurs.js) : chiffres agrégés pour l'administration, calculés par le serveur.
 const indicateursModule=window.createIndicateurs?.({$,esc,toast,sectors:serviceSectors,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(view==='indicateurs'){closeCroDictation();indicateursModule.render();return}renderBeforeIndicateurs()}}

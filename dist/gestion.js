@@ -54,11 +54,13 @@ root.createClinicManagement=function(ctx){
  const fingerprint=r=>JSON.stringify(Object.fromEntries(Object.entries(r).filter(([k])=>!['executions','administered'].includes(k))));
  const validation=(r,i)=>records.filter(x=>x.kind==='validation'&&x.rx===i&&x.fingerprint===fingerprint(r)).at(-1);
  const job=ctx.access?.()?.profile.profession;
- const canReview=['anesthesiste','chirurgien','pharmacien'].includes(job);
- const canValidate=job==='pharmacien';
+ // Préparateur en pharmacie : conciliation seulement ; l'analyse et la validation pharmaceutiques reviennent au pharmacien.
+ const preparateur=job==='pharmacien'&&ctx.access?.()?.profile.poste==='preparateur';
+ const canReview=['anesthesiste','chirurgien','pharmacien'].includes(job)&&(medicineTab==='reconciliation'||!preparateur);
+ const canValidate=job==='pharmacien'&&!preparateur;
  const rxOptions=rows.map(({r,i})=>[String(i),r.name]);
  const text=(name,label)=>`<label class="wide">${label}<textarea name="${name}" required maxlength="3000"></textarea></label>`;
- const reviewForm=(kind,body,button,allowed)=>allowed?`<form id="medicine-review" class="management-form"><div class="formgrid">${body}${field('author','Auteur fictif de la revue','text','','required maxlength="100"')}</div><p role="alert" class="management-error"></p><button class="primary">${button}</button></form>`:'<p class="notice">Lecture seule. Cette étape nécessite un compte habilité'+(kind==='validation'?' de pharmacien.':'.')+'</p>';
+ const reviewForm=(kind,body,button,allowed)=>allowed?`<form id="medicine-review" class="management-form"><div class="formgrid">${body}${field('author','Auteur fictif de la revue','text','','required maxlength="100"')}</div><p role="alert" class="management-error"></p><button class="primary">${button}</button></form>`:'<p class="notice">Lecture seule. Cette étape nécessite un compte habilité'+(kind==='validation'||preparateur?' de pharmacien (le préparateur ne fait ni l’analyse ni la validation pharmaceutique).':'.')+'</p>';
  let html='';
  if(medicineTab==='analysis'){
  const names=rows.map(x=>x.r.name.trim().toLocaleLowerCase('fr'));const duplicates=names.filter((x,i)=>names.indexOf(x)!==i);

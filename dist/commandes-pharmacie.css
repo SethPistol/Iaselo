@@ -1,0 +1,48 @@
+/* IASELO · commandes de la pharmacie (commandes-pharmacie.js). Jetons --i-* : iaselo.css. */
+.cp-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.cp-mut { color: var(--i-mut, #5b6b73); font-size: 13.5px; margin: 2px 0; }
+.cp-tabs { margin: 6px 0 14px; }
+.cp-empty { padding: 14px 16px; border: 1px dashed var(--i-line-strong, #c3cdd6); border-radius: var(--i-r-m, 14px); color: var(--i-mut, #5b6b73); }
+.cp-h3 { margin: 20px 0 8px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.cp-count { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--i-s2, #edf1f5); color: var(--i-mut, #5b6b73); }
+.cp-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); gap: 10px; margin: 6px 0 10px; }
+.cp-chip, .cp-flag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--i-s2, #edf1f5); color: var(--i-mut, #5b6b73); white-space: nowrap; vertical-align: middle; }
+.cp-chip.ok { background: var(--i-ok-soft, #e1f4ec); color: var(--i-ok, #0f6e55); }
+.cp-chip.warn, .cp-flag.warn { background: var(--i-warn-soft, #fdf1dc); color: var(--i-warn, #8a5a00); }
+.cp-chip.crit, .cp-flag.crit { background: var(--i-crit-soft, #fbe4e4); color: var(--i-crit, #a32020); }
+.cp-chip.acc { background: var(--i-acc-soft, #e3f0f3); color: var(--i-acc-ink, #0f4d5c); }
+.cp-flag { font-size: 11px; padding: 0 7px; }
+.cp-flag.stup { background: #efe6fb; color: #5b2a9a; }
+.cp-flag.froid { background: #e2effc; color: #1d5a96; }
+.cp-flag.mds { background: #fbe7ef; color: #93224f; }
+.cp-num { font-weight: 700; padding: 0; }
+.cp-prop { border: 1px solid var(--i-line, #dae1e8); border-radius: var(--i-r-m, 14px); background: var(--i-s1, #fff); padding: 12px 14px; margin: 10px 0; }
+.cp-prop header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.cp-prop h4 { margin: 0; }
+.cp-panel { border: 1px solid var(--i-line, #dae1e8); border-radius: var(--i-r-m, 14px); background: var(--i-s1, #fff); padding: 14px 16px; margin: 12px 0; display: grid; gap: 10px; }
+.cp-panel h4 { margin: 0; }
+.cp-panel textarea { min-height: 70px; }
+.cp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.cp-danger { color: var(--i-crit, #a32020); }
+.cp-total { text-align: right; margin: 6px 0; }
+.cp-dhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.cp-dhead h3 { margin: 0 0 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cp-note { background: var(--i-s2, #edf1f5); border-radius: var(--i-r-s, 8px); padding: 8px 12px; margin: 8px 0; white-space: pre-wrap; }
+.cp-ok { background: var(--i-ok-soft, #e1f4ec); color: var(--i-ok, #0f6e55); }
+.cp-qte { width: 90px; }
+.cp-check { display: flex !important; flex-direction: row !important; align-items: center; gap: 8px; }
+.cp-check input { width: auto; min-height: 0; }
+.cp-ajout { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 10px 0; }
+.cp-ajout label { display: grid; gap: 4px; }
+.cp-ajout select { min-width: min(100%, 320px); }
+.cp-rec { display: grid; gap: 10px; }
+.cp-rec-l { border: 1px solid var(--i-line, #dae1e8); border-radius: var(--i-r-s, 8px); padding: 10px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 8px 12px; align-items: end; }
+.cp-rec-l legend { font-weight: 600; padding: 0 4px; }
+.cp-rec-l label { display: grid; gap: 4px; font-size: 13.5px; }
+.cp-rec-l .wide { grid-column: 1 / -1; }
+.cp-bl { display: grid; gap: 4px; max-width: 320px; }
+.cp-ev { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; }
+.cp-ev li { border-left: 3px solid var(--i-line-strong, #c3cdd6); padding: 2px 0 2px 10px; }
+.cp-ev-date { color: var(--i-mut, #5b6b73); margin-right: 8px; font-variant-numeric: tabular-nums; }
+.cp-hash { font-family: var(--i-mono, ui-monospace, monospace); font-size: 11.5px; margin-left: 8px; }
+.cp-wrap .notice { width: 100%; box-sizing: border-box; display: flex; }
