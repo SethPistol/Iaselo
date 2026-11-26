@@ -40,7 +40,9 @@ export function creerModuleAssurance(o){
   const dec=codage?.decisions||{},ix=ccamIndex(),asa=A.ASA[String(consult?.asa||'').replace(/E$/,'')]||'';
   // Codage de l'intervention (dist/codage-ccam-regles.js) : lignes validées par leur praticien, avec modificateurs et association.
   const actes=CC.lignesFacturables(codage||{},ix).filter(x=>x.confirme).map(x=>({cle:x.cle,code:x.code,libelle:x.libelle||ix?.parCode.get(x.code)?.libelle||'',activite:x.activite,phase:'0',date:dateActe,dim:x.dim==='Validé',rejeteDim:x.dim==='Rejeté',
-    extension:x.activite==='4'?(t(p.extensionAsa)||asa):'',tarif:CC.prixUnitaire(ix,x.code,x.activite),association:x.association,
+    extension:x.activite==='4'?(t(p.extensionAsa)||asa):'',association:x.association,
+    // Valeur de l'acte : tarif corrigé par la facturation, sinon celui du codage (CCAM, ou saisi par le praticien si absent de la CCAM).
+    ...(()=>{const corr=CC.euro(f.tarifs?.[x.cle]),dep=CC.euro(f.depassements?.[x.cle]);return {tarif:corr>0?corr:x.tarif,tarifSource:corr>0?'facturation':x.tarifManuel?'praticien':x.tarif!=null?'ccam':'',montantCodage:corr>0?null:x.montant,depassement:dep!=null&&!Number.isNaN(dep)?dep:x.depassement,depassementSource:dep!=null&&!Number.isNaN(dep)?'facturation':x.depassement?'praticien':''}})(),
     modificateurs:(t(f.modificateurs?.[x.cle]||'')||x.modificateurs).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4)}));
   const dmiSaisis=p.dmi||{};
   const dmi=(perop?.dmi||[]).map(x=>{const m=dmiSaisis[x.gtin]||{};return {gtin:x.gtin||'',lot:x.lot||'',serie:x.serie||'',peremption:x.peremption||'',lpp:m.lpp||'',enSus:m.enSus===undefined?undefined:!!m.enSus,prix:m.prix||'',libelle:m.libelle||''}});
@@ -61,7 +63,7 @@ export function creerModuleAssurance(o){
   return {id:rec?.id||'',version:rec?.version||0,statut:rec?.status||'',etape:A.etape({statut:rec?.status},ctl),droits:data.droits||{},pmsi,facture:data.facture||{},
    constats,pret:ctl.pret,preFacture:pf,repartition:rep,clinique:clin,
    contexte:{identite:{lastName:ctx.identite.lastName||'',firstName:ctx.identite.firstName||'',birthDate:ctx.identite.birthDate||'',sex:ctx.identite.sex||''},insQualifiee:ctx.insQualifiee,mode:ctx.mode,dateActe:ctx.dateActe,
-    actes:ctx.actes.map(a=>clin?a:{code:a.code,libelle:a.libelle,activite:a.activite,date:a.date,dim:a.dim,tarif:a.tarif,modificateurs:a.modificateurs,cle:a.cle}),dmi:ctx.dmi,devis:ctx.devis,...(clin?{diagnostics:ctx.diagnostics,asa:ctx.asa}:{})}};
+    actes:ctx.actes.map(a=>clin?a:{code:a.code,libelle:a.libelle,activite:a.activite,date:a.date,dim:a.dim,tarif:a.tarif,tarifSource:a.tarifSource,depassement:a.depassement,modificateurs:a.modificateurs,cle:a.cle}),dmi:ctx.dmi,devis:ctx.devis,...(clin?{diagnostics:ctx.diagnostics,asa:ctx.asa}:{})}};
  }
  const verrouille=rec=>['transmise','paye'].includes(rec?.status);
  const nettoie=(obj,cles,n=200)=>Object.fromEntries(cles.filter(k=>obj[k]!==undefined).map(k=>[k,typeof obj[k]==='boolean'?obj[k]:court(obj[k],n)]));
@@ -138,6 +140,9 @@ export function creerModuleAssurance(o){
 
    if(action==='facture'){if(!est(acl,FACT))return refuse('Facture : service facturation.','assurance');
     const x=d.facture||{},v=nettoie(x,['ghm','ghs','ghsTarif','exhJours','exhTarif','chambreNuits','chambrePrix','amcChambreParNuit','observation'],120);
+    // Valeur de chaque acte et dépassements d'honoraires, par ligne de codage (clé ligne:activité).
+    const cleOk=k=>/^[A-Za-z0-9_-]{1,40}(:c)?:[A-Z0-9]{1,7}$/.test(k);
+    for(const champ of ['tarifs','depassements'])if(x[champ]&&typeof x[champ]==='object'){const o={};for(const [k,m] of Object.entries(x[champ]).slice(0,60)){if(!cleOk(k))continue;const n=CC.euro(m);if(n===null)continue;if(Number.isNaN(n)||n<0||(champ==='depassements'&&n>CC.DEPASSEMENT_MAX))return json({error:(champ==='tarifs'?'Valeur d’acte':'Dépassement d’honoraires')+' invalide : montant en euros.'},400);o[k]=n}v[champ]=o}
     if(x.modificateurs&&typeof x.modificateurs==='object')v.modificateurs=Object.fromEntries(Object.entries(x.modificateurs).filter(([k])=>/^[A-Za-z0-9_-]{1,40}(:c)?:[A-Z0-9]{1,7}$|^(chir|anes)$/.test(k)).slice(0,40).map(([k,m])=>[k,court(m,4).toUpperCase().replace(/[^A-Z0-9]/g,'')]));
     for(const k of ['ghsTarif','exhTarif','chambrePrix'])if(v[k]&&!(Number(String(v[k]).replace(',','.'))>=0))return json({error:'Montant invalide.'},400);
     return enregistre({...data,facture:{...data.facture,...v,maj:maintenant(),par:acteur.nom}},undefined,'Facture du séjour enregistrée')}

@@ -20,3 +20,24 @@ html body #patientlist .patient .row small{font-size:11.5px;line-height:1.3;whit
 /* Tablette étroite et téléphone : la liste passe au-dessus, en grille compacte (règle existante) */
 @media (max-width:1000px){html body .layout:has(#patientlist){grid-template-columns:1fr}html body #patientlist .patient .ui-patient>:first-child:not(.ui-who){display:flex}}
 html body.dossier-focus .layout:has(#patientlist){grid-template-columns:minmax(0,1fr)}
+/* Navigation (26/11/2026) : le menu « Patients & séjours » affiche la liste seule ; un patient ouvert affiche son dossier seul. */
+html body.sejours-liste .layout:has(#patientlist),html body.sejours-dossier .layout:has(#patientlist){grid-template-columns:minmax(0,1fr);clear:both}
+html body.sejours-liste .layout:has(#patientlist)>#detail{display:none}
+html body.sejours-dossier .layout>.panel:has(#patientlist),html body.sejours-dossier #stats{display:none}
+html body.sejours-liste .layout>.panel:has(#patientlist){position:static;max-height:none}
+html body.sejours-liste .layout>.panel:has(#patientlist)>.panelhead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 16px}
+html body.sejours-liste .layout>.panel:has(#patientlist)>.panelhead h3{font-size:17px;margin:0}
+html body.sejours-liste .layout>.panel:has(#patientlist) .filters{flex-direction:row;flex:0 1 520px;gap:8px}
+html body.sejours-liste .layout>.panel:has(#patientlist) .filters input{flex:2 1 220px}
+html body.sejours-liste .layout>.panel:has(#patientlist) .filters select{flex:1 1 150px}
+html body.sejours-liste #patientlist{display:grid;grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;padding:12px;max-height:none;overflow:visible}
+html body.sejours-liste #patientlist .patient{border:1px solid var(--line,#d9e0e6);border-radius:10px;padding:10px 12px;width:auto;margin:0}
+html body.sejours-liste #patientlist .patient .ui-patient>:first-child:not(.ui-who){display:flex}
+html body.sejours-liste #patientlist .patient .ui-who strong{font-size:14.5px}
+html body.sejours-liste #patientlist .empty{grid-column:1/-1}
+html body.sejours-dossier .retour-liste{font-weight:600}
+@media (max-width:640px){html body.sejours-liste #patientlist{grid-template-columns:1fr;padding:8px}html body.sejours-liste .layout>.panel:has(#patientlist) .filters{flex:1 1 100%;flex-wrap:wrap}}
+html body .layout>.retour-sejours{display:none}
+html body.sejours-dossier .layout>.retour-sejours{display:inline-flex;align-items:center;justify-self:start;gap:6px;min-height:40px;padding:8px 16px;font-size:14px;font-weight:600;margin:0 0 -4px}
+html body.sejours-dossier #focusdossier{display:none}
+@media print{html body .layout>.retour-sejours{display:none!important}}

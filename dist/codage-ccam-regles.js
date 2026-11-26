@@ -21,6 +21,9 @@ const TYPES_ANESTHESIE={'1':'Anesthésie générale','2':'Anesthésie locorégio
 const t=v=>typeof v==='string'?v.trim():v==null?'':String(v).trim();
 const arrondi=n=>Math.round(n*100)/100;
 const stable=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
+// Montant en euros saisi (virgule acceptée) ; null si vide, NaN si illisible.
+const euro=v=>{const x=t(v).replace(/\s/g,'').replace(',','.');if(!x)return null;const n=Number(x);return Number.isFinite(n)?arrondi(n):NaN};
+const DEPASSEMENT_MAX=20000;
 const mods=v=>[...new Set(t(v).toUpperCase().replace(/[^A-Z0-9]/g,'').split(''))].slice(0,4).join('');
 const id=()=>'l'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
@@ -57,12 +60,13 @@ function panneau(codage,cle,ix){
  const c=normaliser(codage),P=PANNEAUX[cle],out=[];
  for(const l of c.lignes){
   const a=l.activites?.[P.activite];
-  if(a?.coche)out.push({cle:l.id+':'+P.activite,ligne:l.id,code:l.code,libelle:l.libelle,activite:P.activite,modificateurs:mods(a.modificateurs),association:t(a.association),complement:false});
-  if(cle==='anesthesie')for(const [code,x] of Object.entries(l.complements||{}))if(x?.coche)out.push({cle:l.id+':c:'+code,ligne:l.id,code,libelle:(COMPLEMENTS.find(([k])=>k===code)||[])[1]||x.libelle||'',activite:'1',modificateurs:mods(x.modificateurs),association:t(x.association),complement:true});
+  if(a?.coche)out.push({cle:l.id+':'+P.activite,ligne:l.id,code:l.code,libelle:l.libelle,activite:P.activite,modificateurs:mods(a.modificateurs),association:t(a.association),complement:false,depassement:euro(a.depassement),tarifSaisi:euro(a.tarifSaisi)});
+  if(cle==='anesthesie')for(const [code,x] of Object.entries(l.complements||{}))if(x?.coche)out.push({cle:l.id+':c:'+code,ligne:l.id,code,libelle:(COMPLEMENTS.find(([k])=>k===code)||[])[1]||x.libelle||'',activite:'1',modificateurs:mods(x.modificateurs),association:t(x.association),complement:true,depassement:euro(x.depassement),tarifSaisi:euro(x.tarifSaisi)});
  }
  const defs=ix?.modificateurs||{};
  for(const x of out){
-  x.pu=prixUnitaire(ix,x.code,x.activite);let maj=0,forfait=0;const inconnus=[];
+  // Valeur de l'acte : prix de la CCAM ; à défaut (nomenclature non chargée, acte sans prix), tarif saisi par le praticien.
+  x.pu=prixUnitaire(ix,x.code,x.activite);x.tarifManuel=false;if(x.pu==null&&x.tarifSaisi>0){x.pu=x.tarifSaisi;x.tarifManuel=true}let maj=0,forfait=0;const inconnus=[];
   for(const m of x.modificateurs.split('').filter(Boolean)){const d=defs[m];if(d?.majoration!=null)maj+=d.majoration;else if(d?.forfait!=null)forfait+=d.forfait;else inconnus.push(m)}
   x.modificateursSansTarif=inconnus.join('');x.base=x.pu==null?null:arrondi(x.pu*(1+maj));x.forfait=forfait;
  }
@@ -71,14 +75,14 @@ function panneau(codage,cle,ix){
  const pris=new Set(out.filter(x=>x.association).map(x=>x.association)),libres=['1','2'].filter(c=>!pris.has(c));
  for(const x of rang)x.associationAuto=libres.shift()||'0';
  for(const x of out){const code=x.association||x.associationAuto||'1';x.associationRetenue=code;const taux=ASSOCIATIONS[code]?.taux??1;x.montant=x.base==null?null:arrondi(x.base*taux+(taux?x.forfait:0))}
- const total=arrondi(out.reduce((s,x)=>s+(x.montant||0),0));
- return {cle,...P,lignes:out,total,validation:c.validations?.[P.activite]||null,incomplet:out.some(x=>x.pu==null)};
+ const total=arrondi(out.reduce((s,x)=>s+(x.montant||0),0)),depassements=arrondi(out.reduce((s,x)=>s+(x.depassement>0?x.depassement:0),0));
+ return {cle,...P,lignes:out,total,depassements,totalGeneral:arrondi(total+depassements),validation:c.validations?.[P.activite]||null,incomplet:out.some(x=>x.pu==null)};
 }
 
 // Toutes les lignes facturables (pour l'Assurance maladie, la transmission et le RUM) : une par code et activité.
 function lignesFacturables(codage,ix){
  const c=normaliser(codage);
- return Object.keys(PANNEAUX).flatMap(k=>{const p=panneau(c,k,ix);return p.lignes.map(x=>({cle:x.cle,code:x.code,libelle:x.libelle,activite:x.activite,modificateurs:x.modificateurs,association:x.associationRetenue,tarif:x.pu,montant:x.montant,complement:x.complement,
+ return Object.keys(PANNEAUX).flatMap(k=>{const p=panneau(c,k,ix);return p.lignes.map(x=>({cle:x.cle,code:x.code,libelle:x.libelle,activite:x.activite,modificateurs:x.modificateurs,association:x.associationRetenue,tarif:x.pu,tarifManuel:x.tarifManuel,base:x.base,montant:x.montant,depassement:x.depassement>0?x.depassement:0,complement:x.complement,
   confirme:!!p.validation,by:p.validation?.par||'',at:p.validation?.at||'',dim:t(c.decisions?.[x.cle]?.decision)}))});
 }
 
@@ -92,6 +96,8 @@ function erreurValidation(codage,cle,ix){
   if(a&&!x.complement&&a.activites&&!a.activites.includes(x.activite))return x.code+' n’a pas d’activité '+x.activite+' dans la CCAM.';
   const ok=autorises(ix,x.code,x.activite);if(ok&&x.modificateurs.split('').some(m=>m&&!ok.includes(m)))return x.code+' : modificateur non autorisé pour cette activité (autorisés : '+ok.split('').join(', ')+').';
   if(x.associationRetenue&&!ASSOCIATIONS[x.associationRetenue])return x.code+' : code d’association inconnu.';
+  if(Number.isNaN(x.depassement)||x.depassement<0||x.depassement>DEPASSEMENT_MAX)return x.code+' : dépassement d’honoraires invalide (montant en euros, de 0 à '+DEPASSEMENT_MAX+' €).';
+  if(Number.isNaN(x.tarifSaisi)||x.tarifSaisi<0)return x.code+' : tarif saisi invalide.';
  }
  if(p.lignes.filter(x=>x.associationRetenue==='1').length>1)return 'Un seul acte peut porter le code d’association 1.';
  return '';
@@ -123,5 +129,5 @@ function ecritureAutorisee(job,avant,apres){
  return partInchangee(avant,apres,autre)&&decisionsAutorisees(avant,apres,moi);
 }
 
-return {PANNEAUX,COMPLEMENTS,ASSOCIATIONS,TYPES_ANESTHESIE,normaliser,panneau,lignesFacturables,erreurValidation,part,partInchangee,decisionsAutorisees,ecritureAutorisee,prixUnitaire,autorises,mods,id};
+return {DEPASSEMENT_MAX,euro,PANNEAUX,COMPLEMENTS,ASSOCIATIONS,TYPES_ANESTHESIE,normaliser,panneau,lignesFacturables,erreurValidation,part,partInchangee,decisionsAutorisees,ecritureAutorisee,prixUnitaire,autorises,mods,id};
 });

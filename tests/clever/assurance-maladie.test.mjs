@@ -55,6 +55,12 @@ test('Assurance maladie : droits, PMSI, facture, retours',async()=>{
   assert.equal(r.data.dossier.facture.tarifAuto.tarif,4100);assert.deepEqual([r.data.dossier.repartition.amo,r.data.dossier.repartition.amc,r.data.dossier.repartition.patient],[r.data.dossier.preFacture.amo,284,90]);
   const pf=r.data.dossier.preFacture;assert.equal(pf.participation,24);assert.equal(pf.forfaitJournalier,80);assert.equal(pf.baseSejour,5600,'GHS + implant en sus');
   assert.equal(r.data.dossier.contexte.diagnostics,undefined,'facturation : pas de diagnostic');
+  // Valeur de chaque acte et dépassements d'honoraires saisis par la facturation (26/11/2026).
+  assert.equal((await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{depassements:{'chir:1':'abc'}}})).status,400);
+  r=await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{tarifs:{'chir:4':'150,5'},depassements:{'chir:1':'100'}}});assert.equal(r.status,200);
+  let hono=r.data.dossier.preFacture.honoraires;assert.deepEqual(hono.map(h=>[h.cle,h.montant,h.depassement,h.total,h.tarifSource]),[['chir:1',470.49,100,570.49,'ccam'],['chir:4',150.5,0,150.5,'facturation']]);
+  assert.ok(!r.data.dossier.constats.some(c=>/devis/.test(c.message)),'aucun blocage lié aux dépassements');
+  r=await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{depassements:{'chir:1':'0'}}});assert.equal(r.data.dossier.preFacture.depassementsActes,0);
   t1=await api(fac,'POST','/marche/assurance',{action:'transmettre',stay:'AM1'});assert.equal(t1.status,200,JSON.stringify(t1.data));
   const ref=t1.data.dossier.facture.reference;assert.match(ref,/^FAC-/);assert.equal(t1.data.dossier.statut,'transmise');
   const fEnvoi=(await api(fac,'GET','/marche/assurance?stay=AM1')).data.envois.find(e=>e.data.type==='Facture B2');assert.doesNotMatch(fEnvoi.data.message,/M16/);assert.match(fEnvoi.data.message,/285027512345672/);
