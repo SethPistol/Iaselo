@@ -1,0 +1,50 @@
+/* IASELO · plannings infirmiers (dist/plannings-infirmiers.js). Couleurs par type de poste, clair et sombre. */
+:root{--pi-jour:#dcecf7;--pi-jour-ink:#174a6b;--pi-soir:#fdebd3;--pi-soir-ink:#7a4a05;--pi-nuit:#2f3b63;--pi-nuit-ink:#fff;--pi-garde:#f6d6d6;--pi-garde-ink:#8a1c1c;--pi-astreinte:#efe2f6;--pi-astreinte-ink:#5b2a78;--pi-formation:#e2f2e2;--pi-formation-ink:#245c24;--pi-repos:#f1f3f4;--pi-repos-ink:#6b7a80;--pi-conge:#fff6c9;--pi-conge-ink:#6b5800;--pi-absence:#e9e4df;--pi-absence-ink:#5a4636;--pi-we:rgba(31,107,120,.06)}
+:root[data-theme=dark]{--pi-jour:#1d3a50;--pi-jour-ink:#cfe6f7;--pi-soir:#4a3316;--pi-soir-ink:#ffd9a3;--pi-nuit:#39467a;--pi-nuit-ink:#fff;--pi-garde:#552426;--pi-garde-ink:#ffc9c9;--pi-astreinte:#3e2a4d;--pi-astreinte-ink:#e9cdfa;--pi-formation:#1f3d22;--pi-formation-ink:#c8eec8;--pi-repos:#262d30;--pi-repos-ink:#9fb0b6;--pi-conge:#4a4214;--pi-conge-ink:#fff1a6;--pi-absence:#3c342d;--pi-absence-ink:#e6d6c8;--pi-we:rgba(255,255,255,.04)}
+.pi-barre{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 12px}
+.pi-mois{display:flex;align-items:center;gap:8px}.pi-mois strong{min-width:150px;text-align:center}
+.pi-services{display:inline-flex;border:1px solid var(--i-line,#d8e0e2);border-radius:999px;overflow:hidden}
+.pi-services button{border:0;background:transparent;padding:7px 14px;font:inherit;color:inherit;cursor:pointer}
+.pi-services button+button{border-left:1px solid var(--i-line,#d8e0e2)}
+.pi-services button.active{background:var(--i-acc,#1f6b78);color:var(--i-on-acc,#fff);font-weight:600}
+.pi-vues{margin:4px 0 12px}
+.pi-sub{color:var(--i-mut,#5b6b73);font-size:13px;margin:4px 0 10px}
+.pi-lecture{margin:0 0 12px}
+.pi-scroll{overflow-x:auto;border:1px solid var(--i-line,#d8e0e2);border-radius:var(--i-r-m,12px);background:var(--i-s1,#fff);max-width:100%}
+.pi-grid{border-collapse:separate;border-spacing:0;font-size:12px;min-width:100%}
+.pi-grid th,.pi-grid td{border-bottom:1px solid var(--i-line,#e5eaeb);border-right:1px solid var(--i-line,#eef1f2);padding:0;text-align:center;height:32px;min-width:26px}
+.pi-grid thead th{position:sticky;top:0;background:var(--i-s2,#eef2f3);font-weight:600;line-height:1.1;padding:4px 2px}
+.pi-grid thead th small{display:block;font-weight:400;color:var(--i-mut,#5b6b73);font-size:10px}
+.pi-grid .pi-nom{position:sticky;left:0;z-index:1;background:var(--i-s1,#fff);text-align:left;padding:4px 26px 4px 10px;min-width:150px;max-width:200px;font-weight:600;white-space:nowrap}
+.pi-grid thead .pi-nom{z-index:2;background:var(--i-s2,#eef2f3)}
+.pi-grid .pi-nom span{display:block;overflow:hidden;text-overflow:ellipsis}
+.pi-grid .pi-nom small{display:block;font-weight:400;color:var(--i-mut,#5b6b73);font-size:11px}
+.pi-retirer{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--i-mut,#5b6b73);font-size:16px;cursor:pointer;padding:2px 6px;border-radius:6px}
+.pi-retirer:hover{background:var(--i-crit-soft,#fbe3e1);color:var(--i-crit,#b42318)}
+.pi-c{font-weight:700;cursor:default;position:relative}
+.pi-c i{position:absolute;top:0;right:2px;font-style:normal;font-size:10px}
+.pi-c[role=button]{cursor:pointer}.pi-c[role=button]:hover,.pi-c[role=button]:focus-visible{outline:2px solid var(--i-acc,#1f6b78);outline-offset:-2px}
+.pi-we{background:var(--pi-we)}
+.pi-today{box-shadow:inset 0 -3px 0 var(--i-acc,#1f6b78)}
+.pi-h{font-variant-numeric:tabular-nums;padding:0 8px!important;white-space:nowrap;color:var(--i-mut,#5b6b73)}
+.pi-eff td,.pi-eff th{background:var(--i-s2,#eef2f3);font-weight:600}
+.pi-moi .pi-nom{box-shadow:inset 4px 0 0 var(--i-acc,#1f6b78)}
+.pi-vide{padding:16px!important;color:var(--i-mut,#5b6b73)}
+.pi-date,.pi-tag{white-space:nowrap}.pi-moi-liste .pi-tag{justify-self:start}
+.pi-tag{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:12px;border:1px solid transparent;background:var(--i-s2,#eef2f3);color:inherit;font:inherit;font-size:12px}
+button.pi-tag{cursor:pointer}button.pi-tag.active{border-color:var(--i-acc,#1f6b78);box-shadow:0 0 0 2px var(--i-acc-soft,#d9eef1)}
+.pi-jour{background:var(--pi-jour);color:var(--pi-jour-ink)}
+.pi-soir{background:var(--pi-soir);color:var(--pi-soir-ink)}.pi-nuit{background:var(--pi-nuit);color:var(--pi-nuit-ink)}.pi-garde{background:var(--pi-garde);color:var(--pi-garde-ink)}.pi-astreinte{background:var(--pi-astreinte);color:var(--pi-astreinte-ink)}.pi-formation{background:var(--pi-formation);color:var(--pi-formation-ink)}.pi-repos{background:var(--pi-repos);color:var(--pi-repos-ink)}.pi-conge{background:var(--pi-conge);color:var(--pi-conge-ink)}.pi-absence{background:var(--pi-absence);color:var(--pi-absence-ink)}
+.pi-outils,.pi-legende{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.pi-legende{margin-top:14px}
+.pi-ajout,.pi-actions{display:flex;flex-wrap:wrap;align-items:end;gap:10px 14px;margin:14px 0 0}
+.pi-ajout label,.pi-actions label{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.pi-actions label{flex:1 1 320px}
+.pi-alertes{margin:14px 0 0;display:block!important}.pi-alertes ul{margin:6px 0;padding-left:18px}.pi-alertes li{font-size:13px}
+.pi-hist{margin-top:18px}.pi-versions{padding-left:20px}.pi-versions li{margin:8px 0;font-size:13px}
+.pi-moi-liste{list-style:none;padding:0;margin:0;display:grid;gap:6px;max-width:640px}
+.pi-moi-liste li{display:grid;grid-template-columns:110px auto 1fr;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--i-line,#d8e0e2);border-radius:var(--i-r-s,8px);background:var(--i-s1,#fff);font-size:14px}
+.pi-moi-liste li.pi-today{border-color:var(--i-acc,#1f6b78);box-shadow:0 0 0 2px var(--i-acc-soft,#d9eef1)}
+#pi-dialog{border:1px solid var(--i-line,#d8e0e2);border-radius:var(--i-r-l,16px);background:var(--i-s1,#fff);color:inherit;max-width:min(420px,calc(100vw - 32px));width:100%}
+.pi-form{display:flex;flex-direction:column;gap:12px}.pi-form h3{margin:0}.pi-form label{display:flex;flex-direction:column;gap:4px;font-size:13px}.pi-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:640px){.pi-grid .pi-nom{min-width:120px;max-width:140px}.pi-moi-liste li{grid-template-columns:1fr;gap:4px}.pi-mois strong{min-width:0}}
+@media print{aside,header,.no-print,.pi-outils,.pi-ajout,.pi-actions,.pi-hist{display:none!important}.pi-scroll{overflow:visible;border:0}.pi-grid{font-size:9px}.pi-grid th,.pi-grid td{min-width:0;height:22px}.pi-nom{position:static!important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}

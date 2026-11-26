@@ -1,4 +1,4 @@
-import {randomBytes,randomUUID,scrypt as scryptCb,timingSafeEqual,createHmac} from 'node:crypto';import {promisify} from 'node:util';import {newSecret,verify as verifyTotp,mfaPage} from './mfa.mjs';import {recette,RECETTE_EMAIL,RECETTE_PASSWORD,RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD,RECETTE_CADRE_EMAIL,RECETTE_CADRE_PASSWORD} from './config.mjs';
+import {randomBytes,randomUUID,scrypt as scryptCb,timingSafeEqual,createHmac} from 'node:crypto';import {promisify} from 'node:util';import {newSecret,verify as verifyTotp,mfaPage} from './mfa.mjs';import {recette,RECETTE_EMAIL,RECETTE_PASSWORD,RECETTE_CHIRURGIEN_EMAIL,RECETTE_CHIRURGIEN_PASSWORD,RECETTE_CADRE_EMAIL,RECETTE_CADRE_PASSWORD,RECETTE_INFIRMIERES} from './config.mjs';
 const scrypt=promisify(scryptCb);
 export async function hashPassword(password){if(typeof password!=='string'||password.length<14||password.length>1024)throw Error('Mot de passe : entre 14 et 1024 caractères.');const salt=randomBytes(16).toString('hex'),key=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return 'scrypt$16384$'+salt+'$'+key.toString('hex')}
 export async function verifyPassword(password,hash){if(typeof password!=='string'||password.length>1024||!/^scrypt\$16384\$[a-f0-9]{32}\$[a-f0-9]{128}$/.test(hash||''))return false;const [,,salt,expected]=hash.split('$'),actual=await scrypt(password,salt,64,{N:16384,maxmem:64*1024*1024});return timingSafeEqual(actual,Buffer.from(expected,'hex'))}
@@ -37,7 +37,18 @@ export async function ensureRecetteCadre(pool,env=process.env){
  await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);return id;
  }catch(e){console.error('compte cadre de bloc de recette non créé',e?.message||e);return null}
 }
-export async function bootstrap(pool,env=process.env){if((await pool.query('SELECT id FROM auth_users LIMIT 1')).rows.length){await ensureRecetteSurgeon(pool,env);await ensureRecetteCadre(pool,env);return}if(recette(env)){await createAccount(pool,{email:RECETTE_EMAIL,name:'Dr Démo (recette)',passwordHash:await hashPassword(RECETTE_PASSWORD),admin:true});await ensureRecetteSurgeon(pool,env);await ensureRecetteCadre(pool,env);return}await createAccount(pool,{email:env.BOOTSTRAP_ADMIN_EMAIL,name:env.BOOTSTRAP_ADMIN_NAME||'Administrateur',passwordHash:env.BOOTSTRAP_ADMIN_PASSWORD_HASH,admin:true})}
+// Recette uniquement : infirmière de bloc et infirmière d'étage de test (plannings en lecture seule). Mêmes règles que le cadre.
+export async function ensureRecetteInfirmieres(pool,env=process.env){
+ if(!recette(env))return [];const ids=[];
+ for(const c of RECETTE_INFIRMIERES){try{if((await pool.query('SELECT id FROM auth_users WHERE email=$1',[c.email])).rows.length)continue;
+  const id=await createAccount(pool,{email:c.email,name:c.name,passwordHash:await hashPassword(c.password)}),at=new Date().toISOString();
+  await pool.query("UPDATE professional_profiles SET profession='infirmier',poste=$3,updated_at=$2 WHERE user_id=$1",[id,at,c.poste]);
+  await pool.query("INSERT INTO care_teams(id,label) VALUES('demo-clinique','Chirurgie') ON CONFLICT DO NOTHING");
+  await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);ids.push(id);
+ }catch(e){console.error('compte infirmier(ère) de recette non créé',e?.message||e)}}
+ return ids;
+}
+export async function bootstrap(pool,env=process.env){if((await pool.query('SELECT id FROM auth_users LIMIT 1')).rows.length){await ensureRecetteSurgeon(pool,env);await ensureRecetteCadre(pool,env);await ensureRecetteInfirmieres(pool,env);return}if(recette(env)){await createAccount(pool,{email:RECETTE_EMAIL,name:'Dr Démo (recette)',passwordHash:await hashPassword(RECETTE_PASSWORD),admin:true});await ensureRecetteSurgeon(pool,env);await ensureRecetteCadre(pool,env);await ensureRecetteInfirmieres(pool,env);return}await createAccount(pool,{email:env.BOOTSTRAP_ADMIN_EMAIL,name:env.BOOTSTRAP_ADMIN_NAME||'Administrateur',passwordHash:env.BOOTSTRAP_ADMIN_PASSWORD_HASH,admin:true})}
 // Formulaires HTML : avec Referrer-Policy: no-referrer, les navigateurs envoient « Origin: null » pour un POST
 // de formulaire, même vers la même origine. Sec-Fetch-Site, fixé par le navigateur et non modifiable par une page,
 // confirme alors que la requête vient bien de cette origine. Toute autre origine reste refusée.

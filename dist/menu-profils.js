@@ -10,9 +10,9 @@
 const MENUS={
  anesthesiste:['priorities','controle','patients','releve','regulation','ouvertureSalles','pharmacy','questionnaireSend','preadmissions','tasks','droits'],
  chirurgien:['priorities','controle','patients','regulation','pmsi','questionnaireSend','preadmissions','tasks','droits'],
- infirmier:['priorities','controle','patients','releve','identity','regulation','ouvertureSalles','pharmacy','tasks'],
+ infirmier:['priorities','controle','patients','releve','identity','regulation','planningsInfirmiers','ouvertureSalles','pharmacy','tasks'],
  // Infirmier(ère) d'étage : sans l'ouverture des salles (ni la check-list HAS, masquée dans le dossier).
- infirmier_etage:['priorities','controle','patients','releve','identity','regulation','pharmacy','tasks'],
+ infirmier_etage:['priorities','controle','patients','releve','identity','regulation','planningsInfirmiers','pharmacy','tasks'],
  secretariat:['priorities','controle','patients','preadmissions','identity','questionnaireSend','regulation','tasks'],
  // Pharmacien et préparateur en pharmacie : même menu ; les droits (validation) diffèrent côté serveur.
  pharmacien:['controle','patients','pharmacy','commandesPharmacie','tasks'],
@@ -23,7 +23,8 @@ const MENUS={
 };
 // Administrateur des habilitations : gestion de la clinique en plus de son métier.
 // « Bloc & lits » : l'administrateur y gère les plages opératoires des chirurgiens (26/11/2026).
-const ADMIN=['indicateurs','professionalAccess','pilotage','droits','protocoles','commandesPharmacie','regulation','activity','billing'];
+// Plannings infirmiers : l'administrateur les consulte (lecture seule, la validation revient au cadre).
+const ADMIN=['indicateurs','professionalAccess','pilotage','droits','protocoles','commandesPharmacie','regulation','planningsInfirmiers','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
 function menuPourProfil(profession,isAdmin,poste){

@@ -2340,6 +2340,9 @@ const ouvertureSalles=window.createOuvertureSalles?.({$,esc,toast,go:v=>{if(view
 // Préadmissions des patients (admissions, anesthésistes, chirurgiens) : écran dist/preadmissions.js.
 const preadmissionsEcran=window.createPreadmissions?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(preadmissionsEcran){const renderBeforePreadmissions=render;render=function(){if(view==='preadmissions'){closeCroDictation();preadmissionsEcran.render();return}renderBeforePreadmissions()}}
+// Plannings infirmiers (dist/plannings-infirmiers.js) : préparés et validés par le cadre, consultés en lecture seule par les infirmier(ère)s.
+const planningsInfirmiers=window.createPlanningsInfirmiers?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(planningsInfirmiers){const renderBeforePlannings=render;render=function(){if(view==='planningsInfirmiers'){closeCroDictation();planningsInfirmiers.render();return}renderBeforePlannings()}}
 if(ouvertureSalles){const renderBeforeOuverture=render;render=function(){if(view==='ouvertureSalles'){closeCroDictation();ouvertureSalles.render();return}renderBeforeOuverture()};const detailBeforeOuverture=detail;detail=function(){if(blocInterdit(tab))tab='perop';detailBeforeOuverture();if(tab==='perop'&&['anesthesiste','infirmier','chirurgien'].includes(jobNow())&&!infirmierEtage())ouvertureSalles.bandeauPerop($('#content'))}}
 
 // Modules issus de la comparaison au marché (dist/marche.js, dist/marche-gestion.js) : outils, messagerie, biologie, moniteurs, dictée.
