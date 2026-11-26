@@ -566,12 +566,17 @@ function prescriptions(){
   <label>Libellé de démonstration<input name="name" required></label>
   <label>Catégorie<select name="category">${optionHTML(['Médicament','Examen biologique','Surveillance','Soin infirmier'],'Médicament')}</select></label>
   <label class="wide">Consignes de démonstration<textarea name="instructions" required></textarea></label>
- </div><button class="primary">Ajouter au brouillon</button></form>`:''}
+ </div><div class="actions"><button class="primary">Ajouter au brouillon</button>${window.IaseloProtocolesUI?'<button type="button" class="secondary pr-reprendre" id="rx-protocole">Reprendre un protocole</button>':''}</div></form>`:''}
  <div id="rxlist">${rows.map(({rx,index})=>`<article class="rx">
  <div class="row"><strong>${esc(rx.name)}</strong><span class="pill ${rx.validated?'good':'warn'}">${rx.validated?'Validée médicalement · simulation':'Brouillon'}</span></div>
- <p class="muted">${esc(rx.category)} · ${esc(rx.author)}${rx.validatedAt?' · Validée le '+esc(rx.validatedAt):''}</p>
+ <p class="muted">${esc(rx.category)} · ${esc(rx.author)}${rx.validatedAt?' · Validée le '+esc(rx.validatedAt):''}${rx.protocole?' · Protocole '+esc(rx.protocole.nom)+' (version '+esc(rx.protocole.version)+')':''}</p>
  <p class="preserve">${esc(rx.instructions)}</p>
- ${!rx.validated?`<button class="secondary" data-validate="${index}">Simuler la validation médicale</button>`:`
+ ${!rx.validated?`<div class="actions"><button class="secondary" data-validate="${index}">Simuler la validation médicale</button>${physician()?`<button type="button" class="textbutton" data-rx-remove="${index}">Retirer du brouillon</button>`:''}</div>
+  ${physician()?`<details class="rx-draft-edit"><summary>Ajuster cette ligne</summary><form data-rx-edit="${index}"><div class="formgrid">
+   <label>Libellé<input name="name" required value="${esc(rx.name)}"></label>
+   <label>Catégorie<select name="category">${optionHTML(['Médicament','Examen biologique','Surveillance','Soin infirmier'],rx.category)}</select></label>
+   <label class="wide">Consignes<textarea name="instructions" required>${esc(rx.instructions)}</textarea></label>
+  </div><button class="primary">Enregistrer la ligne</button></form></details>`:''}`:`
   <h4>Exécutions tracées</h4>
   ${rx.administered?'<p>Réalisation simulée enregistrée antérieurement.</p>':''}
   ${(rx.executions||[]).map(item=>`<div class="event"><strong>${esc(item.status)} · ${esc(periTime(item.at))}</strong>${item.serverAt&&Math.abs(Date.parse(item.serverAt)-Date.parse(item.at))>15*60000?`<small class="late-entry">Saisie enregistrée le ${esc(new Date(item.serverAt).toLocaleString('fr-FR'))}</small>`:''}
@@ -600,6 +605,31 @@ function prescriptions(){
   event('Prescription de démonstration ajoutée au brouillon','Prescription');
   detail();
  };
+ // Protocole de l'établissement : lignes ajoutées au brouillon, ajustées puis validées une à une par le médecin.
+ const rxProto=$('#rx-protocole');
+ if(rxProto)rxProto.onclick=async()=>{
+  const proto=await window.IaseloProtocolesUI.choisir({type:'postop',stay,specialite:stay.specialty});
+  if(!proto||!physician()||p()!==stay)return;
+  const lignes=window.IaseloProtocoles.lignesPostop(proto.contenu,{auteur:role,protocole:window.IaseloProtocolesUI.reference(proto)});
+  stay.rx.push(...lignes);
+  event('Protocole repris en prescription postopératoire : '+proto.nom+' · version '+proto.version+' · '+lignes.length+' ligne(s) au brouillon','Prescription');
+  detail();toast(lignes.length+' ligne(s) ajoutée(s) au brouillon : ajustez puis validez');
+ };
+ document.querySelectorAll('[data-rx-remove]').forEach(button=>button.onclick=()=>{
+  const index=Number(button.dataset.rxRemove),rx=stay.rx[index];
+  if(!physician()||p()!==stay||!rx||rx.validated)return;
+  stay.rx.splice(index,1);event('Ligne retirée du brouillon de prescription · '+rx.name,'Prescription');detail();
+ });
+ document.querySelectorAll('[data-rx-edit]').forEach(form=>form.onsubmit=e=>{
+  e.preventDefault();
+  const rx=stay.rx[Number(form.dataset.rxEdit)];
+  if(!physician()||p()!==stay||!rx||rx.validated)return;
+  const values=Object.fromEntries(new FormData(form)),name=String(values.name||'').trim(),instructions=String(values.instructions||'').trim();
+  if(!name||!instructions){toast('Renseignez le libellé et les consignes');return}
+  const avant=rx.name;Object.assign(rx,{name,category:values.category,instructions});
+  if(rx.protocole)rx.protocole={...rx.protocole,ajuste:true};
+  event('Ligne du brouillon ajustée · '+(avant===name?name:avant+' → '+name),'Prescription');detail();
+ });
  document.querySelectorAll('[data-validate]').forEach(button=>button.onclick=()=>{
   const rx=stay.rx[Number(button.dataset.validate)];
   if(!physician()||p()!==stay||!rx||rx.validated)return;
@@ -788,7 +818,7 @@ function dischargeRx(){
   <div id="discharge-rx-items"></div>
   <label>Spécimen de signature fictive (facultatif, PNG ou JPEG, 1 Mo max.)<input type="file" name="signature" accept="image/png,image/jpeg"></label>
   ${saved?.signature?`<label class="check"><input type="checkbox" name="removeSignature">Retirer le spécimen enregistré</label>`:''}
-  <div class="actions"><button class="secondary" type="button" id="discharge-rx-add">Ajouter un médicament</button>
+  <div class="actions"><button class="secondary" type="button" id="discharge-rx-add">Ajouter un médicament</button>${window.IaseloProtocolesUI?'<button class="secondary pr-reprendre" type="button" id="discharge-rx-protocole">Reprendre un protocole</button>':''}
   <button class="primary">Enregistrer et afficher l’aperçu</button></div>
   <p id="discharge-rx-error" class="warn" role="alert"></p>
  </form>`:''}
@@ -824,6 +854,16 @@ function dischargeRx(){
   invalidatePreview();
   renderItems();
   form.elements.namedItem(`rx-${items.length-1}-drug`).focus();
+ };
+ const dxProto=$('#discharge-rx-protocole');
+ if(dxProto)dxProto.onclick=async()=>{
+  const current=readItems(),proto=await window.IaseloProtocolesUI.choisir({type:'sortie',stay,specialite:stay.specialty});
+  if(!proto||!physician()||p()!==stay)return;
+  const res=window.IaseloProtocoles.lignesSortie(current,proto.contenu);
+  items=res.items.length?res.items:[{}];
+  invalidatePreview();renderItems();
+  event('Protocole repris en ordonnance de sortie : '+proto.nom+' · version '+proto.version+' · '+res.ajoutes+' médicament(s)','Sortie');
+  toast(res.ajoutes?res.ajoutes+' médicament(s) ajouté(s) : ajustez puis enregistrez l’ordonnance':'Aucun nouveau médicament dans ce protocole');
  };
  form.oninput=invalidatePreview;
  form.onsubmit=async e=>{
@@ -2256,6 +2296,9 @@ if(vpaModule&&veilleModule){const panelBeforeVpa=veilleModule.panel;veilleModule
 // Feuille d’anesthésie : sans droit de saisie (chirurgien, autres profils), on n’affiche pas un formulaire grisé.
 {const detailBeforePeriEntry=detail;detail=function(){detailBeforePeriEntry();if(tab!=='perop'||periCanWrite('Surveillance'))return;const entry=document.querySelector('#content .peri-entry');if(entry)entry.outerHTML='<p class="notice no-print peri-readonly">Feuille d’anesthésie en lecture seule pour votre profil : la saisie est réservée à l’anesthésiste, et aux constantes pour l’infirmier.</p>'}}
 
+// Protocoles de prescription (dist/protocoles-prescription.js) : gestion par l'administrateur.
+const protocolesModule=window.createProtocolesPrescription?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(protocolesModule){const renderBeforeProtocoles=render;render=function(){if(view==='protocoles'){closeCroDictation();protocolesModule.render();return}renderBeforeProtocoles()}}
 // Activité & occupation (dist/indicateurs.js) : chiffres agrégés pour l'administration, calculés par le serveur.
 const indicateursModule=window.createIndicateurs?.({$,esc,toast,sectors:serviceSectors,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(view==='indicateurs'){closeCroDictation();indicateursModule.render();return}renderBeforeIndicateurs()}}

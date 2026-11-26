@@ -7,6 +7,7 @@ import {staffAnnoncesBlocApi} from './annonces-bloc.mjs';
 import {staffIndicateursApi} from './indicateurs.mjs';
 import {staffOuvertureSallesApi} from './ouverture-salles.mjs';
 import {staffMarcheApi} from './marche.mjs';
+import {staffProtocolesApi} from './protocoles.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
 import {patientEspacePatientApi,staffEspacePatientApi,consentAvant,consentDeclencher} from './espace-patient.mjs';
 import {patientLettreLiaisonApi,staffLettreLiaisonApi,lettresAvant,declencher} from './lettre-liaison.mjs';
@@ -65,6 +66,7 @@ export async function workspaceApi(request,env){
   const indicateursResponse=await staffIndicateursApi(request,env,acl);if(indicateursResponse)return indicateursResponse;
   const ouvertureResponse=await staffOuvertureSallesApi(request,env,acl);if(ouvertureResponse)return ouvertureResponse;
   const marcheResponse=await staffMarcheApi(request,env,acl);if(marcheResponse)return marcheResponse;
+  const protocolesResponse=await staffProtocolesApi(request,env,acl);if(protocolesResponse)return protocolesResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;
   if(path==='/api/workspace'&&method==='GET'){
    const result={results:await openingRows(env.DB)},visible=result.results.filter(row=>acl.canRead(row.key));await acl.log('read','workspace','allowed','',JSON.stringify(visible.map(r=>r.key)));return json({user,role,access:{profile:acl.profile,teams:acl.teams,epoch:acl.epoch,planningOccupancy:acl.planningOccupancy(JSON.parse(result.results.find(r=>r.key==='management/reservations')?.data||'[]'))},canInitialize:env.ENABLE_DEMO_SEED===true&&acl.isAdmin&&result.results.length===0,documents:visible.map(rowValue)});

@@ -21,7 +21,7 @@ const MENUS={
  unassigned:['professionalAccess']
 };
 // Administrateur des habilitations : gestion de la clinique en plus de son métier.
-const ADMIN=['indicateurs','professionalAccess','pilotage','droits','activity','billing'];
+const ADMIN=['indicateurs','professionalAccess','pilotage','droits','protocoles','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
 function menuPourProfil(profession,isAdmin,poste){

@@ -1,0 +1,68 @@
+/* IASELO · protocoles de prescription partagés (protocoles-prescription.js). Jetons --i-* : iaselo.css. */
+.pr-wrap svg, .pr-reprendre svg { width: 16px; height: 16px; flex: none; }
+.pr-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+.pr-head > p { margin: 0; max-width: 760px; color: var(--i-mut, #5b6b73); }
+.pr-head h3 { margin: 2px 0 0; }
+.pr-head .primary { display: inline-flex; align-items: center; gap: 6px; }
+.pr-mut { color: var(--i-mut, #5b6b73); font-size: 13.5px; margin: 2px 0; }
+.pr-empty { padding: 18px; border: 1px dashed var(--i-line-strong, #c3cdd6); border-radius: var(--i-r-m, 14px); color: var(--i-mut, #5b6b73); }
+.pr-filtres { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.pr-filtre { border: 1px solid var(--i-line, #dae1e8); background: var(--i-s1, #fff); color: var(--i-ink, #12404c); border-radius: 999px; padding: 6px 14px; font-size: 13.5px; min-height: 36px; cursor: pointer; }
+.pr-filtre.is-on { background: var(--i-acc, #0f4d5c); border-color: var(--i-acc, #0f4d5c); color: var(--i-on-acc, #fff); }
+.pr-h3 { margin: 18px 0 10px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.pr-count { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--i-s2, #edf1f5); color: var(--i-mut, #5b6b73); }
+.pr-list, .pr-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 12px; }
+.pr-item, .pr-pick-item { border: 1px solid var(--i-line, #dae1e8); border-radius: var(--i-r-m, 14px); background: var(--i-s1, #fff); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.pr-item.is-off { opacity: .7; border-style: dashed; }
+.pr-item header, .pr-pick-item header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.pr-item h4, .pr-pick-item h4 { margin: 0; font-size: 15.5px; }
+.pr-item > p, .pr-pick-item > p { margin: 0; font-size: 14px; }
+.pr-chip { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--i-s2, #edf1f5); color: var(--i-mut, #5b6b73); white-space: nowrap; }
+.pr-chip.ok { background: var(--i-ok-soft, #e1f4ec); color: var(--i-ok, #0f6e55); }
+.pr-resume { margin: 2px 0 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 2px; }
+.pr-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+/* Éditeur */
+.pr-form { display: flex; flex-direction: column; gap: 14px; }
+.pr-sec { border: 1px solid var(--i-line, #dae1e8); border-radius: var(--i-r-m, 14px); background: var(--i-s1, #fff); padding: 14px 16px; }
+.pr-sec h4 { margin: 0 0 8px; font-size: 15px; }
+.pr-field { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; font-weight: 560; color: var(--i-mut, #5b6b73); margin-top: 8px; min-width: 0; }
+.pr-field input, .pr-field select, .pr-field textarea { font: inherit; font-size: 15px; font-weight: 400; color: var(--i-ink, #12404c); width: 100%; box-sizing: border-box; }
+.pr-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 0 14px; }
+.pr-bilans { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 6px 14px; }
+.pr-tick { display: inline-flex; align-items: flex-start; gap: 8px; font-size: 14px; margin: 4px 14px 4px 0; cursor: pointer; }
+.pr-tick input { margin-top: 3px; }
+.pr-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0; font-size: 14px; }
+.pr-opts label { display: inline-flex; align-items: center; gap: 6px; }
+.pr-sub { margin: 4px 0 0 4px; padding-left: 12px; border-left: 2px solid var(--i-line, #dae1e8); }
+.pr-sec:has([name$=".inclure"]:not(:checked)) .pr-sub { opacity: .5; }
+.pr-row { display: grid; gap: 0 10px; align-items: end; padding: 6px 0 10px; border-bottom: 1px solid var(--i-line, #dae1e8); }
+.pr-row-3 { grid-template-columns: 2fr 1.3fr 2fr auto; }
+.pr-row-postop { grid-template-columns: 2fr 1fr 3fr auto; }
+.pr-row-sortie { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
+.pr-row-sortie .pr-x { grid-column: 4; grid-row: 1; }
+@media (max-width: 760px) { .pr-row-3, .pr-row-postop, .pr-row-sortie { grid-template-columns: 1fr auto; } .pr-row .pr-field { grid-column: 1; } .pr-row .pr-x { grid-column: 2; grid-row: 1; } }
+.pr-x { border: 0; background: none; font-size: 22px; line-height: 1; color: var(--i-mut, #5b6b73); cursor: pointer; min-height: 40px; min-width: 40px; }
+.pr-x:hover { color: var(--i-crit, #a3192b); }
+.pr-err { color: var(--i-crit, #a3192b); margin: 4px 0; font-weight: 560; }
+.pr-save { position: sticky; bottom: 0; box-shadow: 0 -6px 18px rgba(0, 0, 0, .06); }
+/* Historique */
+.pr-dialog { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+.pr-dialog.is-large { width: min(920px, calc(100vw - 32px)); }
+.pr-dialog-body { overflow: auto; }
+.pr-versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pr-versions > li { border-left: 3px solid var(--i-acc, #0f4d5c); padding: 6px 12px; background: var(--i-s2, #edf1f5); border-radius: 0 var(--i-r-s, 10px) var(--i-r-s, 10px) 0; }
+.pr-versions header { font-size: 14px; }
+.pr-diff { margin: 4px 0; padding-left: 18px; font-size: 13.5px; }
+.pr-diff .is-add { color: var(--i-ok, #0f6e55); }
+.pr-diff .is-del { color: var(--i-crit, #a3192b); text-decoration: line-through; }
+.pr-hash { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--i-mut, #5b6b73); margin: 4px 0 0; }
+.pr-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.pr-table th, .pr-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--i-line, #dae1e8); }
+/* Dans le dossier */
+.pr-reprendre { display: inline-flex; align-items: center; gap: 6px; }
+.pr-repris { font-size: 13px; color: var(--i-mut, #5b6b73); margin: 6px 0 0; }
+.pr-repris b { color: var(--i-ink, #12404c); font-weight: 600; }
+.rx-draft-edit { margin-top: 8px; }
+.rx-draft-edit .formgrid { margin-top: 8px; }
+.pr-item header, .pr-pick-item header, .pr-versions header { margin: 0; min-height: 0; padding: 0; }
+.pr-versions header { display: block; }

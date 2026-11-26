@@ -38,7 +38,7 @@ window.createPrescriptionsPreop=function(ctx){
    if(s.mode==='Ambulatoire')d.autres=QUICK[0]+'\n'+QUICK[1];
    s.prescriptionsPreop={draft:d,signed:null,history:[]};
   }
-  const x=s.prescriptionsPreop;x.draft=R.normaliser(x.draft);x.history=Array.isArray(x.history)?x.history:[];return x;
+  const x=s.prescriptionsPreop;x.draft=R.normaliser(x.draft);x.history=Array.isArray(x.history)?x.history:[];x.protocoles=Array.isArray(x.protocoles)?x.protocoles:[];return x;
  }
  const snapshot=(s,x,draft)=>({contenu:draft||x.draft,version:(draft||x.draft).version,signeLe:x.signed?.at||null,etablissement:'Clinique du Trocadéro',intervention:surgeryDate(s),
   patient:{nom:s.identity?.lastName||'',prenom:s.identity?.firstName||'',naissance:s.identity?.birthDate||''},
@@ -147,6 +147,8 @@ window.createPrescriptionsPreop=function(ctx){
      <section class="v-card pp-actions">
       ${x.signed?`<p class="pp-signed">${ICON.sign}<span>Signée par <b>${esc(x.signed.name)}</b> le ${esc(fmt(x.signed.at))}</span></p>`:''}
       <div id="pp-check"></div>
+      ${editable&&window.IaseloProtocolesUI?`<button type="button" class="secondary pr-reprendre" id="pp-protocole">Reprendre un protocole</button>`:''}
+      ${x.protocoles.length?`<p class="pr-repris">Protocoles repris : ${x.protocoles.slice(0,5).map(r=>`<b>${esc(r.nom)}</b> (version ${r.version}, ${esc(fmt(r.at))}, ${esc(r.par)})`).join(' · ')}</p>`:''}
       <div class="v-actions">${!x.signed&&can()?`<button type="button" class="primary" id="pp-sign">${ICON.sign}Signer les prescriptions</button>`:''}<button type="button" class="secondary" id="pp-print-btn">${ICON.print}${x.signed?'Imprimer l’ordonnance':'Imprimer le brouillon'}</button>${x.signed&&can()?'<button type="button" class="secondary" id="pp-edit">Modifier (nouvelle version)</button>':''}</div>
       ${can()?sendHTML(s,x):''}
       <div id="pp-status"></div>
@@ -185,6 +187,14 @@ window.createPrescriptionsPreop=function(ctx){
    toast('Prescriptions signées');panel();
   };
   const ed=$('#pp-edit');if(ed)ed.onclick=()=>{x.draft={...x.draft,version:x.draft.version+1};x.signed=null;trace(s,'Prescriptions préopératoires rouvertes · version '+x.draft.version+' ('+who()+')');panel()};
+  // Protocole de l'établissement : complète le brouillon, le médecin ajuste puis signe (reprise tracée).
+  const pr=$('#pp-protocole');if(pr)pr.onclick=async()=>{
+   sync();const proto=await window.IaseloProtocolesUI.choisir({type:'preop',stay:s,specialite:s.specialty});if(!proto||cur()?.id!==s.id||x.signed)return;
+   const res=window.IaseloProtocoles.appliquerPreop(x.draft,proto.contenu,{surgeryDate:surgeryDate(s)});x.draft={...res.draft,version:x.draft.version};
+   x.protocoles.unshift({...window.IaseloProtocolesUI.reference(proto),at:new Date().toISOString(),par:who(),version_brouillon:x.draft.version});x.protocoles=x.protocoles.slice(0,20);
+   trace(s,'Protocole repris en prescription préopératoire : '+proto.nom+' · version '+proto.version+' ('+who()+')');
+   panel();toast(res.ajouts.length?'Protocole repris : '+res.ajouts.join(', ')+'. Relisez et ajustez avant de signer.':'Protocole repris : rien de nouveau à ajouter.');
+  };
   const pb=$('#pp-print-btn');if(pb)pb.onclick=()=>{sync();print(s,x)};
   const sd=$('#pp-send');if(sd)sd.onclick=async()=>{
    const channels=[...document.querySelectorAll('[name=pp-ch]:checked')].map(i=>i.value);if(!channels.length){toast('Choisissez SMS et/ou e-mail');return}
