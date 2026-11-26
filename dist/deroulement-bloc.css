@@ -12,9 +12,6 @@
 .dr-leg i { width:14px; height:12px; border-radius:3px; display:inline-grid; place-items:center; font-style:normal; font-weight:700; font-size:10px; color:#fff; background:var(--c); }
 .dr-leg.st-nonConfirme i { background:transparent; border:1.5px dashed var(--c); color:var(--c); }
 .st-arrivee{--c:var(--dr-arrivee)} .st-entree{--c:var(--dr-entree)} .st-sortie{--c:var(--dr-sortie)} .st-sortieBloc{--c:var(--dr-sortieBloc)} .st-programme{--c:var(--dr-programme)} .st-nonConfirme{--c:var(--dr-nonConfirme)} .st-annule{--c:var(--dr-programme)}
-.dr-tabs { display:flex; gap:4px; border-bottom:1px solid var(--i-line); }
-.dr-tabs button { border:1px solid transparent; border-bottom:none; background:none; padding:7px 14px; border-radius:8px 8px 0 0; font-weight:600; color:var(--i-mut); cursor:pointer; }
-.dr-tabs button.active { background:var(--i-s1); border-color:var(--i-line); color:var(--i-ink); box-shadow:inset 0 2px 0 var(--i-acc); }
 .dr-board { position:relative; display:grid; grid-template-columns:150px 1fr; background:var(--i-s1); border:1px solid var(--i-line); border-radius:var(--i-r-l); padding:8px 12px 10px; overflow:hidden; }
 .dr-hours { display:contents; }
 .dr-hours > div { position:relative; height:22px; border-bottom:1px solid var(--i-line); }

@@ -1,0 +1,33 @@
+/* Onglets plus visibles (26/11/2026, demande de Romain : « Rends les menus plus visibles »).
+   Toutes les barres d'onglets de l'espace de travail : chaque onglet a l'aspect d'un bouton (bordure, fond),
+   l'onglet ouvert est plein, couleur de la marque, avec un repère sous le texte. Clair et sombre. */
+html body #workspace .tabs:not(.dossier-tabs), html body #workspace .dr-tabs {
+ display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; margin: 14px 0 18px; width: auto; max-width: 100%;
+ background: var(--i-s2); border: 1px solid var(--i-line); border-radius: 14px;
+}
+html body #workspace .tabs:not(.dossier-tabs) button, html body #workspace .dr-tabs button {
+ position: relative; min-height: 44px; padding: 0 18px; margin: 0;
+ border: 1.5px solid color-mix(in srgb, var(--i-acc) 35%, var(--i-line)); border-radius: 10px;
+ background: var(--i-s1); color: var(--i-ink); font-size: 15px; font-weight: 650; letter-spacing: .1px;
+ box-shadow: 0 1px 2px color-mix(in srgb, #000 8%, transparent); cursor: pointer;
+ transition: background .12s, border-color .12s, color .12s;
+}
+html body #workspace .tabs:not(.dossier-tabs) button:hover, html body #workspace .dr-tabs button:hover {
+ background: var(--i-acc-soft); border-color: var(--i-acc); color: var(--i-acc-ink);
+}
+html body #workspace .tabs:not(.dossier-tabs) button:is(.active, [aria-pressed=true], [aria-selected=true]),
+html body #workspace .dr-tabs button:is(.active, [aria-selected=true]) {
+ background: var(--i-acc); border-color: var(--i-acc); color: var(--i-on-acc, #fff); font-weight: 750;
+ box-shadow: 0 2px 8px color-mix(in srgb, var(--i-acc) 35%, transparent);
+}
+html body #workspace .tabs:not(.dossier-tabs) button:is(.active, [aria-pressed=true], [aria-selected=true])::after,
+html body #workspace .dr-tabs button:is(.active, [aria-selected=true])::after {
+ content: ""; position: absolute; left: 14px; right: 14px; bottom: 6px; height: 3px; border-radius: 2px; background: currentColor; opacity: .55;
+}
+html body #workspace .tabs:not(.dossier-tabs) button:focus-visible, html body #workspace .dr-tabs button:focus-visible {
+ outline: 3px solid color-mix(in srgb, var(--i-acc) 55%, transparent); outline-offset: 2px;
+}
+html body #workspace .dr-tabs { border-bottom: 1px solid var(--i-line); }
+@media (max-width: 700px) {
+ html body #workspace .tabs:not(.dossier-tabs) button, html body #workspace .dr-tabs button { flex: 1 1 calc(50% - 8px); min-height: 42px; padding: 0 10px; font-size: 14px; }
+}
