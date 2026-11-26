@@ -85,8 +85,14 @@ function delaiFacturation(sortie,maintenant=new Date()){const s=jourIso(sortie);
    Plusieurs actes au cours de la même intervention : le plus cher à 100 % (code 1), le 2e à 50 % (code 2),
    les suivants ne sont pas facturables sauf dérogation (à traiter par le praticien). Un seul acte d'anesthésie
    (activité 4) par intervention : celui de l'acte le mieux tarifé. */
+const TAUX_ASSOCIATION={'1':1,'2':0.5,'3':0.75,'4':1,'5':1,'0':0};
 function associer(actes){
  const out=[];
+ // Codes d'association posés par les praticiens dans l'écran de codage : ils font foi.
+ if(actes.length&&actes.every(a=>Object.hasOwn(TAUX_ASSOCIATION,String(a.association??'')))){
+  for(const a of actes){const tarif=num(a.tarif)??0,taux=TAUX_ASSOCIATION[String(a.association)];out.push({...a,tarif,taux,montant:arrondi(tarif*taux),note:taux?'':'Codé sans facturation (code d’association 0)'})}
+  return out;
+ }
  for(const activite of ['1','4']){
   const l=actes.filter(a=>String(a.activite||'1')===activite).map(a=>({...a,tarif:num(a.tarif)??0})).sort((a,b)=>b.tarif-a.tarif);
   l.forEach((a,i)=>{const taux=activite==='4'?(i===0?1:0):(i===0?1:i===1?0.5:0);out.push({...a,association:taux===1?'1':taux===0.5?'2':'',taux,montant:arrondi(a.tarif*taux),note:taux?'':activite==='4'?'Un seul acte d’anesthésie par intervention':'3e acte et suivants : non facturables sauf dérogation'})});
@@ -171,7 +177,7 @@ function preFacture(dossier={},contexte={}){
  const baseSejour=arrondi(lignes.filter(l=>l.base).reduce((s,l)=>s+l.montant,0));
  // Honoraires
  const asso=associer((contexte.actes||[]).filter(a=>a.dim));
- for(const a of asso)honoraires.push({code:a.code,activite:a.activite,association:a.association,modificateurs:a.modificateurs||'',libelle:a.libelle||'',tarif:a.tarif,montant:a.montant,note:a.note});
+ for(const a of asso)honoraires.push({cle:a.cle,code:a.code,activite:a.activite,association:a.association,modificateurs:a.modificateurs||'',libelle:a.libelle||'',tarif:a.tarif,montant:a.montant,note:a.note});
  const baseHonoraires=arrondi(honoraires.reduce((s,h)=>s+h.montant,0)),depassements=arrondi((contexte.devis||[]).reduce((s,v)=>s+(num(v.depassement)||0),0));
  // Participation de l'assuré : PF 24 € si un acte ≥ 120 €, sinon ticket modérateur de 20 % ; exonérations.
  const acteLourd=(contexte.actes||[]).some(a=>(num(a.tarif)||0)>=SEUIL_PF24);

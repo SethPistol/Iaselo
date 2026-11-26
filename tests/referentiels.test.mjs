@@ -38,16 +38,20 @@ const archives=[
  zip([['R_ACTE_IVITE.dbf',dbf([['COD_AA',14],['ACTE_COD',13],['ACTIV_COD',1],['DT_MODIF',8]],[
   {COD_AA:'NFFC0041',ACTE_COD:'NFFC004',ACTIV_COD:'1',DT_MODIF:'20200101'},{COD_AA:'NFFC0044',ACTE_COD:'NFFC004',ACTIV_COD:'4',DT_MODIF:'20200101'},
   {COD_AA:'NEKA0201',ACTE_COD:'NEKA020',ACTIV_COD:'1',DT_MODIF:'20200101'},{COD_AA:'NEKA0204',ACTE_COD:'NEKA020',ACTIV_COD:'4',DT_MODIF:'20200101'}])],
-  ['R_ACTE_IVITE_PHASE.dbf',dbf([['COD_AAP',15],['PU_BASE',12],['DT_MODIF',8]],[{COD_AAP:'NFFC00410',PU_BASE:'172.80',DT_MODIF:'20200101'},{COD_AAP:'NFFC00410',PU_BASE:'150.00',DT_MODIF:'20150101'}])],
+  ['R_ACTE_IVITE_PHASE.dbf',dbf([['COD_AAP',15],['PU_BASE',12],['DT_MODIF',8]],[{COD_AAP:'NFFC00410',PU_BASE:'172.80',DT_MODIF:'20200101'},{COD_AAP:'NFFC00410',PU_BASE:'150.00',DT_MODIF:'20150101'},{COD_AAP:'NFFC00440',PU_BASE:'60.00',DT_MODIF:'20200101'}])],
+  ['R_ACTE_IVITE_MODIF.dbf',dbf([['COD_AA',14],['MODIFI_COD',1],['DT_MODIF',8]],[{COD_AA:'NFFC0041',MODIFI_COD:'K'},{COD_AA:'NFFC0041',MODIFI_COD:'J'},{COD_AA:'NFFC0044',MODIFI_COD:'7'},{COD_AA:'NFFC0044',MODIFI_COD:'A'}])],
+  ['R_TB_MODIF.dbf',dbf([['COD_MODIF',1],['LIBELLE',80],['COEF',8],['FORFAIT',8],['DT_DEBUT',8]],[{COD_MODIF:'K',LIBELLE:'Majoration K (test)',COEF:'1.20',DT_DEBUT:'20200101'},{COD_MODIF:'K',LIBELLE:'Ancienne',COEF:'1.10',DT_DEBUT:'20100101'},{COD_MODIF:'F',LIBELLE:'Forfait F (test)',COEF:'',FORFAIT:'19.06',DT_DEBUT:'20200101'},{COD_MODIF:'7',LIBELLE:'Majoration 7 (test)',COEF:'104',DT_DEBUT:'20200101'}])],
   ['R_MENU.dbf',dbf([['COD_MENU',6],['COD_PERE',6],['RANG',3],['LIBELLE',100]],[{COD_MENU:'1',COD_PERE:'',RANG:'0',LIBELLE:'ARBORESCENCE'},{COD_MENU:'12',COD_PERE:'1',RANG:'14',LIBELLE:'Système ostéoarticulaire du membre inférieur'}])]])
 ];
 
 test('CCAM : archives ameli, version en vigueur, libellé long recollé, actes clos écartés',async()=>{
- assert.equal(entreesZip(archives[1]).length,3);
+ assert.equal(entreesZip(archives[1]).length,5);
  const r=await construireCcam(archives,{version:'08400',aujourdhui:'20261123'});
  assert.equal(r.version,'08400');assert.deepEqual(r.actes.map(a=>a[0]),['NEKA020','NFFC004']);
  const m=r.actes.find(a=>a[0]==='NFFC004');
  assert.equal(m[1],'Méniscectomie latérale ou médiale du genou, par arthroscopie');assert.equal(m[2],'14');assert.equal(m[3],172.8);assert.equal(m[4],'Système ostéoarticulaire du membre inférieur');
+ assert.deepEqual(m[5],{'1':172.8,'4':60},'tarif par activité');assert.deepEqual(m[6],{'1':'JK','4':'7A'},'modificateurs autorisés par activité');
+ assert.equal(r.modificateurs.K.libelle,'Majoration K (test)');assert.ok(Math.abs(r.modificateurs.K.majoration-0.2)<1e-9);assert.ok(Math.abs(r.modificateurs['7'].majoration-0.04)<1e-9);assert.equal(r.modificateurs.F.forfait,19.06);
  await assert.rejects(construireCcam([archives[1]]),/R_ACTE absente/);
 });
 

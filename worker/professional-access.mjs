@@ -1,4 +1,5 @@
 import invitationCore from '../dist/invitation-core.js';
+import codageCcam from '../dist/codage-ccam-regles.js';
 import nursingCore from '../dist/nursing-core.js';
 import planningCore from '../dist/planning-core.js';import {stampSignatures} from './signatures.mjs';import {heal,stamp} from './horodatage.mjs';import {lockCheck} from './verrous.mjs';
 const professions={unassigned:'Non attribué',anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier',secretariat:'Secrétariat',pharmacien:'Pharmacien',dim:'DIM',facturation:'Facturation',administration:'Administration'};
@@ -64,7 +65,8 @@ export async function professionalAccess(env,request,user,member,at){
    // Saisie rapide au bloc : anesthésiste et infirmier (IADE) seulement, le chirurgien la lit (audit du 24/11, point 5).
    if(module==='peropRapide')return ['anesthesiste','infirmier'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(['periopPlus','soinsPlus','sortiePlus','iaTrace'].includes(module))return ['anesthesiste','chirurgien','infirmier'].includes(job)&&!!data&&typeof data==='object';
-   if(module==='codage')return ['anesthesiste','chirurgien','dim'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
+   // Codage CCAM (26/11/2026) : chaque praticien ne modifie que sa partie (activité 1 ou anesthésie), le DIM tout.
+   if(module==='codage')return ['anesthesiste','chirurgien','dim'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data)&&codageCcam.ecritureAutorisee(job,old||{},data);
    if(module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job)&&!!data&&typeof data==='object'&&!Array.isArray(data);
    if(module==='droitsRgpd')return (['anesthesiste','chirurgien'].includes(job)||isAdmin)&&Array.isArray(data);
    // Modules issus de la veille marché : statut bloc, check-list HAS, suivi J+1 (soignants) ; aide CPA (anesthésiste) ; envois DMP/MSSanté (médecins).

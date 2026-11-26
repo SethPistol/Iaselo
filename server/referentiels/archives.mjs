@@ -67,3 +67,11 @@ export function lignesTabulees(b){
  let t;try{t=new TextDecoder('utf-8',{fatal:true}).decode(b)}catch{t=new TextDecoder('windows-1252').decode(b)}
  return t.replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim()).map(l=>l.split('\t').map(x=>x.trim()));
 }
+
+/** Noms des colonnes d'une table DBF (lecture de l'en-tête seulement). */
+export async function colonnesDbf(flux){
+ let tampon=Buffer.alloc(0);
+ for await(const morceau of flux){tampon=Buffer.concat([tampon,morceau]);if(tampon.length<32)continue;const longueur=tampon.readUInt16LE(8);if(tampon.length<longueur)continue;
+  const noms=[];for(let p=32;p+32<=longueur&&tampon[p]!==0x0d;p+=32)noms.push(tampon.toString('latin1',p,p+11).replace(/\0.*$/s,''));flux.destroy?.();return noms}
+ return [];
+}

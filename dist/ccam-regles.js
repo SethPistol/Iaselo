@@ -13,10 +13,10 @@ const CODE=/^[A-Z]{4}\d{3}$/;
 
 /** Prépare l'index (une fois par chargement). `ref` = contenu de assets/ccam.json. */
 function indexer(ref){
- const actes=(ref?.actes||[]).map(([code,libelle,activites,tarif,chapitre])=>({code,libelle,activites:String(activites||''),tarif,chapitre:chapitre||'',plie:plier(code+' '+libelle),racines:[...new Set(mots(libelle))]}));
+ const actes=(ref?.actes||[]).map(([code,libelle,activites,tarif,chapitre,tarifs,modificateurs])=>({code,libelle,activites:String(activites||''),tarif,chapitre:chapitre||'',tarifs:tarifs||{},modificateurs:modificateurs||{},plie:plier(code+' '+libelle),racines:[...new Set(mots(libelle))]}));
  const df=new Map();for(const a of actes)for(const r of a.racines)df.set(r,(df.get(r)||0)+1);
  const n=actes.length||1,idf=new Map([...df].map(([r,k])=>[r,Math.log(1+n/k)]));
- return {version:ref?.version||'',miseAJour:ref?.miseAJour||'',actes,idf,parCode:new Map(actes.map(a=>[a.code,a]))};
+ return {version:ref?.version||'',miseAJour:ref?.miseAJour||'',modificateurs:ref?.modificateurs||{},actes,idf,parCode:new Map(actes.map(a=>[a.code,a]))};
 }
 
 /** Recherche libre : code exact ou tous les mots présents dans le libellé. */

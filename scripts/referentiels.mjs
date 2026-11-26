@@ -34,8 +34,9 @@ export async function majCcam({dossier=racine,journal=console.log}={}){
  const zips=[];for(const u of cible.urls)zips.push(await telecharger(u));
  const ccam=await construireCcam(zips,{version:cible.version});
  fs.writeFileSync(path.join(dossier,'ccam.json'),JSON.stringify(ccam)+'\n');
- journal('CCAM V'+cible.version+' : '+ccam.actes.length+' actes en vigueur.');
- return {etat:'ok',version:cible.version,actes:ccam.actes.length,date:ccam.miseAJour};
+ const nMod=Object.keys(ccam.modificateurs||{}).length,nAut=ccam.actes.filter(a=>Object.keys(a[6]||{}).length).length;
+ journal('CCAM V'+cible.version+' : '+ccam.actes.length+' actes en vigueur, '+nMod+' modificateurs décrits, '+nAut+' actes avec modificateurs autorisés.');
+ return {etat:'ok',version:cible.version,actes:ccam.actes.length,date:ccam.miseAJour,modificateurs:nMod,actesAvecModificateurs:nAut,tablesModificateurs:ccam.tablesModificateurs};
 }
 
 export async function majReferentiels({dossier=racine,journal=console.log}={}){

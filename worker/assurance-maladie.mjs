@@ -18,13 +18,10 @@ import G from '../dist/gestion-financiere-regles.js';
 import H from '../dist/interop-hl7.js';
 import {identityRecord} from './veille.mjs';
 
-let ccamCache;
-function ccamTarifs(){
- if(ccamCache!==undefined)return ccamCache;
- try{const ref=JSON.parse(fs.readFileSync(new URL('../dist/assets/ccam.json',import.meta.url),'utf8'));ccamCache=new Map((ref.actes||[]).map(([code,libelle,,tarif])=>[code,{libelle,tarif}]))}catch{ccamCache=null}
- return ccamCache;
-}
-export const _testCcam=m=>{ccamCache=m};
+import {ccamIndex,_testCcamIndex} from './ccam-ref.mjs';
+import CC from '../dist/codage-ccam-regles.js';
+// Compatibilité des tests : Map code → {libelle, tarif}.
+export const _testCcam=m=>_testCcamIndex(m);
 
 export function creerModuleAssurance(o){
  const {json,t,court,lire,un,creer,modifier,docData,est,voitSejour,cliniqueSejour,maintenant,aujourdhui,etatConnecteur,envoyer,sejours}=o;
@@ -40,10 +37,11 @@ export function creerModuleAssurance(o){
   const identite=core?.identity||{},ins=await identityRecord(env,stay).catch(()=>null),p=dossier?.data?.pmsi||{},f=dossier?.data?.facture||{};
   const ev=(perop?.evenements||[]).filter(x=>!x.annule),entreeSalle=ev.find(x=>x.label==='Entrée en salle')?.at||'';
   const dateActe=A.jourIso(p.dateActes)||A.jourIso(entreeSalle)||A.jourIso(consult?.ext?.surgeryDate)||A.jourIso(annonce?.published?.fields?.date);
-  const dec=codage?.decisions||{},tarifs=ccamTarifs(),asa=A.ASA[String(consult?.asa||'').replace(/E$/,'')]||'';
-  const actes=Object.entries(codage?.actes||{}).filter(([,x])=>x&&x.confirme).map(([k,x])=>{const code=t(x.code).toUpperCase(),activite=k==='anes'?'4':'1';
-   return {cle:k,code,libelle:x.libelle||tarifs?.get(code)?.libelle||'',activite,phase:'0',date:dateActe,dim:dec['acte:'+k]?.decision==='Validé',rejeteDim:dec['acte:'+k]?.decision==='Rejeté',
-    extension:activite==='4'?(t(p.extensionAsa)||asa):'',tarif:tarifs?.get(code)?.tarif??null,modificateurs:t(f.modificateurs?.[k]||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4)}});
+  const dec=codage?.decisions||{},ix=ccamIndex(),asa=A.ASA[String(consult?.asa||'').replace(/E$/,'')]||'';
+  // Codage de l'intervention (dist/codage-ccam-regles.js) : lignes validées par leur praticien, avec modificateurs et association.
+  const actes=CC.lignesFacturables(codage||{},ix).filter(x=>x.confirme).map(x=>({cle:x.cle,code:x.code,libelle:x.libelle||ix?.parCode.get(x.code)?.libelle||'',activite:x.activite,phase:'0',date:dateActe,dim:x.dim==='Validé',rejeteDim:x.dim==='Rejeté',
+    extension:x.activite==='4'?(t(p.extensionAsa)||asa):'',tarif:CC.prixUnitaire(ix,x.code,x.activite),association:x.association,
+    modificateurs:(t(f.modificateurs?.[x.cle]||'')||x.modificateurs).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4)}));
   const dmiSaisis=p.dmi||{};
   const dmi=(perop?.dmi||[]).map(x=>{const m=dmiSaisis[x.gtin]||{};return {gtin:x.gtin||'',lot:x.lot||'',serie:x.serie||'',peremption:x.peremption||'',lpp:m.lpp||'',enSus:m.enSus===undefined?undefined:!!m.enSus,prix:m.prix||'',libelle:m.libelle||''}});
   const diagnostics=Object.entries(dec).filter(([k,v])=>A.cim10(k)&&v?.decision==='Retenu').map(([k])=>A.normCim(k));
@@ -140,7 +138,7 @@ export function creerModuleAssurance(o){
 
    if(action==='facture'){if(!est(acl,FACT))return refuse('Facture : service facturation.','assurance');
     const x=d.facture||{},v=nettoie(x,['ghm','ghs','ghsTarif','exhJours','exhTarif','chambreNuits','chambrePrix','amcChambreParNuit','observation'],120);
-    if(x.modificateurs&&typeof x.modificateurs==='object')v.modificateurs=Object.fromEntries(['chir','anes'].map(k=>[k,court(x.modificateurs[k],4).toUpperCase().replace(/[^A-Z0-9]/g,'')]));
+    if(x.modificateurs&&typeof x.modificateurs==='object')v.modificateurs=Object.fromEntries(Object.entries(x.modificateurs).filter(([k])=>/^[A-Za-z0-9_-]{1,40}(:c)?:[A-Z0-9]{1,7}$|^(chir|anes)$/.test(k)).slice(0,40).map(([k,m])=>[k,court(m,4).toUpperCase().replace(/[^A-Z0-9]/g,'')]));
     for(const k of ['ghsTarif','exhTarif','chambrePrix'])if(v[k]&&!(Number(String(v[k]).replace(',','.'))>=0))return json({error:'Montant invalide.'},400);
     return enregistre({...data,facture:{...data.facture,...v,maj:maintenant(),par:acteur.nom}},undefined,'Facture du séjour enregistrée')}
 

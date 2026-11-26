@@ -22,7 +22,12 @@ const texte=(v,n=1000)=>typeof v==='string'?v.trim().slice(0,n):'';
 // Services ouverts au métier d'un compte.
 function servicesDe(job){return Object.keys(SERVICES).filter(k=>SERVICES[k].metiers.includes(job))}
 // Actes confirmés du codage du séjour (stay/<id>/codage), avec la décision du DIM s'il y en a une.
-function actesConfirmes(codage){
+// cc : règles du codage CCAM (dist/codage-ccam-regles.js) et ix : index CCAM ; sans elles, ancien format seulement.
+function actesConfirmes(codage,cc,ix){
+ if(cc)return cc.lignesFacturables(codage||{},ix).filter(x=>x.confirme).map(x=>({cle:x.cle,code:x.code,libelle:texte(x.libelle,300),activite:x.activite,confirmePar:texte(x.by,160),confirmeLe:x.at||'',dim:texte(x.dim,20),modificateurs:x.modificateurs||'',association:x.association||'',montant:x.montant??null,complement:!!x.complement}));
+ return actesAncien(codage);
+}
+function actesAncien(codage){
  const actes=codage&&typeof codage.actes==='object'?codage.actes:{},dec=codage&&typeof codage.decisions==='object'?codage.decisions:{};
  return Object.entries(actes).filter(([,x])=>x&&x.confirme&&/^[A-Z]{4}\d{3}$/.test(String(x.code||'').toUpperCase())).map(([k,x])=>({cle:k,code:String(x.code).toUpperCase(),libelle:texte(x.libelle,300),activite:k==='anes'?'4':'1',confirmePar:texte(x.by,160),confirmeLe:x.at||'',dim:texte(dec['acte:'+k]?.decision,20)}));
 }

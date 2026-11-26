@@ -6,6 +6,8 @@
 //  POST {action:'traiter'|'corriger',id,service,commentaire|motif} : le service destinataire.
 // Minimisation : identité, dates et actes CCAM seulement (ni diagnostics, ni ASA, ni compte rendu). Tout est tracé.
 import C from '../dist/codage-transmis-regles.js';
+import CC from '../dist/codage-ccam-regles.js';
+import {ccamIndex} from './ccam-ref.mjs';
 
 export function creerModuleCodage(o){
  const {json,t,court,lire,un,creer,modifier,docData,est,cliniqueSejour,aujourdhui,maintenant}=o;
@@ -36,7 +38,7 @@ export function creerModuleCodage(o){
     const stay=t(d.stay);if(!codeur(acl))return refuse('La transmission du codage revient au médecin ou au DIM.','codage');
     if(!stay||!cliniqueSejour(acl,stay))return refuse('Séjour hors habilitation.','codage');
     const [codage,core]=await Promise.all([docData(env,'stay/'+stay+'/codage'),docData(env,'stay/'+stay+'/core')]);
-    const actes=C.actesConfirmes(codage||{});
+    const actes=C.actesConfirmes(codage||{},CC,ccamIndex());
     // Le navigateur annonce les codes qu'il voit : s'ils diffèrent du codage enregistré, l'enregistrement n'est pas encore arrivé.
     if(Array.isArray(d.codes)&&d.codes.map(String).sort().join()!==actes.map(a=>a.code).sort().join())return json({error:'Le codage n’est pas encore enregistré sur le serveur : réessayez dans quelques secondes.'},409);
     const demande={destinataires:Array.isArray(d.destinataires)?d.destinataires.map(String):[],autre:court(d.autre,120),note:court(d.note,2000)};
