@@ -1,7 +1,7 @@
 import invitationCore from '../dist/invitation-core.js';
 import codageCcam from '../dist/codage-ccam-regles.js';
 import nursingCore from '../dist/nursing-core.js';
-import planningCore from '../dist/planning-core.js';import {stampSignatures} from './signatures.mjs';import {heal,stamp} from './horodatage.mjs';import {lockCheck} from './verrous.mjs';
+import planningCore from '../dist/planning-core.js';import plagesRegles from '../dist/plages-operatoires-regles.js';import {stampSignatures} from './signatures.mjs';import {heal,stamp} from './horodatage.mjs';import {lockCheck} from './verrous.mjs';
 const professions={unassigned:'Non attribué',anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier',secretariat:'Secrétariat',pharmacien:'Pharmacien',dim:'DIM',facturation:'Facturation',administration:'Administration'};
 const stable=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const same=(a,b)=>stable(a)===stable(b);
@@ -41,14 +41,14 @@ export async function professionalAccess(env,request,user,member,at){
  const annonceJob=['chirurgien','anesthesiste','secretariat'].includes(job)||cadre,createJob=['anesthesiste','chirurgien','secretariat'].includes(job)||cadre;
  if(!active||['unassigned','administration'].includes(job))allowed.clear();
  const epoch=(await DB.prepare('SELECT revision FROM professional_policy_revision WHERE id=1').first()).revision;
- const globalRead={planningResources:['anesthesiste','chirurgien','infirmier','secretariat'],vacations:['anesthesiste','chirurgien','infirmier','secretariat'],reservations:['anesthesiste','chirurgien','infirmier','secretariat'],acts:['anesthesiste','chirurgien','dim','facturation'],lots:['anesthesiste','chirurgien','infirmier','pharmacien'],movements:['anesthesiste','chirurgien','infirmier','pharmacien'],pmsi:['dim','anesthesiste','chirurgien'],invoices:['facturation'],patientDrafts:[]};
+ const globalRead={planningResources:['anesthesiste','chirurgien','infirmier','secretariat'],vacations:['anesthesiste','chirurgien','infirmier','secretariat'],plages:['anesthesiste','chirurgien','infirmier','secretariat'],reservations:['anesthesiste','chirurgien','infirmier','secretariat'],acts:['anesthesiste','chirurgien','dim','facturation'],lots:['anesthesiste','chirurgien','infirmier','pharmacien'],movements:['anesthesiste','chirurgien','infirmier','pharmacien'],pmsi:['dim','anesthesiste','chirurgien'],invoices:['facturation'],patientDrafts:[]};
  // Stock de la pharmacie (lots) : commun à l'établissement, sans lien avec un séjour ; la pharmacie y accède même sans séjour dans son périmètre.
  const lotsPharmacie=id=>id==='lots'&&job==='pharmacien';
- function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact'||module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job);if(module==='surgicalAnnouncement'&&job==='secretariat')return true;return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||(allowed.size>0||lotsPharmacie(id))&&(globalRead[id]||[]).includes(job));return false;}
+ function canRead(key){if(!active)return false;const [group,id,module]=key.split('/');if(group==='stay'){if(!allowed.has(id))return false;if(module==='invitationContact'||module==='preadmission')return ['anesthesiste','chirurgien','secretariat'].includes(job);if(module==='surgicalAnnouncement'&&job==='secretariat')return true;return module==='core'?job!=='unassigned'&&job!=='administration':clinical;}if(group==='identities')return allowed.size>0&&(clinical||job==='secretariat');if(group==='management'&&cadre&&['planningResources','vacations','plages'].includes(id))return true;if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||(allowed.size>0||lotsPharmacie(id))&&(globalRead[id]||[]).includes(job));return false;}
  function filter(key,data){if(data===null||data===undefined)return data;const [group,name,module]=key.split('/');
   if(group==='stay'&&module==='core'&&!clinical)return Object.fromEntries(Object.entries(data).filter(([k])=>['id','specialty','mode','stage','sector','identity','careTeamId','origin'].includes(k)));
   if(group==='management'){
-   if(['lots','planningResources','vacations'].includes(name))return data;
+   if(['lots','planningResources','vacations','plages'].includes(name))return data;
    if(['pmsi','invoices'].includes(name))return (data||[]).filter(([id])=>allowed.has(id));
    if(name==='patientDrafts')return Object.fromEntries(Object.entries(data||{}).filter(([id])=>allowed.has(id)));
    return (data||[]).filter(row=>allowed.has(row.patient));
@@ -96,11 +96,14 @@ export async function professionalAccess(env,request,user,member,at){
   }
   if(group==='identities')return allowed.size>0&&(isAdmin||job==='secretariat');
   if(group==='management'&&id==='planningResources')return isAdmin&&Array.isArray(data);
+  // Plages opératoires des chirurgiens : administrateur et cadre de bloc ; le cadre écrit aussi les vacations qui en découlent.
+  if(group==='management'&&id==='plages')return (isAdmin||cadre)&&Array.isArray(data);
+  if(group==='management'&&id==='vacations'&&cadre)return Array.isArray(data);
   if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||({reservations:['anesthesiste','chirurgien','secretariat'],vacations:['anesthesiste','chirurgien','secretariat'],acts:['anesthesiste','chirurgien'],lots:['pharmacien'],movements:['pharmacien'],pmsi:['dim'],invoices:['facturation']}[id]||[]).includes(job)&&(allowed.size>0||lotsPharmacie(id)));
   return false;
  }
  function merge(key,old,data){const [group,name,module]=key.split('/');if(group==='stay'&&module==='core'&&!clinical)return {...old,...data};
-  if(group==='management'&&['lots','planningResources','vacations'].includes(name))return data;
+  if(group==='management'&&['lots','planningResources','vacations','plages'].includes(name))return data;
   if(group==='management'&&name==='patientDrafts')return {...Object.fromEntries(Object.entries(old||{}).filter(([id])=>!allowed.has(id))),...data};
   if(group==='management'||group==='identities'){
    if(!Array.isArray(data))return data;
@@ -141,6 +144,8 @@ export async function professionalAccess(env,request,user,member,at){
   }
   // Contrôle sur le programme complet : les réservations des autres équipes
   // participent aux conflits sans être renvoyées au professionnel.
+  const plagesDoc=out.find(d=>d.key==='management/plages');
+  if(plagesDoc){const row=await DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind('management/planningResources').first(),res=out.find(d=>d.key==='management/planningResources')?.data||(row?JSON.parse(row.data):[]);const error=plagesRegles.listeError(plagesDoc.data,res);if(error){planningError='Plage opératoire refusée : '+error;await log('planning-conflict','management/plages','denied',error);return null}}
   if(out.some(d=>['management/reservations','management/planningResources','management/vacations'].includes(d.key))){
    const load=async key=>{const changed=out.find(d=>d.key===key);if(changed)return changed.data;const row=await DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(key).first();return row?JSON.parse(row.data):[]};
    const resources=await load('management/planningResources'),vacations=await load('management/vacations'),bookings=await load('management/reservations');
