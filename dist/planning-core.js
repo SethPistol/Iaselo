@@ -74,7 +74,9 @@ function placeAnnouncements(day,announcements,vacations,reservations){
  const list=announcements.filter(a=>a&&a.state==='Transmise'&&a.date===day&&!programmed(a.stay,reservations));
  // Ordre d'arrivée des annonces (urgences d'abord) ; l'heure souhaitée est respectée quand le créneau est libre.
  list.sort((a,b)=>(a.urgency==='Urgente'?0:1)-(b.urgency==='Urgente'?0:1)||(a.sentAt||'~').localeCompare(b.sentAt||'~')||String(a.stay).localeCompare(String(b.stay)));
- const busy=v=>[...reservations.filter(r=>active(r)&&r.resource===v.resource&&overlap(r,v)).map(r=>({start:r.start,end:r.end})),...placed.filter(p=>p.resource===v.resource).map(p=>({start:p.start,end:p.end}))].sort((a,b)=>a.start.localeCompare(b.start));
+ // Un passage terminé ou en cours occupe toujours son créneau (seules les annulations le libèrent).
+ const held=r=>r.state!=='Annulée';
+ const busy=v=>[...reservations.filter(r=>held(r)&&r.resource===v.resource&&overlap(r,v)).map(r=>({start:r.start,end:r.end})),...placed.filter(p=>p.resource===v.resource).map(p=>({start:p.start,end:p.end}))].sort((a,b)=>a.start.localeCompare(b.start));
  for(const a of list){
   const vs=vacations.filter(v=>v.state!=='Annulée'&&v.start.slice(0,10)===day&&sameSurgeon(v.surgeon,a.surgeon)).sort((x,y)=>x.start.localeCompare(y.start));
   if(!a.surgeon){unplaced.push({...a,reason:'Chirurgien non renseigné dans l’annonce.'});continue}
@@ -90,7 +92,7 @@ function placeAnnouncements(day,announcements,vacations,reservations){
   placed.push(p);
  }
  for(const v of vacations.filter(v=>v.state!=='Annulée'&&v.start.slice(0,10)===day)){
-  const cap=minutes(v.start,v.end),used=reservations.filter(r=>active(r)&&r.vacationId===v.id).reduce((n,r)=>n+minutes(r.start,r.end),0),announced=placed.filter(p=>p.vacationId===v.id).reduce((n,p)=>n+minutes(p.start,p.end),0);
+  const cap=minutes(v.start,v.end),used=reservations.filter(r=>held(r)&&r.vacationId===v.id).reduce((n,r)=>n+minutes(r.start,r.end),0),announced=placed.filter(p=>p.vacationId===v.id).reduce((n,p)=>n+minutes(p.start,p.end),0);
   load.set(v.id,{capacity:cap,used,announced,free:cap-used-announced});
  }
  return {placed,unplaced,load};

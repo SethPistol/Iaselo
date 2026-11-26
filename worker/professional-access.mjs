@@ -99,6 +99,8 @@ export async function professionalAccess(env,request,user,member,at){
   // Plages opératoires des chirurgiens : administrateur et cadre de bloc ; le cadre écrit aussi les vacations qui en découlent.
   if(group==='management'&&id==='plages')return (isAdmin||cadre)&&Array.isArray(data);
   if(group==='management'&&id==='vacations'&&cadre)return Array.isArray(data);
+  // Le cadre de bloc régule le programme : il confirme les annonces et programme les séjours de ses équipes (26/11/2026).
+  if(group==='management'&&id==='reservations'&&cadre)return Array.isArray(data)&&allowed.size>0;
   if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||({reservations:['anesthesiste','chirurgien','secretariat'],vacations:['anesthesiste','chirurgien','secretariat'],acts:['anesthesiste','chirurgien'],lots:['pharmacien'],movements:['pharmacien'],pmsi:['dim'],invoices:['facturation']}[id]||[]).includes(job)&&(allowed.size>0||lotsPharmacie(id)));
   return false;
  }

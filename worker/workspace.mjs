@@ -9,6 +9,7 @@ import {staffOuvertureSallesApi} from './ouverture-salles.mjs';
 import {staffMarcheApi} from './marche.mjs';
 import {staffProtocolesApi} from './protocoles.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
+import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
 import {patientEspacePatientApi,staffEspacePatientApi,consentAvant,consentDeclencher} from './espace-patient.mjs';
 import {patientLettreLiaisonApi,staffLettreLiaisonApi,lettresAvant,declencher} from './lettre-liaison.mjs';
@@ -70,8 +71,10 @@ export async function workspaceApi(request,env){
   const protocolesResponse=await staffProtocolesApi(request,env,acl);if(protocolesResponse)return protocolesResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;
+  // Recette seulement : programme fictif du bloc (worker/recette-bloc.mjs), écrit par la route normale d'enregistrement.
+  const recetteResponse=await recetteProgrammeApi(request,env,acl,{json,commit:(owner,documents)=>workspaceApi(new Request(url.origin+'/api/workspace/commit',{method:'POST',headers:{'oai-authenticated-user-id':owner,Origin:url.origin,'Content-Type':'application/json'},body:JSON.stringify({documents})}),env)});if(recetteResponse)return recetteResponse;
   if(path==='/api/workspace'&&method==='GET'){
-   const result={results:await openingRows(env.DB)},visible=result.results.filter(row=>acl.canRead(row.key));await acl.log('read','workspace','allowed','',JSON.stringify(visible.map(r=>r.key)));return json({user,role,access:{profile:acl.profile,teams:acl.teams,epoch:acl.epoch,planningOccupancy:acl.planningOccupancy(JSON.parse(result.results.find(r=>r.key==='management/reservations')?.data||'[]'))},canInitialize:env.ENABLE_DEMO_SEED===true&&acl.isAdmin&&result.results.length===0,documents:visible.map(rowValue)});
+   const result={results:await openingRows(env.DB)},visible=result.results.filter(row=>acl.canRead(row.key));await acl.log('read','workspace','allowed','',JSON.stringify(visible.map(r=>r.key)));return json({user,role,access:{profile:acl.profile,teams:acl.teams,epoch:acl.epoch,planningOccupancy:acl.planningOccupancy(JSON.parse(result.results.find(r=>r.key==='management/reservations')?.data||'[]')),recette:env.RECETTE===true},canInitialize:env.ENABLE_DEMO_SEED===true&&acl.isAdmin&&result.results.length===0,documents:visible.map(rowValue)});
   }
   // Séjours archivés (worker/archives.mjs) : recherche puis rechargement d'un séjour, tracés.
   if(path==='/api/workspace/archives'&&method==='GET'){const q=String(url.searchParams.get('q')||'').slice(0,120);if(q.trim().length<2)return json({error:'Saisissez au moins deux caractères.'},400);const results=await searchArchives(env.DB,acl,q);await acl.log('archive-search','workspace','allowed','',String(results.length)+' résultat(s)');return json({results})}

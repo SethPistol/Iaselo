@@ -98,3 +98,7 @@ html body .management .eyebrow { display: none; }
 .bl-plage-chip.is-edit { outline: 2px solid var(--i-acc); }
 #plan-plage h4 { margin: 0 0 12px; font-size: 17px; }
 @media (max-width: 640px) { .bl-plages-jour { grid-template-columns: 1fr; gap: 6px; } }
+
+/* Recette seulement : rechargement du programme fictif du bloc. */
+.bl-recette { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 4px 0 10px; padding: 8px 12px; border: 1px dashed var(--line, #c9cdd6); border-radius: 10px; }
+.bl-recette small { color: var(--muted, #5d6470); }

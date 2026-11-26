@@ -5,6 +5,8 @@ import {randomBytes} from 'node:crypto';
 export const RECETTE_EMAIL='demo@iaselo.test',RECETTE_PASSWORD='Recette IASELO 2026';
 // Compte chirurgien de test, créé uniquement en recette, pour essayer l'application avec ce profil.
 export const RECETTE_CHIRURGIEN_EMAIL='chirurgien@iaselo.test',RECETTE_CHIRURGIEN_PASSWORD='Chirurgien IASELO 2026';
+// Compte cadre de bloc de test (26/11/2026), créé uniquement en recette : infirmier(ère) au poste « cadre ».
+export const RECETTE_CADRE_EMAIL='cadre@iaselo.test',RECETTE_CADRE_PASSWORD='Cadre de bloc IASELO 2026';
 export function recette(env=process.env){return env.IASELO_RECETTE==='true'}
 function recetteEnv(env){
  if(!recette(env))return env;const out={...env};
