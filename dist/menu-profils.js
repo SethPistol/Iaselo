@@ -29,6 +29,8 @@ const RETIREES=['search','service','open-nursing-record','portal','patientlink']
 function menuPourProfil(profession,isAdmin,poste){
  const base=MENUS[profession==='infirmier'&&!['bloc','cadre'].includes(poste)?'infirmier_etage':profession]||MENUS.unassigned;
  const vues=isAdmin?[...base,...ADMIN.filter(v=>!base.includes(v))]:[...base];
+ // Cadre de bloc : commandes de matériel des UF du bloc (26/11/2026).
+ if(profession==='infirmier'&&poste==='cadre'&&!vues.includes('commandesPharmacie'))vues.splice(vues.indexOf('pharmacy')+1,0,'commandesPharmacie');
  return vues;
 }
 function cle(el){if(el.dataset?.view)return el.dataset.view;if(el.id==='open-nursing-record')return 'open-nursing-record';if(el.classList?.contains('patientlink'))return 'patientlink';return null}
@@ -41,7 +43,7 @@ function installer(doc){
  function appliquer(){
   if(enCours)return;const aside=doc.querySelector('aside');const job=doc.body.dataset.profession;if(!aside||!job)return;enCours=true;
   try{
-   const visibles=new Set(menuPourProfil(job,doc.body.dataset.admin==='true',doc.body.dataset.poste));
+   const visibles=new Set(menuPourProfil(job,doc.body.dataset.admin==='true',doc.body.dataset.cadre==='true'?'cadre':doc.body.dataset.poste));
    aside.querySelectorAll('.nav, a.patientlink').forEach(el=>{const k=cle(el);if(!k||el.closest('.asidebottom'))return;el.classList.toggle('menu-masque',RETIREES.includes(k)||!visibles.has(k))});
    // Titres de section sans entrée visible.
    aside.querySelectorAll('.navtitle').forEach(t=>{let n=t.nextElementSibling,vu=false;while(n&&!n.classList.contains('navtitle')){if(n.matches('.nav, a.patientlink')&&!n.classList.contains('menu-masque')&&!n.hidden)vu=true;n=n.nextElementSibling}t.classList.toggle('menu-masque',!vu)});

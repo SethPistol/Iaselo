@@ -2156,7 +2156,7 @@ function saveSharedConsult(button,prospective){
 
 let accessJob='',careTeams=[];
 const professionalWorkspace=window.createProfessionalWorkspace({esc,toast,setProfile:(profile,teams)=>{
- accessJob=profile.profession;careTeams=teams;document.body.dataset.admin=profile.isAdmin===true?'true':'false';document.body.dataset.poste=accessJob==='infirmier'?(['bloc','cadre'].includes(profile.poste)?'bloc':'etage'):accessJob==='pharmacien'?(profile.poste==='preparateur'?'preparateur':'pharmacien'):'';document.body.dataset.cadre=accessJob==='infirmier'&&profile.poste==='cadre'?'true':'false';document.body.dataset.profession=accessJob;
+ accessJob=profile.profession;careTeams=teams;document.body.dataset.admin=profile.isAdmin===true?'true':'false';document.body.dataset.poste=accessJob==='infirmier'?(['bloc','cadre'].includes(profile.poste)?'bloc':'etage'):accessJob==='pharmacien'?(profile.poste==='preparateur'?'preparateur':'pharmacien'):'';document.body.dataset.cadre=accessJob==='infirmier'&&profile.poste==='cadre'?'true':'false';document.body.dataset.cadre=accessJob==='infirmier'&&profile.poste==='cadre'?'true':'false';document.body.dataset.profession=accessJob;
  role=({anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier'})[accessJob]||'Infirmier';
  $('#role').value=role;$('#role').disabled=true;if($('#doctor'))$('#doctor').disabled=true;
  const details=document.querySelector('.art-profile');if(details)details.hidden=true;

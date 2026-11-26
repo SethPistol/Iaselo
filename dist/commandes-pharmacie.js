@@ -20,7 +20,7 @@ async function api(body,query){
 root.createCommandesPharmacie=function(ctx){
  const {$,esc,toast}=ctx;
  let s={onglet:'suivi',donnees:null,erreur:'',detail:null,edition:null,article:null,filtre:'en-cours',message:'',demande:null,nouvelleDemande:null};
- const P=()=>s.donnees?.profil,pharma=()=>P()==='pharmacien',ecrit=()=>['pharmacien','preparateur'].includes(P());
+ const P=()=>s.donnees?.profil,pharma=()=>P()==='pharmacien',ecrit=()=>['pharmacien','preparateur','bloc'].includes(P()),bloc=()=>P()==='bloc',demandeur=()=>R().estService(P());
  const refus=(a,c)=>R().refus(a,P(),c,s.donnees?.moi);
  const service=()=>P()==='service',refusD=(a,d)=>R().refusDemande(a,P(),d,s.donnees?.moi);
  const TON_D={demandee:'warn',en_preparation:'acc',delivree:'acc',recue:'ok',refusee:'crit',annulee:'crit'};
@@ -49,24 +49,25 @@ root.createCommandesPharmacie=function(ctx){
  }
  /* Menu de gauche, sur le modèle de l'écran « Gestion des commandes » du bloc (Dedalus). */
  const SECTIONS=()=>{
-  const cmd=!service()||s.donnees.voitCommandes;
-  return [
+  const cmd=!service()||s.donnees.voitCommandes,hors=bloc()?['preparation','liquidation','inventaire','parametrage']:[];
+  const L=[
    ['Demande interne',[['demandes','Demandes des services']]],
    ...(cmd?[['Commande et réception',[['nouvelles','Nouvelles commandes'],['preparation','Préparation de commande'],['suivi','Suivi des commandes'],['envois','Suivi des envois de commandes'],['parArticle','Suivi par article'],['cadencier','Cadencier'],['analyse','Analyse'],['achats','Analyse des achats']]],
     ['Liquidation',[['liquidation','Liquidation des factures']]],['Stock',[['stock','Stock']]],['Inventaire',[['inventaire','Inventaire']]],
     ['Configurateur',[['livret','Livret des produits']]],['Paramétrage',[['parametrage','UF, adresses, fournisseurs']]],['Exploitation',[['exploitation','Exports']]]]:[])];
+  return L.map(([x,it])=>[x,it.filter(([k])=>!hors.includes(k))]).filter(([,it])=>it.length);
  };
  function dessiner(){
   const host=$('#cp-host');if(!host)return;
   if(!s.donnees){host.innerHTML=`<p class="notice warn">${esc(s.erreur||'Commandes disponibles sur le serveur de la clinique.')}</p>`;return}
-  $('#title').textContent=service()&&!s.donnees.voitCommandes?'Demandes à la pharmacie':'Gestion des commandes';
+  $('#title').textContent=demandeur()&&!s.donnees.voitCommandes?'Demandes à la pharmacie':'Gestion des commandes';
   const sections=SECTIONS(),actif=!s.detail&&!s.edition&&!s.demande&&!s.nouvelleDemande?s.onglet:(s.edition?'nouvelles':s.demande||s.nouvelleDemande?'demandes':'suivi');
-  const tete=`<div class="cp-head"><div><p class="cp-mut">${service()?'Demandez à la pharmacie les produits du livret pour votre service ; elle les délivre par lot, vous accusez réception.'+(s.donnees.medecin?' Les stupéfiants sont demandés par un médecin.':''):esc(R().PROFILS[P()]||'Lecture seule (administrateur)')+' · '}${service()?'':P()==='preparateur'?'vous préparez, soumettez, transmettez et réceptionnez ; le pharmacien valide.':P()==='pharmacien'?'vous validez les commandes et tenez le livret ; le préparateur prépare et réceptionne.':'les commandes sont passées par la pharmacie.'}</p></div>${service()?'<button type="button" class="primary" id="cp-nouvelle-demande">Nouvelle demande</button>':''}</div>`;
+  const tete=bloc()?`<div class="cp-head"><div><p class="cp-mut">Cadre de bloc · vous commandez le matériel des UF du bloc (${R().UF_BLOC.join(', ')}) : vous préparez, soumettez au pharmacien qui valide, transmettez et réceptionnez. Vous faites aussi les demandes du service à la pharmacie.</p></div><button type="button" class="primary" id="cp-nouvelle-demande">Nouvelle demande à la pharmacie</button></div>`:`<div class="cp-head"><div><p class="cp-mut">${service()?'Demandez à la pharmacie les produits du livret pour votre service ; elle les délivre par lot, vous accusez réception.'+(s.donnees.medecin?' Les stupéfiants sont demandés par un médecin.':''):esc(R().PROFILS[P()]||'Lecture seule (administrateur)')+' · '}${service()?'':P()==='preparateur'?'vous préparez, soumettez, transmettez et réceptionnez ; le pharmacien valide.':P()==='pharmacien'?'vous validez les commandes et tenez le livret ; le préparateur prépare et réceptionne.':'les commandes sont passées par la pharmacie.'}</p></div>${service()?'<button type="button" class="primary" id="cp-nouvelle-demande">Nouvelle demande</button>':''}</div>`;
   host.innerHTML=`${tete}<div class="cp-shell"><nav class="cp-nav" aria-label="Gestion des commandes">${sections.map(([t,items])=>`<div class="cp-nav-sec"><p class="cp-nav-t">${esc(t)}</p>${items.map(([k,l])=>`<button type="button" data-cp-onglet="${k}" class="${actif===k?'is-on':''}" aria-current="${actif===k?'page':'false'}">${esc(l)}</button>`).join('')}</div>`).join('')}</nav>
    <div class="cp-main">${s.erreur?`<p class="notice warn">${esc(s.erreur)}</p>`:''}${s.message?`<p class="notice cp-ok">${esc(s.message)}</p>`:''}<div id="cp-body"></div></div></div>`;
   s.message='';
   host.querySelectorAll('[data-cp-onglet]').forEach(b=>b.onclick=()=>{const k=b.dataset.cpOnglet;s.detail=null;s.edition=null;s.article=null;s.demande=null;s.nouvelleDemande=null;s.selection=new Set();
-   if(k==='nouvelles'&&ecrit()){s.onglet='suivi';s.edition={fournisseur:'',lignes:[],note:'',urgent:false,...R().entete({})};dessiner();return}s.onglet=k;dessiner();charger()});
+   if(k==='nouvelles'&&ecrit()){s.onglet='suivi';s.edition={fournisseur:'',lignes:[],note:'',urgent:false,...R().entete({},P())};dessiner();return}s.onglet=k;dessiner();charger()});
   $('#cp-nouvelle-demande')?.addEventListener('click',()=>{s.nouvelleDemande={service:s.donnees.serviceParDefaut||'bloc',lignes:[],note:'',urgent:false};s.demande=null;dessiner()});
   const body=$('#cp-body');
   if(s.nouvelleDemande)return formDemande(body);
@@ -124,7 +125,7 @@ root.createCommandesPharmacie=function(ctx){
  }
  function outilListe(o){
   const sel=s.donnees.commandes.filter(c=>s.selection.has(c.id));
-  if(o==='nouveau'){s.edition={fournisseur:'',lignes:[],note:'',urgent:false,...R().entete({ufGestion:s.filtres.ufGestion})};dessiner();return}
+  if(o==='nouveau'){s.edition={fournisseur:'',lignes:[],note:'',urgent:false,...R().entete({ufGestion:s.filtres.ufGestion},P())};dessiner();return}
   if(o==='actualiser'){charger();return}
   if(o==='imprimer'||o==='apercu'){if(!sel.length){toast('Cochez une ou plusieurs commandes');return}if(o==='apercu'&&sel.length===1){s.detail=sel[0];dessiner();return}imprimer(sel);return}
   if(sel.length!==1){toast('Cochez une seule commande');return}
@@ -235,7 +236,7 @@ root.createCommandesPharmacie=function(ctx){
    ${!A.length?'<p class="notice warn">Le livret des produits est vide : le pharmacien y ajoute d’abord les produits commandables (onglet Livret des produits).</p>':''}
    <div class="formgrid cp-form"><label>Fournisseur<input list="cp-fournisseurs" id="cp-fournisseur" value="${esc(e.fournisseur)}" maxlength="120" required></label><datalist id="cp-fournisseurs">${fournisseurs.map(f=>`<option value="${esc(f)}">`).join('')}</datalist>
    <label>Code fournisseur<input value="${esc(e.fournisseur?R().codeFournisseur(e.fournisseur):'')}" readonly tabindex="-1"></label>
-   <label>UF de gestion<select id="cp-ufg">${sel(R().UF,e.ufGestion)}</select></label><label>UF de commande<select id="cp-ufc">${sel(R().UF,e.ufCommande)}</select></label>
+   <label>UF de gestion<select id="cp-ufg">${sel(bloc()?Object.fromEntries(R().UF_BLOC.map(k=>[k,R().UF[k]])):R().UF,e.ufGestion)}</select></label><label>UF de commande<select id="cp-ufc">${sel(R().UF,e.ufCommande)}</select></label>
    <label>Adresse de livraison<select id="cp-adr">${sel(R().ADRESSES,e.adresse)}</select></label><label>Type de commande<select id="cp-type">${sel(R().TYPES,e.type)}</select></label>
    <label>Livraison prévue le<input type="date" id="cp-prevue" value="${esc(e.datePrevue||'')}"></label><label>Objet<input id="cp-objet" maxlength="160" value="${esc(e.objet||'')}" placeholder="Ex. réassort hebdomadaire bloc"></label>
    <label class="wide">Note pour le pharmacien ou le fournisseur<textarea id="cp-note" maxlength="600">${esc(e.note)}</textarea></label></div>

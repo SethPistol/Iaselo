@@ -19,7 +19,7 @@ test('commandes de la pharmacie : circuit préparateur → pharmacien → fourni
    const id=await createAccount(pool,{email:nom+'@example.test',name:'Test '+nom,passwordHash:await hashPassword(password)});await pool.query('UPDATE professional_profiles SET profession=$2,poste=$3,updated_at=$4 WHERE user_id=$1',[id,job,poste,at]);
    await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);await pool.query('UPDATE auth_users SET must_change_password=0 WHERE id=$1',[id]);c[nom]=await login(nom+'@example.test',password)}
   const {pharma,prep,ide}=c;
-  {const v=await api(ide);assert.equal(v.data.profil,'service');assert.deepEqual(v.data.commandes,[],'la cadre ne voit pas les commandes fournisseurs')}
+  {const v=await api(ide);assert.equal(v.data.profil,'bloc');assert.deepEqual(v.data.commandes,[],'la cadre de bloc ne voit pas les commandes de la pharmacie')}
   let r=await api(prep);assert.equal(r.status,200);assert.equal(r.data.profil,'preparateur');
   {const v=(await api(admin)).data;assert.equal(v.voitCommandes,true,'administrateur : commandes en lecture')}
   // Livret : pharmacien seulement, motif exigé en modification.
@@ -106,12 +106,29 @@ test('demandes des services : le service demande, la pharmacie délivre par lot,
   const admin=await login(RECETTE_EMAIL,RECETTE_PASSWORD);await call('GET','/api/workspace',undefined,admin);
   const api=async(cookie,data)=>{const r=await call(data?'POST':'GET','/api/workspace/pharmacie',data,cookie);return {status:r.status,data:await r.json()}};
   const at=new Date().toISOString(),password='Mot de passe de test 2026',c={};
-  for(const [nom,job,poste] of [['pharma','pharmacien','pharmacien'],['prep','pharmacien','preparateur'],['ide','infirmier','bloc'],['mar','anesthesiste',''],['sec','secretariat','']]){
+  for(const [nom,job,poste] of [['pharma','pharmacien','pharmacien'],['prep','pharmacien','preparateur'],['ide','infirmier','bloc'],['mar','anesthesiste',''],['sec','secretariat',''],['cadre','infirmier','cadre']]){
    const id=await createAccount(pool,{email:nom+'@example.test',name:'Test '+nom,passwordHash:await hashPassword(password)});await pool.query('UPDATE professional_profiles SET profession=$2,poste=$3,updated_at=$4 WHERE user_id=$1',[id,job,poste,at]);
    await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);await pool.query('UPDATE auth_users SET must_change_password=0 WHERE id=$1',[id]);c[nom]=await login(nom+'@example.test',password)}
   const {pharma,prep,ide,mar,sec}=c;
   const a1=(await api(pharma,{action:'article',article:{nom:'Paracétamol 10 mg/ml perfusion',fournisseur:'Labo A',prix:'1',stockMin:2,stockMax:10,unite:'flacon'}})).data.article;
   const a2=(await api(pharma,{action:'article',article:{nom:'Sufentanil 5 µg/ml',fournisseur:'Labo B',prix:'2',stockMin:1,stockMax:5,unite:'ampoule',stupefiant:true}})).data.article;
+  // Cadre de bloc : commande de matériel des UF du bloc ; le pharmacien valide ; pas d'accès aux commandes de la pharmacie.
+  const cadre=c.cadre;
+  let g=await api(cadre);assert.equal(g.data.profil,'bloc');assert.ok(g.data.voitCommandes);
+  let rb=await api(cadre,{action:'creer',fournisseur:'Labo A',ufGestion:'PHARMA',lignes:[{articleId:a1.id,quantite:3}],objet:'Champs salle 1'});assert.equal(rb.status,200,JSON.stringify(rb.data));
+  let cb=rb.data.commande;assert.equal(cb.ufGestion,'BCHIR','UF du bloc imposée');assert.equal(cb.adresse,'MAG-BLOC');
+  cb=(await api(cadre,{action:'soumettre',id:cb.id,version:cb.version})).data.commande;assert.equal(cb.statut,'a_valider');
+  assert.equal((await api(cadre,{action:'valider',id:cb.id,version:cb.version})).status,403,'le cadre ne valide pas');
+  cb=(await api(pharma,{action:'valider',id:cb.id,version:cb.version})).data.commande;
+  cb=(await api(cadre,{action:'envoyer',id:cb.id,version:cb.version,mode:'portail'})).data.commande;assert.equal(cb.statut,'envoyee');
+  rb=await api(cadre,{action:'receptionner',id:cb.id,version:cb.version,bonLivraison:'BL-B1',lignes:[{ligne:0,quantite:3,lot:'CH1',peremption:'2029-01-01'}]});assert.equal(rb.data.commande?.statut,'recue',JSON.stringify(rb.data));
+  assert.equal((await api(cadre,{action:'liquider',id:cb.id,version:rb.data.commande.version,facture:'F',dateFacture:'2026-11-26',montant:'3'})).status,403);
+  const cp=(await api(prep,{action:'creer',fournisseur:'Labo A',lignes:[{articleId:a1.id,quantite:1}]})).data.commande;
+  assert.equal((await api(cadre,{action:'modifier',id:cp.id,version:cp.version,fournisseur:'Labo A',lignes:[{articleId:a1.id,quantite:2}]})).status,403,'commande de la pharmacie');
+  g=await api(cadre);assert.ok(g.data.commandes.some(x=>x.id===cb.id));assert.ok(!g.data.commandes.some(x=>x.id===cp.id),'ne voit que les commandes du bloc');
+  assert.equal((await api(cadre,{action:'article',article:{nom:'X',fournisseur:'Y',prix:'1'}})).status,403,'livret tenu par le pharmacien');
+  assert.equal((await api(ide)).data.voitCommandes,false);
+  await api(prep,{action:'annuler',id:cp.id,version:cp.version,motif:'Commande de test'});
   const lots=[{id:'L1',articleId:a1.id,drug:a1.nom,batch:'P1',expiry:'2027-06-01',quantity:4},{id:'L2',articleId:a1.id,drug:a1.nom,batch:'P2',expiry:'2028-06-01',quantity:10},{id:'L3',articleId:a2.id,drug:a2.nom,batch:'S1',expiry:'2028-01-01',quantity:3}];
   await pool.query("INSERT INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES('management/lots',$1,1,'test',$2,'op-lots','test')",[JSON.stringify(lots),at]);
   // Lecture : le service voit le livret et les demandes, pas les commandes aux fournisseurs.

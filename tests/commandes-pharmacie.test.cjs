@@ -12,7 +12,7 @@ test('profils : pharmacien, préparateur, lecture pour l’administrateur, refus
  assert.equal(R.profil({job:'pharmacien',poste:'preparateur'}),'preparateur');
  assert.equal(R.profil({job:'dim',isAdmin:true}),'lecteur');
  assert.equal(R.profil({job:'anesthesiste',isAdmin:true}),'service');assert.ok(R.voitCommandes({job:'anesthesiste',isAdmin:true}));
- assert.equal(R.profil({job:'infirmier',poste:'cadre'}),'service');assert.equal(R.voitCommandes({job:'infirmier'}),false);
+ assert.equal(R.profil({job:'infirmier',poste:'cadre'}),'bloc');assert.equal(R.voitCommandes({job:'infirmier'}),false);
  assert.equal(R.profil({job:'secretariat'}),null);
  assert.match(R.refus('creer','service'),/passées par la pharmacie/);
  assert.match(R.refus('lire',null),/pharmacien et au préparateur/);
@@ -184,4 +184,23 @@ test('liquidation de la facture, cadencier et inventaire',()=>{
  assert.match(R.ajusterInventaire(L,'L1',8,{at:'t',par:'p',motif:''}),/Motif/);
  assert.equal(R.ajusterInventaire(L,'L1',8,{at:'t',par:'p',motif:'Deux flacons cassés'}),'');assert.equal(L[0].quantity,8);assert.equal(L[0].inventaires[0].ecart,-2);
  assert.equal(R.ajusterInventaire(L,'X',1,{}),'Lot introuvable.');
+});
+
+test('cadre de bloc : commande le matériel des UF du bloc, le pharmacien valide',()=>{
+ const c={job:'infirmier',poste:'cadre'};
+ assert.equal(R.profil(c),'bloc');assert.ok(R.voitCommandes(c));assert.equal(R.voitCommandes({job:'infirmier',poste:'bloc'}),false);
+ assert.equal(R.profil({job:'infirmier',poste:'bloc'}),'service');
+ assert.equal(R.entete({},'bloc').ufGestion,'BCHIR');assert.equal(R.entete({ufGestion:'PHARMA'},'bloc').ufGestion,'BCHIR');assert.equal(R.entete({ufGestion:'BENDO'},'bloc').adresse,'MAG-BLOC');
+ const b={statut:'brouillon',ufGestion:'BCHIR',creePar:'cadre',lignes:[]},ph={...b,ufGestion:'PHARMA'};
+ assert.equal(R.refus('creer','bloc'),'');
+ for(const a of ['modifier','soumettre','annuler'])assert.equal(R.refus(a,'bloc',b,'cadre'),'',a);
+ assert.match(R.refus('modifier','bloc',ph,'cadre'),/hors bloc/);
+ assert.match(R.refus('valider','bloc',{...b,statut:'a_valider'}),/pharmacien/);
+ assert.match(R.refus('liquider','bloc',{...b,statut:'recue'}),/pharmacien/);
+ assert.match(R.refus('articles','bloc'),/pharmacien/);
+ assert.equal(R.refus('envoyer','bloc',{...b,statut:'validee'}),'');
+ assert.equal(R.refus('receptionner','bloc',{...b,statut:'envoyee'}),'');
+ assert.match(R.refus('receptionner','bloc',{...b,statut:'envoyee',lignes:[{stupefiant:true}]}),/stupéfiants/);
+ assert.match(R.refus('annuler','bloc',{...b,statut:'validee'}),/pharmacien/);
+ assert.equal(R.refusDemande('demander','bloc'),'');assert.match(R.refusDemande('prendre','bloc',{statut:'demandee'}),/pharmacie/);
 });

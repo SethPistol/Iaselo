@@ -51,6 +51,8 @@ test('Ma journée : indicateurs adaptés au métier, saisie peropératoire masqu
 });
 test('menu : l’infirmier(ère) d’étage n’a pas l’ouverture des salles, celle de bloc l’a',()=>{
  assert.ok(M.menuPourProfil('infirmier',false,'bloc').includes('ouvertureSalles'));
+ assert.ok(M.menuPourProfil('infirmier',false,'cadre').includes('commandesPharmacie'),'cadre de bloc : commandes de matériel');
+ assert.ok(!M.menuPourProfil('infirmier',false,'bloc').includes('commandesPharmacie'));
  for(const poste of ['etage','',undefined])assert.ok(!M.menuPourProfil('infirmier',false,poste).includes('ouvertureSalles'),'étage : '+poste);
  assert.ok(M.menuPourProfil('anesthesiste',false,'').includes('ouvertureSalles'));
  const s=fs.readFileSync(path.join(__dirname,'..','dist','parcours-v8.js'),'utf8');

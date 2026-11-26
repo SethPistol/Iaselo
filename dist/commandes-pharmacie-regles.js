@@ -30,7 +30,9 @@ const fold=s=>String(s||'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLow
 const STATUTS={brouillon:'Brouillon',a_valider:'À valider par le pharmacien',validee:'Validée',envoyee:'Transmise au fournisseur',partielle:'Reçue en partie',recue:'Reçue',soldee:'Soldée (reliquat abandonné)',annulee:'Annulée'};
 const EN_COURS=['brouillon','a_valider','validee','envoyee','partielle'];
 const MODES_ENVOI={edi:'EDI (échange informatisé)',portail:'Portail du fournisseur',email:'E-mail',telephone:'Téléphone',fax:'Télécopie'};
-const PROFILS={pharmacien:'Pharmacien',preparateur:'Préparateur en pharmacie'};
+const PROFILS={pharmacien:'Pharmacien',preparateur:'Préparateur en pharmacie',bloc:'Cadre de bloc'};
+// UF dont le cadre de bloc commande le matériel (26/11/2026, accord de Romain).
+const UF_BLOC=['BCHIR','BENDO'];
 const MAX_LIGNES=80,PEREMPTION_COURTE=90;
 
 // Profil d'un compte pour ce module : pharmacien (titulaire, adjoint), préparateur, lecteur (administrateur) ou aucun.
@@ -38,12 +40,16 @@ const METIERS_SERVICE=['infirmier','anesthesiste'];
 function profil(c){
  if(!c)return null;
  if(c.job==='pharmacien')return c.poste==='preparateur'?'preparateur':'pharmacien';
+ if(c.job==='infirmier'&&c.poste==='cadre')return 'bloc';
  if(METIERS_SERVICE.includes(c.job))return 'service';
  if(c.isAdmin)return 'lecteur';
  return null;
 }
 // Les commandes aux fournisseurs restent visibles par la pharmacie et, en lecture, par l'administrateur.
-const voitCommandes=c=>!!c&&(c.job==='pharmacien'||!!c.isAdmin);
+const voitCommandes=c=>!!c&&(c.job==='pharmacien'||!!c.isAdmin||(c.job==='infirmier'&&c.poste==='cadre'));
+// Le cadre de bloc fait aussi les demandes du service à la pharmacie.
+const estService=p=>p==='service'||p==='bloc';
+const commandeDuBloc=c=>UF_BLOC.includes(c?.ufGestion||'PHARMA');
 
 /* ---------- Livret des articles commandables ---------- */
 function normaliserArticle(a){
@@ -106,6 +112,8 @@ function refus(action,p,cmd,acteurId){
  if(!p)return 'Commandes de la pharmacie : réservées au pharmacien et au préparateur en pharmacie.';
  if(p==='lecteur'||p==='service')return action==='lire'&&p==='lecteur'?'':'Commandes aux fournisseurs : passées par la pharmacie (lecture seule pour l’administrateur).';
  const pharma=p==='pharmacien';
+ // Cadre de bloc : commandes de matériel des UF du bloc ; validation, liquidation et livret restent à la pharmacie.
+ if(p==='bloc'&&cmd&&!commandeDuBloc(cmd))return 'Commande d’une UF hors bloc : gérée par la pharmacie.';
  switch(action){
   case 'lire':return '';
   case 'creer':return '';
@@ -123,7 +131,7 @@ function refus(action,p,cmd,acteurId){
   case 'liquider':return !pharma?'La liquidation de la facture fournisseur revient au pharmacien.':['partielle','recue','soldee'].includes(etat)?(cmd.liquidation?'Commande déjà liquidée.':''):'Liquidation après réception.';
   case 'solder':return !pharma?'Seul le pharmacien solde un reliquat.':etat==='partielle'?'':'Seule une commande reçue en partie se solde.';
   case 'annuler':
-   if(['brouillon','a_valider'].includes(etat))return pharma||cmd.creePar===acteurId?'':'Le préparateur n’annule que ses propres commandes avant validation.';
+   if(['brouillon','a_valider'].includes(etat))return pharma||cmd.creePar===acteurId?'':'Avant validation, on n’annule que ses propres commandes.';
    if(['validee','envoyee'].includes(etat))return pharma?'':'Après validation, seul le pharmacien annule une commande.';
    return 'Commande déjà reçue en partie ou close : soldez le reliquat.';
  }
@@ -233,8 +241,8 @@ function refusDemande(action,p,d,moi){
  if(!p)return 'Demandes à la pharmacie : réservées aux soignants des services et à la pharmacie.';
  switch(action){
   case 'lire':return '';
-  case 'demander':return p==='service'?'':'La demande est faite par le service (infirmier(ère) ou anesthésiste).';
-  case 'annuler':return p!=='service'?'La pharmacie refuse une demande, elle ne l’annule pas.':etat==='demandee'?'':'Demande déjà prise en charge par la pharmacie : appelez-la.';
+  case 'demander':return estService(p)?'':'La demande est faite par le service (infirmier(ère) ou anesthésiste).';
+  case 'annuler':return !estService(p)?'La pharmacie refuse une demande, elle ne l’annule pas.':etat==='demandee'?'':'Demande déjà prise en charge par la pharmacie : appelez-la.';
   case 'prendre':return !pharmacie?'Prise en charge par la pharmacie.':etat==='demandee'?'':'Demande déjà prise en charge ou close.';
   case 'delivrer':
    if(!pharmacie)return 'Délivrance par la pharmacie.';
@@ -242,7 +250,7 @@ function refusDemande(action,p,d,moi){
    if(demandeSensible(d)&&p!=='pharmacien')return 'Stupéfiant ou produit hors livret : délivrance par le pharmacien.';
    return '';
   case 'refuser':return p!=='pharmacien'?'Seul le pharmacien refuse une demande.':['demandee','en_preparation'].includes(etat)?'':'Demande déjà délivrée ou close.';
-  case 'accuser':return p!=='service'?'L’accusé de réception est fait par le service.':etat==='delivree'?'':'Rien à réceptionner pour cette demande.';
+  case 'accuser':return !estService(p)?'L’accusé de réception est fait par le service.':etat==='delivree'?'':'Rien à réceptionner pour cette demande.';
  }
  return 'Action inconnue.';
 }
@@ -295,9 +303,10 @@ const ETATS_LIBELLES={C:'En cours de saisie',V:'Validée',E:'Envoyée',P:'Reçue
 const libelleEtat=c=>c.statut==='a_valider'?'En cours de saisie · à valider':c.statut==='soldee'?'Soldée':ETATS_LIBELLES[ETATS[c.statut]]||c.statut;
 // Code fournisseur : F + premières lettres du nom (ex. COMEPA INDUSTRIE → FCOMEPAIN).
 const codeFournisseur=nom=>'F'+fold(nom).replace(/[^a-z0-9]/g,'').toUpperCase().slice(0,8);
-function entete(e){
+function entete(e,p){
  e=e&&typeof e==='object'?e:{};
- const ufG=Object.hasOwn(UF,e.ufGestion)?e.ufGestion:'PHARMA',ufC=Object.hasOwn(UF,e.ufCommande)?e.ufCommande:ufG;
+ let ufG=Object.hasOwn(UF,e.ufGestion)?e.ufGestion:'PHARMA';if(p==='bloc'&&!UF_BLOC.includes(ufG))ufG='BCHIR';
+ const ufC=Object.hasOwn(UF,e.ufCommande)?e.ufCommande:ufG;
  return {ufGestion:ufG,ufCommande:ufC,adresse:Object.hasOwn(ADRESSES,e.adresse)?e.adresse:(['BCHIR','BENDO'].includes(ufG)?'MAG-BLOC':'PUI'),
   type:Object.hasOwn(TYPES,e.type)?e.type:(e.urgent?'U':'N'),datePrevue:/^\d{4}-\d{2}-\d{2}$/.test(String(e.datePrevue||''))?e.datePrevue:'',objet:str(e.objet,160)};
 }
@@ -364,5 +373,5 @@ function ajusterInventaire(lots,lotId,compte,{at,par,motif}){
 /* ---------- Numérotation ---------- */
 const numero=(annee,n)=>'CMD-'+annee+'-'+String(n).padStart(4,'0');
 
-return {UF,ADRESSES,TYPES,ETATS,ETATS_LIBELLES,libelleEtat,codeFournisseur,entete,lettresEtat,filtrer,trier,montantRecu,controlerLiquidation,suiviArticle,cadencier,mois12,analyse,ajusterInventaire,METIERS_SERVICE,voitCommandes,SERVICES,STATUTS_DEMANDE,DEMANDES_EN_COURS,serviceParDefaut,controlerDemande,demandeSensible,refusDemande,lotsDisponibles,controlerDelivrance,appliquerSorties,sortiesHorsStock,numeroDemande,STATUTS,EN_COURS,MODES_ENVOI,PROFILS,MAX_LIGNES,PEREMPTION_COURTE,fold,profil,normaliserArticle,validerArticle,ligneDepuisArticle,normaliserLignes,total,euros,controlerCommande,refus,stockArticle,recuConforme,reliquat,enCoursArticle,propositions,groupesProposition,controlerReception,statutApresReception,lotPourStock,integrerAuStock,receptionsHorsStock,numero,ajouterJours};
+return {UF_BLOC,estService,commandeDuBloc,UF,ADRESSES,TYPES,ETATS,ETATS_LIBELLES,libelleEtat,codeFournisseur,entete,lettresEtat,filtrer,trier,montantRecu,controlerLiquidation,suiviArticle,cadencier,mois12,analyse,ajusterInventaire,METIERS_SERVICE,voitCommandes,SERVICES,STATUTS_DEMANDE,DEMANDES_EN_COURS,serviceParDefaut,controlerDemande,demandeSensible,refusDemande,lotsDisponibles,controlerDelivrance,appliquerSorties,sortiesHorsStock,numeroDemande,STATUTS,EN_COURS,MODES_ENVOI,PROFILS,MAX_LIGNES,PEREMPTION_COURTE,fold,profil,normaliserArticle,validerArticle,ligneDepuisArticle,normaliserLignes,total,euros,controlerCommande,refus,stockArticle,recuConforme,reliquat,enCoursArticle,propositions,groupesProposition,controlerReception,statutApresReception,lotPourStock,integrerAuStock,receptionsHorsStock,numero,ajouterJours};
 });

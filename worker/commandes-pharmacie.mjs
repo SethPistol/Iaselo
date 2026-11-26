@@ -31,7 +31,7 @@ export async function staffCommandesPharmacieApi(request,env,acl){
   const ev=evenements?(await DB.prepare('SELECT version,action,statut,motif,actor_name,actor_profil,at,hash FROM pharmacy_order_events WHERE order_id=? ORDER BY id').bind(row.id).all()).results.map(e=>({version:Number(e.version),action:e.action,statut:e.statut,motif:e.motif,par:e.actor_name,profil:e.actor_profil,at:e.at,hash:e.hash})):[];
   return {id:row.id,numero:row.numero,fournisseur:row.fournisseur,statut:row.statut,version:Number(row.version),total:Number(row.total_centimes),creeLe:row.created_at,creePar:row.created_by,creeParNom:row.created_by_name,miseAJour:row.updated_at,...d,receptions,evenements:ev};
  }
- const voit=R.voitCommandes({job:acl.job,isAdmin:acl.isAdmin});
+ const voit=R.voitCommandes({job:acl.job,poste:acl.poste,isAdmin:acl.isAdmin});
  async function demande(row){
   if(!row)return null;const d=JSON.parse(row.data);
   const ev=(await DB.prepare('SELECT version,action,statut,motif,actor_name,actor_profil,at,hash FROM pharmacy_request_events WHERE request_id=? ORDER BY id').bind(row.id).all()).results.map(e=>({version:Number(e.version),action:e.action,statut:e.statut,motif:e.motif,par:e.actor_name,profil:e.actor_profil,at:e.at,hash:e.hash}));
@@ -42,7 +42,7 @@ export async function staffCommandesPharmacieApi(request,env,acl){
  if(request.method==='GET'){
   // « Commande du » antérieur aux 120 derniers jours : la liste remonte jusqu'à cette date (au plus 1 000 commandes).
   const du=/^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('du')||'')?url.searchParams.get('du'):'',depuis=du||new Date(Date.now()-120*864e5).toISOString(),commandes=[],demandes=[];
-  if(voit){const rows=(await DB.prepare("SELECT * FROM pharmacy_orders WHERE statut IN ('brouillon','a_valider','validee','envoyee','partielle') OR updated_at>=? OR created_at>=? ORDER BY updated_at DESC LIMIT 1000").bind(depuis,depuis).all()).results;for(const r of rows)commandes.push(await commande(r))}
+  if(voit){const rows=(await DB.prepare("SELECT * FROM pharmacy_orders WHERE statut IN ('brouillon','a_valider','validee','envoyee','partielle') OR updated_at>=? OR created_at>=? ORDER BY updated_at DESC LIMIT 1000").bind(depuis,depuis).all()).results;for(const r of rows){const c=await commande(r);if(p!=='bloc'||R.commandeDuBloc(c))commandes.push(c)}}
   const dr=(await DB.prepare("SELECT * FROM pharmacy_requests WHERE statut IN ('demandee','en_preparation','delivree') OR updated_at>=? ORDER BY updated_at DESC LIMIT 300").bind(new Date(Date.now()-45*864e5).toISOString()).all()).results;for(const r of dr)demandes.push(await demande(r));
   const livret=(await articles()).filter(a=>voit||a.actif);
   await acl.log('read','pharmacie','allowed',voit?'Commandes et demandes de la pharmacie':'Demandes à la pharmacie');
@@ -138,7 +138,7 @@ export async function staffCommandesPharmacieApi(request,env,acl){
   return json({error:'Numérotation de la commande impossible : réessayez.'},409);
  }
  // En-tête comme l'écran du bloc : UF de gestion et de commande, adresse de livraison, type (N, U, D), date prévue, objet.
- const contenu=src=>{const e=R.entete(src);return {note:String(src.note||'').trim().slice(0,600),urgent:e.type==='U',...e}};
+ const contenu=src=>{const e=R.entete(src,p);return {note:String(src.note||'').trim().slice(0,600),urgent:e.type==='U',...e}};
 
  if(action==='creer'){
   const r=R.refus('creer',p);if(r)return refuse(r);
