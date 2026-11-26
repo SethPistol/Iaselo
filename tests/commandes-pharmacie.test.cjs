@@ -143,3 +143,45 @@ test('délivrance : lots du produit, stock suffisant, premier périmé, motif si
  assert.equal(R.sortiesHorsStock(dem,lots).length,1);
  assert.match(R.controlerDelivrance(d,[],lots,j,A).errors[0],/motif requis/);
 });
+
+test('gestion des commandes (écran du bloc) : code fournisseur, en-tête, filtres par état et critères, tri',()=>{
+ assert.equal(R.codeFournisseur('COMEPA INDUSTRIE'),'FCOMEPAIN');
+ assert.deepEqual(R.entete({}),{ufGestion:'PHARMA',ufCommande:'PHARMA',adresse:'PUI',type:'N',datePrevue:'',objet:''});
+ assert.deepEqual(R.entete({ufGestion:'BCHIR',urgent:true,datePrevue:'2026-12-01',objet:'Réassort'}),{ufGestion:'BCHIR',ufCommande:'BCHIR',adresse:'MAG-BLOC',type:'U',datePrevue:'2026-12-01',objet:'Réassort'});
+ assert.equal(R.entete({ufGestion:'XXX',type:'Z',adresse:'ailleurs'}).ufGestion,'PHARMA');
+ const C=[{id:1,numero:'CMD-2026-0001',statut:'brouillon',fournisseur:'COMEPA INDUSTRIE',ufGestion:'BCHIR',ufCommande:'BCHIR',adresse:'MAG-BLOC',type:'N',creeLe:'2026-11-02T10:00:00Z'},
+  {id:2,numero:'CMD-2026-0002',statut:'validee',fournisseur:'Labo B',ufGestion:'PHARMA',type:'U',creeLe:'2026-11-10T10:00:00Z',validation:{at:'2026-11-11T09:00:00Z'}},
+  {id:3,numero:'CMD-2026-0003',statut:'recue',fournisseur:'Labo B',ufGestion:'PHARMA',type:'N',creeLe:'2026-11-12T10:00:00Z'},
+  {id:4,numero:'CMD-2026-0004',statut:'annulee',fournisseur:'Labo B',ufGestion:'PHARMA',type:'N',creeLe:'2026-11-13T10:00:00Z'}];
+ const ids=f=>R.filtrer(C,f).map(c=>c.id);
+ assert.deepEqual(R.lettresEtat('c, v'),['C','V']);
+ assert.deepEqual(ids({etat:'C, V'}),[1,2]);
+ assert.deepEqual(ids({}),[1,2,3]);
+ assert.deepEqual(ids({supprimees:true}),[1,2,3,4]);
+ assert.deepEqual(ids({fournisseur:'fcomepa'}),[1]);
+ assert.deepEqual(ids({ufGestion:'BCHIR'}),[1]);
+ assert.deepEqual(ids({type:'U'}),[2]);
+ assert.deepEqual(ids({du:'2026-11-05',au:'2026-11-12'}),[2,3]);
+ assert.deepEqual(ids({valideDu:'2026-11-11',valideAu:'2026-11-11'}),[2]);
+ assert.deepEqual(ids({numero:'0003'}),[3]);
+ assert.deepEqual(R.trier(C,'du',-1).map(c=>c.id),[4,3,2,1]);
+ assert.deepEqual(R.trier(C,'numero',1).map(c=>c.id),[1,2,3,4]);
+ assert.equal(R.libelleEtat(C[0]),'En cours de saisie');assert.equal(R.libelleEtat(C[1]),'Validée');
+});
+
+test('liquidation de la facture, cadencier et inventaire',()=>{
+ const c={statut:'recue',lignes:[{articleId:'a1',quantite:10,prixCentimes:120}],receptions:[{ligne:0,quantite:10,conforme:8}]};
+ assert.equal(R.montantRecu(c),960);
+ assert.ok(R.controlerLiquidation(c,{facture:'F-1',dateFacture:'2026-11-20',montant:'9,60'}).ok);
+ const e=R.controlerLiquidation(c,{facture:'F-1',dateFacture:'2026-11-20',montant:'12'});assert.equal(e.ok,false);assert.match(e.errors.join(),/motif requis/);
+ const m=R.controlerLiquidation(c,{facture:'F-1',dateFacture:'2026-11-20',montant:'12',motif:'Deux flacons cassés facturés, avoir demandé'});assert.ok(m.ok);assert.equal(m.liquidation.ecartCentimes,240);
+ assert.equal(R.controlerLiquidation({...c,statut:'envoyee'},{facture:'F',dateFacture:'2026-11-20',montant:'1'}).ok,false);
+ assert.equal(R.controlerLiquidation({...c,liquidation:{}},{facture:'F',dateFacture:'2026-11-20',montant:'9.6'}).ok,false);
+ const cad=R.cadencier(A,[{statut:'recue',creeLe:'2026-11-03T00:00:00Z',lignes:[{articleId:'a1',quantite:6}]},{statut:'envoyee',creeLe:'2026-10-03T00:00:00Z',lignes:[{articleId:'a1',quantite:6}]},{statut:'annulee',creeLe:'2026-11-03T00:00:00Z',lignes:[{articleId:'a1',quantite:99}]},{statut:'recue',creeLe:'2025-01-03T00:00:00Z',lignes:[{articleId:'a1',quantite:50}]}],'2026-11-26');
+ assert.equal(cad.mois.length,12);assert.equal(cad.mois[11],'2026-11');assert.equal(cad.lignes.length,1);assert.equal(cad.lignes[0].total,12);assert.equal(cad.lignes[0].moyenne,1);
+ const L=[{id:'L1',quantity:10}];
+ assert.equal(R.ajusterInventaire(L,'L1',10,{at:'t',par:'p'}),'');assert.equal(L[0].inventaires,undefined);
+ assert.match(R.ajusterInventaire(L,'L1',8,{at:'t',par:'p',motif:''}),/Motif/);
+ assert.equal(R.ajusterInventaire(L,'L1',8,{at:'t',par:'p',motif:'Deux flacons cassés'}),'');assert.equal(L[0].quantity,8);assert.equal(L[0].inventaires[0].ecart,-2);
+ assert.equal(R.ajusterInventaire(L,'X',1,{}),'Lot introuvable.');
+});

@@ -48,10 +48,24 @@ test('commandes de la pharmacie : circuit préparateur → pharmacien → fourni
   assert.equal((await api(prep,{action:'receptionner',id:cmd.id,version:cmd.version,bonLivraison:'BL-78',lignes:[{ligne:0,quantite:5,lot:'P124',peremption:'2028-03-01'}]})).status,400,'excédent refusé');
   assert.equal((await api(prep,{action:'solder',id:cmd.id,version:cmd.version,motif:'Rupture fournisseur'})).status,403,'seul le pharmacien solde');
   r=await api(pharma,{action:'solder',id:cmd.id,version:cmd.version,motif:'Rupture fournisseur'});assert.equal(r.data.commande.statut,'soldee');
+  // Liquidation de la facture : pharmacien seul, écart motivé, une seule fois.
+  cmd=r.data.commande;assert.equal(cmd.ufGestion,'PHARMA');assert.equal(cmd.type,'N');assert.equal(cmd.adresse,'PUI');
+  assert.equal((await api(prep,{action:'liquider',id:cmd.id,version:cmd.version,facture:'FA-1',dateFacture:'2026-11-20',montant:'7,20'})).status,403,'le préparateur ne liquide pas');
+  r=await api(pharma,{action:'liquider',id:cmd.id,version:cmd.version,facture:'FA-1',dateFacture:'2026-11-20',montant:'9'});assert.equal(r.status,400);assert.match(r.data.error,/motif requis/);
+  r=await api(pharma,{action:'liquider',id:cmd.id,version:cmd.version,facture:'FA-1',dateFacture:'2026-11-20',montant:'7,20'});assert.equal(r.status,200,JSON.stringify(r.data));
+  cmd=r.data.commande;assert.equal(cmd.statut,'soldee');assert.equal(cmd.liquidation.montantCentimes,720);assert.equal(cmd.liquidation.ecartCentimes,0);assert.ok(cmd.liquidation.par);
+  assert.equal(cmd.evenements.at(-1).action,'liquidation');
+  assert.equal((await api(pharma,{action:'liquider',id:cmd.id,version:cmd.version,facture:'FA-2',dateFacture:'2026-11-21',montant:'7,20'})).status,403,'déjà liquidée');
+  // En-tête de commande (UF, adresse, type, date prévue, objet) comme l'écran du bloc.
+  r=await api(prep,{action:'creer',fournisseur:'Laboratoire A',lignes:[{articleId:a1.id,quantite:2}],ufGestion:'BCHIR',type:'U',datePrevue:'2026-12-02',objet:'Réassort salle 2'});
+  let bl=r.data.commande;assert.deepEqual([bl.ufGestion,bl.ufCommande,bl.adresse,bl.type,bl.urgent,bl.datePrevue,bl.objet],['BCHIR','BCHIR','MAG-BLOC','U',true,'2026-12-02','Réassort salle 2']);
+  r=await api(prep,{action:'modifier',id:bl.id,version:bl.version,fournisseur:'Laboratoire A',lignes:[{articleId:a1.id,quantite:3}],ufGestion:'BENDO',adresse:'QUAI',type:'N'});bl=r.data.commande;
+  assert.deepEqual([bl.ufGestion,bl.adresse,bl.type,bl.urgent],['BENDO','QUAI','N',false]);
+  r=await api(prep,{action:'annuler',id:bl.id,version:bl.version,motif:'Commande de test du bloc'});assert.equal(r.status,200,JSON.stringify(r.data));
   // Stupéfiants : bon dédié, numéro exigé, réception par le pharmacien.
   assert.equal((await api(prep,{action:'creer',fournisseur:'Laboratoire B',lignes:[{articleId:a2.id,quantite:5},{articleId:a1.id,quantite:1}]})).status,200,'brouillon mixte accepté');
   let st=(await api(prep,{action:'creer',fournisseur:'Laboratoire B',lignes:[{articleId:a2.id,quantite:5}]})).data.commande;
-  assert.equal(st.numero.slice(-4),'0003');
+  assert.equal(st.numero.slice(-4),'0004');
   r=await api(pharma,{action:'valider',id:st.id,version:st.version});assert.equal(r.status,400);assert.match(r.data.error,/numéro du bon/);
   st=(await api(pharma,{action:'valider',id:st.id,version:st.version,bonStupefiants:'ST-41'})).data.commande;assert.equal(st.bonStupefiants,'ST-41');
   st=(await api(prep,{action:'envoyer',id:st.id,version:st.version,mode:'telephone'})).data.commande;
@@ -64,7 +78,7 @@ test('commandes de la pharmacie : circuit préparateur → pharmacien → fourni
   assert.equal((await api(pharma,{action:'annuler',id:br.id,version:1,motif:'Doublon de commande'})).data.commande.statut,'annulee');
   // Historique : étapes dans l'ordre, profil de l'auteur ; tables non modifiables.
   const h=(await api(pharma)).data.commandes.find(x=>x.id===cmd.id);
-  assert.deepEqual(h.evenements.map(e=>[e.action,e.profil]),[['creation','preparateur'],['soumission','preparateur'],['validation','pharmacien'],['transmission','preparateur'],['reception','preparateur'],['solde','pharmacien']]);
+  assert.deepEqual(h.evenements.map(e=>[e.action,e.profil]),[['creation','preparateur'],['soumission','preparateur'],['validation','pharmacien'],['transmission','preparateur'],['reception','preparateur'],['solde','pharmacien'],['liquidation','pharmacien']]);
   await assert.rejects(pool.query("UPDATE pharmacy_order_events SET motif='x'"));
   await assert.rejects(pool.query('DELETE FROM pharmacy_receptions'));
   await assert.rejects(pool.query("UPDATE pharmacy_article_versions SET motif='x'"));

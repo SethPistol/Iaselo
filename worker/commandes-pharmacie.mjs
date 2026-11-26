@@ -40,12 +40,13 @@ export async function staffCommandesPharmacieApi(request,env,acl){
  // Stock de la pharmacie (Circuit du médicament › Stocks), lu dans le dossier partagé pour contrôler les délivrances.
  const stock=async()=>{const r=await DB.prepare("SELECT data FROM workspace_documents WHERE key='management/lots'").first();try{const v=r?JSON.parse(r.data):[];return Array.isArray(v)?v:[]}catch{return []}};
  if(request.method==='GET'){
-  const depuis=new Date(Date.now()-120*864e5).toISOString(),commandes=[],demandes=[];
-  if(voit){const rows=(await DB.prepare("SELECT * FROM pharmacy_orders WHERE statut IN ('brouillon','a_valider','validee','envoyee','partielle') OR updated_at>=? ORDER BY updated_at DESC LIMIT 300").bind(depuis).all()).results;for(const r of rows)commandes.push(await commande(r))}
+  // « Commande du » antérieur aux 120 derniers jours : la liste remonte jusqu'à cette date (au plus 1 000 commandes).
+  const du=/^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('du')||'')?url.searchParams.get('du'):'',depuis=du||new Date(Date.now()-120*864e5).toISOString(),commandes=[],demandes=[];
+  if(voit){const rows=(await DB.prepare("SELECT * FROM pharmacy_orders WHERE statut IN ('brouillon','a_valider','validee','envoyee','partielle') OR updated_at>=? OR created_at>=? ORDER BY updated_at DESC LIMIT 1000").bind(depuis,depuis).all()).results;for(const r of rows)commandes.push(await commande(r))}
   const dr=(await DB.prepare("SELECT * FROM pharmacy_requests WHERE statut IN ('demandee','en_preparation','delivree') OR updated_at>=? ORDER BY updated_at DESC LIMIT 300").bind(new Date(Date.now()-45*864e5).toISOString()).all()).results;for(const r of dr)demandes.push(await demande(r));
   const livret=(await articles()).filter(a=>voit||a.actif);
   await acl.log('read','pharmacie','allowed',voit?'Commandes et demandes de la pharmacie':'Demandes à la pharmacie');
-  return json({profil:p,voitCommandes:voit,moi,aujourdhui:jour(),articles:livret,commandes,demandes,statuts:R.STATUTS,modes:R.MODES_ENVOI,services:R.SERVICES,statutsDemande:R.STATUTS_DEMANDE,serviceParDefaut:R.serviceParDefaut({job:acl.job,poste:acl.poste}),medecin:acl.job==='anesthesiste'});
+  return json({profil:p,voitCommandes:voit,moi,moiNom:p?await nomActeur():'',aujourdhui:jour(),articles:livret,commandes,demandes,statuts:R.STATUTS,modes:R.MODES_ENVOI,services:R.SERVICES,statutsDemande:R.STATUTS_DEMANDE,serviceParDefaut:R.serviceParDefaut({job:acl.job,poste:acl.poste}),medecin:acl.job==='anesthesiste'});
  }
  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
  let d;try{d=await body(request)}catch{return json({error:'Requête illisible.'},400)}
@@ -136,7 +137,8 @@ export async function staffCommandesPharmacieApi(request,env,acl){
   }
   return json({error:'Numérotation de la commande impossible : réessayez.'},409);
  }
- const contenu=src=>({note:String(src.note||'').trim().slice(0,600),urgent:!!src.urgent});
+ // En-tête comme l'écran du bloc : UF de gestion et de commande, adresse de livraison, type (N, U, D), date prévue, objet.
+ const contenu=src=>{const e=R.entete(src);return {note:String(src.note||'').trim().slice(0,600),urgent:e.type==='U',...e}};
 
  if(action==='creer'){
   const r=R.refus('creer',p);if(r)return refuse(r);
@@ -186,6 +188,11 @@ export async function staffCommandesPharmacieApi(request,env,acl){
   const litiges=recues.filter(x=>x.litige>0).length;
   const res=await etape(row,'reception',statut,data,{extra,motifEtape:'BL '+bl+' · '+recues.length+' ligne(s)'+(litiges?' · '+litiges+' litige(s)':'')});
   if(res.status!==200)return res;const out=await res.json();return json({...out,receptions:recues.map(x=>x.id),avertissements:c.avertissements});
+ }
+ if(action==='liquider'){
+  if(p!=='pharmacien')return refuse('La liquidation de la facture fournisseur revient au pharmacien.','pharmacie/commande/'+cmd.numero);
+  const v=R.controlerLiquidation(cmd,d);if(!v.ok)return json({error:v.errors.join(' ')},400);
+  return etape(row,'liquidation',cmd.statut,{...data,liquidation:{...v.liquidation,at,par:await nomActeur()}},{motifEtape:'Facture '+v.liquidation.facture+' · '+R.euros(v.liquidation.montantCentimes)+(v.liquidation.ecartCentimes?' · écart '+R.euros(v.liquidation.ecartCentimes):'')});
  }
  if(action==='solder'){const e=await exiger();if(e)return e;return etape(row,'solde','soldee',data)}
  if(action==='annuler'){const e=await exiger();if(e)return e;return etape(row,'annulation','annulee',data)}

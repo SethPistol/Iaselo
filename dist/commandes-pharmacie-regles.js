@@ -120,6 +120,7 @@ function refus(action,p,cmd,acteurId){
    if(!['envoyee','partielle'].includes(etat))return 'Réception possible après transmission au fournisseur.';
    if((cmd.lignes||[]).some(x=>x.stupefiant)&&!pharma)return 'Stupéfiants : la réception est enregistrée par le pharmacien (registre des stupéfiants).';
    return '';
+  case 'liquider':return !pharma?'La liquidation de la facture fournisseur revient au pharmacien.':['partielle','recue','soldee'].includes(etat)?(cmd.liquidation?'Commande déjà liquidée.':''):'Liquidation après réception.';
   case 'solder':return !pharma?'Seul le pharmacien solde un reliquat.':etat==='partielle'?'':'Seule une commande reçue en partie se solde.';
   case 'annuler':
    if(['brouillon','a_valider'].includes(etat))return pharma||cmd.creePar===acteurId?'':'Le préparateur n’annule que ses propres commandes avant validation.';
@@ -284,8 +285,84 @@ function sortiesHorsStock(demandes,lots){
 }
 const numeroDemande=(annee,n)=>'DEM-'+annee+'-'+String(n).padStart(4,'0');
 
+/* ---------- Gestion des commandes sur le modèle de l'écran du bloc (Dedalus, photos de Romain du 26/11) ---------- */
+// UF de gestion / de commande, adresses de livraison, types de commande, lettres d'état.
+const UF={BCHIR:'Bloc chirurgical',BENDO:'Bloc endoscopie',SSPI:'SSPI',HOSPI:'Hospitalisation',AMBU:'Ambulatoire',PHARMA:'Pharmacie (PUI)'};
+const ADRESSES={'MAG-BLOC':'Magasin du bloc opératoire','PUI':'Pharmacie à usage intérieur','QUAI':'Quai de livraison de la clinique'};
+const TYPES={N:'Normale',U:'Urgente',D:'Dépôt (réassort de dépôt)'};
+const ETATS={brouillon:'C',a_valider:'C',validee:'V',envoyee:'E',partielle:'P',recue:'R',soldee:'R',annulee:'S'};
+const ETATS_LIBELLES={C:'En cours de saisie',V:'Validée',E:'Envoyée',P:'Reçue en partie',R:'Reçue',S:'Supprimée'};
+const libelleEtat=c=>c.statut==='a_valider'?'En cours de saisie · à valider':c.statut==='soldee'?'Soldée':ETATS_LIBELLES[ETATS[c.statut]]||c.statut;
+// Code fournisseur : F + premières lettres du nom (ex. COMEPA INDUSTRIE → FCOMEPAIN).
+const codeFournisseur=nom=>'F'+fold(nom).replace(/[^a-z0-9]/g,'').toUpperCase().slice(0,8);
+function entete(e){
+ e=e&&typeof e==='object'?e:{};
+ const ufG=Object.hasOwn(UF,e.ufGestion)?e.ufGestion:'PHARMA',ufC=Object.hasOwn(UF,e.ufCommande)?e.ufCommande:ufG;
+ return {ufGestion:ufG,ufCommande:ufC,adresse:Object.hasOwn(ADRESSES,e.adresse)?e.adresse:(['BCHIR','BENDO'].includes(ufG)?'MAG-BLOC':'PUI'),
+  type:Object.hasOwn(TYPES,e.type)?e.type:(e.urgent?'U':'N'),datePrevue:/^\d{4}-\d{2}-\d{2}$/.test(String(e.datePrevue||''))?e.datePrevue:'',objet:str(e.objet,160)};
+}
+// Filtres de la liste (comme l'écran du bloc). etat : « C, V » ; dates au format AAAA-MM-JJ.
+function lettresEtat(txt){return [...new Set(String(txt||'').toUpperCase().split(/[^A-Z]+/).filter(x=>Object.hasOwn(ETATS_LIBELLES,x)))]}
+function filtrer(commandes,f={}){
+ const et=lettresEtat(f.etat),txt=v=>fold(v||'');
+ return (commandes||[]).filter(c=>{
+  const l=ETATS[c.statut];
+  if(l==='S'&&!f.supprimees)return false;
+  if(et.length&&!et.includes(l)&&!(l==='S'&&f.supprimees))return false;
+  const du=String(c.creeLe||'').slice(0,10),val=String(c.validation?.at||'').slice(0,10);
+  if(f.du&&du<f.du)return false;if(f.au&&du>f.au)return false;
+  if((f.valideDu||f.valideAu)&&!val)return false;if(f.valideDu&&val<f.valideDu)return false;if(f.valideAu&&val>f.valideAu)return false;
+  if(f.type&&c.type!==f.type)return false;
+  if(f.fournisseur&&!txt(c.fournisseur).includes(txt(f.fournisseur))&&!txt(codeFournisseur(c.fournisseur)).includes(txt(f.fournisseur)))return false;
+  if(f.numero&&!txt(c.numero).includes(txt(f.numero)))return false;
+  if(f.adresse&&c.adresse!==f.adresse)return false;if(f.ufCommande&&c.ufCommande!==f.ufCommande)return false;if(f.ufGestion&&c.ufGestion!==f.ufGestion)return false;
+  return true;
+ });
+}
+function trier(liste,cle,sens=1){
+ const v=c=>({ufGestion:c.ufGestion,numero:c.numero,type:c.type,etat:libelleEtat(c),code:codeFournisseur(c.fournisseur),fournisseur:c.fournisseur,du:c.creeLe,validee:c.validation?.at||'',prevue:c.datePrevue||'',objet:c.objet||''})[cle]??'';
+ return [...liste].sort((a,b)=>String(v(a)).localeCompare(String(v(b)),'fr',{numeric:true})*sens);
+}
+// Montant reçu conforme (base de la liquidation de la facture fournisseur).
+function montantRecu(cmd){return (cmd.receptions||[]).reduce((n,r)=>n+(Number(r.conforme)||0)*(Number(cmd.lignes?.[r.ligne]?.prixCentimes)||0),0)}
+function controlerLiquidation(cmd,f){
+ const errors=[],facture=str(f?.facture,40),date=str(f?.dateFacture,10),m=String(f?.montant??'').trim(),montant=m===''?null:entier(Math.round(Number(m.replace(',','.'))*100),0,1e10);
+ if(!['partielle','recue','soldee'].includes(cmd?.statut))errors.push('Liquidation après réception.');
+ if(cmd?.liquidation)errors.push('Commande déjà liquidée.');
+ if(!facture)errors.push('Numéro de facture du fournisseur requis.');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date))errors.push('Date de la facture requise.');
+ if(montant===null)errors.push('Montant HT de la facture requis.');
+ const recu=montantRecu(cmd||{}),ecart=montant===null?0:montant-recu;
+ if(!errors.length&&ecart!==0&&str(f?.motif,300).length<5)errors.push('Écart de '+euros(ecart)+' entre la facture et les quantités reçues : motif requis.');
+ return {ok:!errors.length,errors,liquidation:{facture,dateFacture:date,montantCentimes:montant,recuCentimes:recu,ecartCentimes:ecart,motif:str(f?.motif,300)}};
+}
+// Suivi par article et cadencier (quantités commandées par mois sur 12 mois).
+function suiviArticle(articleId,commandes){
+ return (commandes||[]).filter(c=>c.statut!=='annulee').flatMap(c=>(c.lignes||[]).map((l,i)=>({c,l,i})).filter(x=>x.l.articleId===articleId)).map(({c,l,i})=>({commande:c,quantite:l.quantite,recu:recuConforme(c,i),reliquat:R0(c,i),prix:l.prixCentimes}));
+}
+const R0=(c,i)=>['envoyee','partielle','validee','a_valider','brouillon'].includes(c.statut)?reliquat(c,i):0;
+function mois12(aujourdhui){const [y,m]=aujourdhui.split('-').map(Number),out=[];for(let k=11;k>=0;k--){const d=new Date(Date.UTC(y,m-1-k,1));out.push(d.toISOString().slice(0,7))}return out}
+function cadencier(articles,commandes,aujourdhui){
+ const mois=mois12(aujourdhui),lignes=(articles||[]).map(a=>{const q=Object.fromEntries(mois.map(x=>[x,0]));for(const c of commandes||[]){if(c.statut==='annulee')continue;const k=String(c.creeLe||'').slice(0,7);if(!(k in q))continue;for(const l of c.lignes||[])if(l.articleId===a.id)q[k]+=Number(l.quantite)||0}const tot=Object.values(q).reduce((n,x)=>n+x,0);return {article:a,parMois:q,total:tot,moyenne:Math.round(tot/12*10)/10}}).filter(x=>x.total>0);
+ return {mois,lignes};
+}
+function analyse(commandes){
+ const C=(commandes||[]).filter(c=>c.statut!=='annulee'),par=(k)=>{const m=new Map();for(const c of C){const key=k(c);const v=m.get(key)||{n:0,montant:0,recu:0};v.n++;v.montant+=Number(c.total)||0;v.recu+=montantRecu(c);m.set(key,v)}return [...m.entries()].sort((a,b)=>b[1].montant-a[1].montant)};
+ const delais=C.filter(c=>c.envoi?.at&&c.receptions?.length).map(c=>(Date.parse(c.receptions[0].at)-Date.parse(c.envoi.at))/864e5);
+ return {parEtat:par(c=>libelleEtat(c)),parFournisseur:par(c=>c.fournisseur),parUf:par(c=>c.ufGestion||'PHARMA'),parMois:par(c=>String(c.creeLe||'').slice(0,7)).sort((a,b)=>a[0].localeCompare(b[0])),
+  delaiMoyenJours:delais.length?Math.round(delais.reduce((n,x)=>n+x,0)/delais.length*10)/10:null,litiges:C.reduce((n,c)=>n+(c.receptions||[]).filter(r=>r.litige>0).length,0)};
+}
+// Inventaire : écart entre la quantité comptée et la quantité en stock d'un lot.
+function ajusterInventaire(lots,lotId,compte,{at,par,motif}){
+ const lot=(lots||[]).find(x=>x.id===lotId),q=entier(compte,0,1000000);
+ if(!lot)return 'Lot introuvable.';if(q===null)return 'Quantité comptée entière requise.';
+ const ecart=q-(Number(lot.quantity)||0);if(!ecart)return '';
+ if(str(motif,300).length<5)return 'Motif de l’écart d’inventaire requis (casse, péremption, erreur de saisie…).';
+ lot.quantity=q;lot.inventaires=[...(lot.inventaires||[]),{at,par,ecart,motif:str(motif,300)}];return '';
+}
+
 /* ---------- Numérotation ---------- */
 const numero=(annee,n)=>'CMD-'+annee+'-'+String(n).padStart(4,'0');
 
-return {METIERS_SERVICE,voitCommandes,SERVICES,STATUTS_DEMANDE,DEMANDES_EN_COURS,serviceParDefaut,controlerDemande,demandeSensible,refusDemande,lotsDisponibles,controlerDelivrance,appliquerSorties,sortiesHorsStock,numeroDemande,STATUTS,EN_COURS,MODES_ENVOI,PROFILS,MAX_LIGNES,PEREMPTION_COURTE,fold,profil,normaliserArticle,validerArticle,ligneDepuisArticle,normaliserLignes,total,euros,controlerCommande,refus,stockArticle,recuConforme,reliquat,enCoursArticle,propositions,groupesProposition,controlerReception,statutApresReception,lotPourStock,integrerAuStock,receptionsHorsStock,numero,ajouterJours};
+return {UF,ADRESSES,TYPES,ETATS,ETATS_LIBELLES,libelleEtat,codeFournisseur,entete,lettresEtat,filtrer,trier,montantRecu,controlerLiquidation,suiviArticle,cadencier,mois12,analyse,ajusterInventaire,METIERS_SERVICE,voitCommandes,SERVICES,STATUTS_DEMANDE,DEMANDES_EN_COURS,serviceParDefaut,controlerDemande,demandeSensible,refusDemande,lotsDisponibles,controlerDelivrance,appliquerSorties,sortiesHorsStock,numeroDemande,STATUTS,EN_COURS,MODES_ENVOI,PROFILS,MAX_LIGNES,PEREMPTION_COURTE,fold,profil,normaliserArticle,validerArticle,ligneDepuisArticle,normaliserLignes,total,euros,controlerCommande,refus,stockArticle,recuConforme,reliquat,enCoursArticle,propositions,groupesProposition,controlerReception,statutApresReception,lotPourStock,integrerAuStock,receptionsHorsStock,numero,ajouterJours};
 });
