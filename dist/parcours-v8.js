@@ -2379,6 +2379,7 @@ if(sharedWorkspace){
   for(const key of Object.keys(patientDrafts))delete patientDrafts[key];Object.assign(patientDrafts,management.patientDrafts||{});
  }});
  durableWorkspace=shared;
+ window.iaseloSharedRefresh=()=>shared.refresh();
  await shared.start();
 }else{
  try { render(); document.body.dataset.appReady='true'; } catch(error) { window.showPatientLoadError?.(error); }

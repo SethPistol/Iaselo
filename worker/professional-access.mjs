@@ -1,7 +1,7 @@
 import invitationCore from '../dist/invitation-core.js';
 import codageCcam from '../dist/codage-ccam-regles.js';
 import nursingCore from '../dist/nursing-core.js';
-import planningCore from '../dist/planning-core.js';import plagesRegles from '../dist/plages-operatoires-regles.js';import {stampSignatures} from './signatures.mjs';import {heal,stamp} from './horodatage.mjs';import {lockCheck} from './verrous.mjs';
+import planningCore from '../dist/planning-core.js';import plagesRegles from '../dist/plages-operatoires-regles.js';import deroulementRegles from '../dist/deroulement-regles.js';import {stampSignatures} from './signatures.mjs';import {heal,stamp} from './horodatage.mjs';import {lockCheck} from './verrous.mjs';
 const professions={unassigned:'Non attribué',anesthesiste:'Anesthésiste',chirurgien:'Chirurgien',infirmier:'Infirmier',secretariat:'Secrétariat',pharmacien:'Pharmacien',dim:'DIM',facturation:'Facturation',administration:'Administration'};
 const stable=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const same=(a,b)=>stable(a)===stable(b);
@@ -101,6 +101,8 @@ export async function professionalAccess(env,request,user,member,at){
   if(group==='management'&&id==='vacations'&&cadre)return Array.isArray(data);
   // Le cadre de bloc régule le programme : il confirme les annonces et programme les séjours de ses équipes (26/11/2026).
   if(group==='management'&&id==='reservations'&&cadre)return Array.isArray(data)&&allowed.size>0;
+  // Infirmier(ère) de bloc : déroulement du programme seulement (arrivée, entrée et sortie de salle, sortie de bloc), sans rien programmer ni déplacer.
+  if(group==='management'&&id==='reservations'&&job==='infirmier'&&poste==='bloc')return allowed.size>0&&deroulementRegles.deroulementSeulement(old,data,r=>allowed.has(r?.patient));
   if(group==='management')return Object.hasOwn(globalRead,id)&&(isAdmin||({reservations:['anesthesiste','chirurgien','secretariat'],vacations:['anesthesiste','chirurgien','secretariat'],acts:['anesthesiste','chirurgien'],lots:['pharmacien'],movements:['pharmacien'],pmsi:['dim'],invoices:['facturation']}[id]||[]).includes(job)&&(allowed.size>0||lotsPharmacie(id)));
   return false;
  }

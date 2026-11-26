@@ -8,7 +8,7 @@
 //
 // L'écriture passe par la route normale d'enregistrement (/api/workspace/commit) au nom du propriétaire de la recette :
 // mêmes contrôles serveur que pour un enregistrement à l'écran (conflits de salle, de personnel, de SSPI, de lit…).
-import planningCore from '../dist/planning-core.js';import plagesRegles from '../dist/plages-operatoires-regles.js';import serviceSectors from '../dist/service-sectors.js';
+import planningCore from '../dist/planning-core.js';import plagesRegles from '../dist/plages-operatoires-regles.js';import serviceSectors from '../dist/service-sectors.js';import D from '../dist/deroulement-regles.js';
 
 export const PREFIXE='DEMO-BLOC-';
 const estDemo=id=>typeof id==='string'&&(id.startsWith('demo-')||id.startsWith(PREFIXE)||id.startsWith('VAC-PL-demo-')||id.startsWith('VAC-demo-'));
@@ -55,6 +55,10 @@ export function plagesDemo(today){
  const out=[];for(const [chir,jours,salle,start,duration,rhythm,label]of PLAGES)for(const j of jours)out.push({id:'demo-pl-'+chir+'-'+j+(rhythm==='hebdo'?'':'-'+rhythm),surgeon:CHIRURGIENS[chir],weekday:j,resource:salle,start,duration,staffIds:EQUIPES[salle].filter(x=>!x.startsWith('demo-mar')),from:today,until:'',rhythm,label,state:'Active',updatedAt:today+'T07:00',updatedBy:'Programme fictif de recette'});
  return out;
 }
+// Anesthésistes fictifs par salle et codes CCAM des actes du programme (les actes sans code certain restent « à coder »).
+const ANESTH={'demo-salle-1':'Dr Perrot (fictif)','demo-salle-2':'Dr Kessler (fictif)','demo-salle-3':'Dr Nguyen (fictif)','demo-salle-4':'Dr Anesthésiste fictif 1','demo-endo-1':'Dr Kessler (fictif)'};
+const CCAM=[[/hanche/i,'NEKA020'],[/prothèse totale de genou/i,'NFKA007'],[/cholécystectomie/i,'HMFC004'],[/cataracte/i,'BFGA004'],[/appendicectomie/i,'HHFA016'],[/^coloscopie totale|coloscopie de dépistage/i,'HHQE005'],[/fibroscopie œso/i,'HEQE002'],[/canal carpien/i,'AHPA009'],[/thyroïdectomie totale/i,'KCFA005'],[/gastrectomie longitudinale/i,'HFFC018']];
+const ccamDe=acte=>(CCAM.find(([re])=>re.test(acte))||[,''])[1];
 const PRENOMS=['Claire','Hugo','Nadia','Paul','Inès','Marc','Léa','Karim','Odile','Théo','Sophie','Yanis','Martine','Lucas','Agathe','Bruno','Chloé','Driss','Elise','Fabien','Gisèle','Henri','Iris','Jules','Kenza','Louis','Maëlle','Noé','Olga','Pierre','Rose','Simon'];
 const NOMS=['LAMBERT','ROUSSEL','GARNIER','FAURE','BLANC','GIRAUD','MOREL','BARBIER','ARNAUD','LEROY','BRUN','COLIN','PERRIN','RENAUD','SCHMITT','NOEL','MEUNIER','DUMAS','LUCAS','FONTAINE','CARON','CHEVALIER','ROBIN','GAUTHIER','MASSON','DENIS','MULLER','HENRY','RIVIERE','JOLY','LEMOINE','AUBERT'];
 
@@ -137,23 +141,30 @@ export function programmeFictif({today,now,current={}}){
   if(start<v.start||end>v.end)continue;
   const state=c.retard?'Réservée':end<=now?'Terminée':start<=now?'Occupée':'Réservée';
   const id=sejour(c,{stage:state==='Terminée'?(c.mode==='Ambulatoire'?'Sortie':'Hospitalisation'):state==='Occupée'?'Intervention':'Préopératoire',task:state==='Terminée'?'Surveillance postopératoire':'Programme du bloc'});
-  const r={id:PREFIXE+'RES-'+id.slice(PREFIXE.length),planningVersion:1,patient:id,resource:c.salle,vacationId:v.id,procedure:c.acte+(c.urgent?' (URGENCE)':''),start,end,duration:c.d,turnover:15,staffIds:[...v.staffIds],equipmentIds:[],note:'Programme fictif de recette'+(c.chir?' · '+CHIRURGIENS[c.chir]:v.surgeon?' · '+v.surgeon:''),state};
+  const r={id:PREFIXE+'RES-'+id.slice(PREFIXE.length),planningVersion:1,patient:id,resource:c.salle,vacationId:v.id,procedure:c.acte+(c.urgent?' (URGENCE)':''),start,end,duration:c.d,turnover:15,staffIds:[...v.staffIds],equipmentIds:[],note:'Programme fictif de recette',state,surgeon:c.chir?CHIRURGIENS[c.chir]:v.surgeon||'',anesthesiste:ANESTH[c.salle]||'',ccam:ccamDe(c.acte)};
   busy.push({resource:c.salle,start,end});for(const s of r.staffIds)busy.push({resource:s,start,end});
   for(const e of c.eq||[])if(libre(e,start,end)){busy.push({resource:e,start,end});r.equipmentIds.push(e)}
   // SSPI (sauf endoscopie courte), puis lit ou fauteuil en aval selon le mode.
   if(c.salle!=='demo-endo-1'||c.d>=45){const rs=opEnd,re=C.addMinutes(opEnd,c.d>=120?90:60),poste=prendre([1,2,3,4].map(i=>'demo-sspi-'+i),rs,re);if(poste)r.recovery={resource:poste,start:rs,end:re}}
   const bs=r.recovery?.end||opEnd,be=c.mode==='Ambulatoire'?d+'T19:00':ajouter(d,3)+'T12:00';
   if(bs<be&&!(c.sansLit)){const lit=prendre(c.mode==='Ambulatoire'?[1,2,3,4,5,6].map(i=>'demo-ambu-'+i):[1,2,3,4,5,6].map(i=>'demo-lit-'+i),bs,be);if(lit)r.bed={resource:lit,start:bs,end:be}}
-  if(state==='Terminée'){r.actualStart=start;r.actualEnd=opEnd}
-  if(state==='Occupée'){r.phase=now<opEnd?'primary':r.recovery&&now<r.recovery.end?'recovery':r.bed?'bed':'primary';r.actualStart=start}
+  r.state='Réservée';
+  // Déroulement réel : étapes franchies avant l'heure de chargement (retards et avances variables, sauf le cas « en retard »).
+  if(!c.retard){const ecart=[0,6,-5,18,35,2,12,-3,25,8][n%10],entree=C.addMinutes(start,ecart),sortie=C.addMinutes(entree,c.d),temps={arrivee:C.addMinutes(start,-35),entree,sortie,sortieBloc:C.addMinutes(sortie,r.recovery?(c.d>=120?85:55):10)};
+   for(const k of D.CLES){if(temps[k]>now)break;const o=D.appliquer(r,k,temps[k],'');if(o.error)break;Object.assign(r,o.reservation)}}
+  const stEt=D.etapeCourante(r);stays[id].core.stage=!stEt||stEt==='arrivee'?'Préopératoire':stEt==='entree'?'Intervention':stEt==='sortie'&&r.phase==='recovery'?'SSPI':c.mode==='Ambulatoire'?'Sortie':'Hospitalisation';
   bookings.push(r);resume.interventions++;
  }
+ // Sécurité : deux passages ne peuvent pas occuper en même temps le même poste de SSPI ou le même lit (retards cumulés).
+ const occupe=new Set();for(const r of bookings.filter(r=>r.state==='Occupée').sort((a,b)=>a.start.localeCompare(b.start))){let cur=C.currentResource(r);
+  while(r.state==='Occupée'&&occupe.has(cur)){const k=D.prochaine(r);const o=k?D.appliquer(r,k,D.etapes(r)[D.CLES[D.CLES.indexOf(k)-1]]||now,''):null;if(!o||o.error){r.state='Terminée';break}Object.assign(r,o.reservation);cur=C.currentResource(r)}
+  if(r.state==='Occupée')occupe.add(cur)}
  // Deux programmes confirmés depuis une annonce, puis l'annonce a bougé : points bloquants « à revoir ».
  const jourChir=k=>jours.find(d=>vacDemo.some(v=>v.surgeon===CHIRURGIENS[k]&&v.start.slice(0,10)===d&&v.state!=='Annulée'));
  const derive=(c,salle,chir,annonce)=>{const d=jours[c.j],v=vacDemo.find(v=>v.resource===salle&&v.start.slice(0,10)===d&&v.surgeon===CHIRURGIENS[chir]&&v.state!=='Annulée');if(!v)return;
   const start=d+'T'+c.h,end=C.addMinutes(start,c.d+15);if(busy.some(x=>x.resource===salle&&start<x.end&&x.start<end)||end>v.end)return;
   const id=sejour(c,{origin:'annonce'});busy.push({resource:salle,start,end});
-  bookings.push({id:PREFIXE+'RES-'+id.slice(PREFIXE.length),planningVersion:1,patient:id,resource:salle,vacationId:v.id,procedure:c.acte,start,end,duration:c.d,turnover:15,staffIds:[...v.staffIds],equipmentIds:[],note:'Annonce chirurgicale v1 · '+v.surgeon,state:'Réservée',source:'annonce',annonceRevision:1});
+  bookings.push({id:PREFIXE+'RES-'+id.slice(PREFIXE.length),planningVersion:1,patient:id,resource:salle,vacationId:v.id,procedure:c.acte,start,end,duration:c.d,turnover:15,staffIds:[...v.staffIds],equipmentIds:[],note:'Annonce chirurgicale v1 · '+v.surgeon,state:'Réservée',source:'annonce',annonceRevision:1,surgeon:v.surgeon,anesthesiste:ANESTH[salle]||'',ccam:''});
   stays[id].surgicalAnnouncement={published:{fields:{procedure:c.acte,surgeon:v.surgeon,urgency:'Programmée',mode:c.mode,laterality:'Non applicable',date:annonce.date||d,time:'',duration:String(c.d),notes:annonce.notes},state:annonce.state,revision:annonce.revision,sentAt:ajouter(today,-2)+'T09:00:00.000Z',at:'Programme fictif de recette',author:{name:v.surgeon,label:'chirurgien'}}};resume.derives++;
  };
  derive({j:1,h:'10:00',d:60,acte:'Rhinoseptoplastie',spe:'ORL',mode:'Ambulatoire',asa:'ASA 1',all:'Aucune allergie connue',age:27,ok:true},'demo-salle-3','okafor',{state:'Transmise',revision:2,date:jours[4],notes:'Annonce modifiée après confirmation : nouvelle date souhaitée.'});

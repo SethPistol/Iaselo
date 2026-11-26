@@ -2,13 +2,13 @@
 'use strict';
 root.createBlocPlanner=function(ctx){
  const {$,esc,patients,sectors,resources,reservations,vacations,toast}=ctx,C=root.PlanningCore,plages=ctx.plages||[];
- let pane='planning',editing=null,focus=null,seed=null,editPlage=null,plageReport=null;
+ let pane='deroulement',editing=null,focus=null,seed=null,editPlage=null,plageReport=null;
  // Annonces chirurgicales : celles du dossier local, complétées par le serveur (profils sans accès clinique, ex. secrétariat).
  const remote={day:'',at:0,rows:[]};
  function announcements(){const local=patients.map(C.announcementOf).filter(Boolean),seen=new Set(local.map(a=>a.stay));return [...local,...remote.rows.filter(a=>a&&!seen.has(a.stay))]}
  const annFor=id=>announcements().find(a=>a.stay===id);
  function refreshRemote(day){if(typeof fetch!=='function'||(remote.day===day&&Date.now()-remote.at<30000))return;remote.day=day;remote.at=Date.now();
-  fetch('/api/workspace/annonces-bloc?date='+encodeURIComponent(day),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(!d||!Array.isArray(d.annonces))return;const before=JSON.stringify(remote.rows);remote.rows=d.annonces;if(before!==JSON.stringify(remote.rows)&&pane==='planning'&&document.querySelector('.bl-board'))render()}).catch(()=>{})}
+  fetch('/api/workspace/annonces-bloc?date='+encodeURIComponent(day),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(!d||!Array.isArray(d.annonces))return;const before=JSON.stringify(remote.rows);remote.rows=d.annonces;if(before!==JSON.stringify(remote.rows)&&(pane==='planning'&&document.querySelector('.bl-board')||pane==='deroulement'&&document.querySelector('.dr-root')))render()}).catch(()=>{})}
  function surgeonNames(){const me=ctx.access?.()?.profile,names=[...plages.map(p=>p.surgeon),...vacations.map(v=>v.surgeon),...announcements().map(a=>a.surgeon),me?.profession==='chirurgien'?me.display_name:''].map(x=>String(x||'').trim()).filter(Boolean);return [...new Map(names.map(n=>[C.normName(n),n])).values()].sort((a,b)=>a.localeCompare(b,'fr'))}
  const types={room:'Salle de bloc',recovery:'Poste de SSPI',bed:'Lit / place',staff:'Personnel',equipment:'Matériel'};
  const opts=(rows,value)=>rows.map(([id,label])=>`<option value="${esc(id)}" ${id===value?'selected':''}>${esc(label)}</option>`).join('');
@@ -21,7 +21,9 @@ root.createBlocPlanner=function(ctx){
  const openResources=type=>resources.filter(r=>C.kind(r)===type&&r.open!==false);
  const otherBookings=()=> (ctx.access?.()?.planningOccupancy||[]).map((a,i)=>({id:'OTHER-'+i,patient:'',resource:a.resource,start:a.start,end:a.end,state:a.current?'Occupée':'Réservée'}));
  const allBookings=()=>[...reservations,...otherBookings()];
- const write=()=>ctx.canWrite();
+ // L'infirmier(ère) de bloc ne saisit que le déroulement (étapes du patient), jamais la programmation.
+ const etapesSeules=()=>{const p=ctx.access?.()?.profile;return p?.profession==='infirmier'&&p.poste==='bloc'};
+ const write=()=>ctx.canWrite()&&!etapesSeules();
  const configWrite=()=>ctx.access?.()?.profile.isAdmin===true;
  const form=(id,body,label,can=write())=>can?`<form id="${id}" class="management-form"><div class="formgrid">${body}</div><p role="alert" class="management-error"></p><button class="primary">${label}</button></form>`:'<p class="notice">Consultation en lecture seule pour ce compte.</p>';
  function attach(id,fn){const f=$('#'+id);if(f)f.onsubmit=e=>{e.preventDefault();const data=new FormData(f),v=Object.fromEntries(data);v.staffIds=data.getAll('staffIds');v.equipmentIds=data.getAll('equipmentIds');const err=fn(v);if(err){f.querySelector('[role=alert]').textContent=err;return}render();toast('Modification préparée · vérifiez la confirmation serveur')};}
@@ -48,11 +50,11 @@ root.createBlocPlanner=function(ctx){
  });}
  function render(){
  const day=ctx.filters.date||ctx.today(),at=ctx.filters.at?.slice(0,10)===day?ctx.filters.at:day+'T10:00';
- const tabs=[['planning','Planning par salle'],['booking','Programmer un séjour'],['plages','Plages des chirurgiens'],['vacations','Vacations'],['capacity','SSPI & lits'],['resources','Ressources'],['convocations','Convocations SMS']];
- document.querySelector('.management')?.classList.toggle('is-plan',pane==='planning');$('#management-body').innerHTML=`<p class="bl-intro">Programme partagé · capacités et durées de démonstration, à paramétrer selon la clinique. Disponibilité prévisionnelle et occupation déclarée sont affichées séparément. Cliquez sur Actualiser pour charger les dernières données serveur.</p><div class="tabs planning-tabs" aria-label="Régulation du bloc et des lits">${tabs.map(([k,l])=>`<button data-plan-pane="${k}" aria-pressed="${pane===k}" class="${pane===k?'active':''}">${l}</button>`).join('')}</div><div class="management-toolbar bl-dates">${input('planning-day','Date du programme','date',day)}${input('planning-at','Disponibilité à cet horaire','datetime-local',at)}</div>${recetteBouton()}<div id="planning-content"></div>`;
+ const tabs=[['deroulement','Déroulement du programme'],['planning','Régulation & annonces'],['booking','Programmer un séjour'],['plages','Plages des chirurgiens'],['vacations','Vacations'],['capacity','SSPI & lits'],['resources','Ressources'],['convocations','Convocations SMS']];
+ document.querySelector('.management')?.classList.toggle('is-plan',['planning','deroulement'].includes(pane));$('#management-body').innerHTML=`<p class="bl-intro">Programme partagé · capacités et durées de démonstration, à paramétrer selon la clinique. Disponibilité prévisionnelle et occupation déclarée sont affichées séparément. Cliquez sur Actualiser pour charger les dernières données serveur.</p><div class="tabs planning-tabs" aria-label="Régulation du bloc et des lits">${tabs.map(([k,l])=>`<button data-plan-pane="${k}" aria-pressed="${pane===k}" class="${pane===k?'active':''}">${l}</button>`).join('')}</div><div class="management-toolbar bl-dates">${input('planning-day','Date du programme','date',day)}${input('planning-at','Disponibilité à cet horaire','datetime-local',at)}</div>${recetteBouton()}<div id="planning-content"></div>`;
  document.querySelectorAll('[data-plan-pane]').forEach(b=>b.onclick=()=>{pane=b.dataset.planPane;render()});
  $('input[name="planning-day"]').onchange=e=>{ctx.filters.date=e.target.value;render()};$('input[name="planning-at"]').onchange=e=>{ctx.filters.at=e.target.value;ctx.filters.date=e.target.value.slice(0,10);render()};
- ({planning:()=>planning(day,at),booking:()=>booking(day),plages:()=>plagesPane(day),vacations:()=>sessions(day),capacity:()=>capacity(at),resources:configuration,convocations:()=>convocations(day)})[pane]();bindActions();bindRecette();document.querySelectorAll('[data-management-dossier]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.managementDossier,b.dataset.tab||'consult'));
+ ({deroulement:()=>deroulement().render($('#planning-content'),day),planning:()=>planning(day,at),booking:()=>booking(day),plages:()=>plagesPane(day),vacations:()=>sessions(day),capacity:()=>capacity(at),resources:configuration,convocations:()=>convocations(day)})[pane]();bindActions();bindRecette();document.querySelectorAll('[data-management-dossier]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.managementDossier,b.dataset.tab||'consult'));
  }
  // Recette seulement (serveur IASELO_RECETTE) : recharge le programme fictif du bloc aux dates du jour (worker/recette-bloc.mjs).
  function recetteBouton(){const a=ctx.access?.();if(a?.recette!==true)return '';const p=a.profile||{};if(!(p.isAdmin||(p.profession==='infirmier'&&p.poste==='cadre')))return '';return `<div class="bl-recette"><button type="button" class="secondary" data-bl-recette>Recharger le programme fictif (recette)</button><small>Remplace uniquement les données de démonstration (salles « démo », patients FICTIF-…).</small></div>`}
@@ -60,6 +62,10 @@ root.createBlocPlanner=function(ctx){
   try{const r=await fetch('/api/workspace/recette/programme-bloc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'recharger'})}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Serveur indisponible');
    toast('Programme fictif chargé : '+d.resume.interventions+' interventions, '+d.resume.annonces+' annonces à confirmer');ctx.filters.date=d.today;setTimeout(()=>location.reload(),900)}
   catch(e){b.disabled=false;b.textContent='Recharger le programme fictif (recette)';toast('Programme fictif non chargé : '+e.message)}}}
+ let dr=null;
+ function deroulement(){return dr??=root.createDeroulement({esc,patients,resources,reservations,vacations,C,today:ctx.today,now:ctx.now,toast,
+  propositions:day=>{refreshRemote(day);return C.placeAnnouncements(day,announcements(),vacations,reservations).placed},caseState,etapesWrite:()=>ctx.canWrite(),allBookings,
+  trace:(id,m)=>changed({patient:id},m),rerender:()=>render(),setDay:d=>{ctx.filters.date=d;render()},open:(id,tab)=>ctx.open(id,tab),regulation:()=>{pane='planning';render()},compte:()=>ctx.access?.()?.profile.user_id||''})}
  function roomName(r){const unit=String(r.label||'').split(' · ').pop();return ({'bloc-chir':'Chirurgie','bloc-endo':'Endoscopie'}[r.sector]||'')+(r.sector in {'bloc-chir':1,'bloc-endo':1}?' · ':'')+unit}
  function who(id){const s=patients.find(p=>p.id===id),n=s?.identity;return n?.lastName?[n.firstName,String(n.lastName).toUpperCase()].filter(Boolean).join(' '):id||'Autre équipe'}
  function caseState(r,now){

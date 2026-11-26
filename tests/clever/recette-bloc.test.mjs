@@ -98,3 +98,20 @@ test('hors recette : route inexistante, aucun programme fictif ni compte cadre',
 });
 
 test('heure de Paris',()=>{assert.deepEqual(maintenantParis(new Date('2026-11-26T23:30:00Z')),{today:'2026-11-27',now:'2026-11-27T00:30'})});
+
+import D from '../../dist/deroulement-regles.js';import {createAccount} from '../../server/auth.mjs';
+test('déroulement : l’infirmière de bloc saisit les étapes du patient, sans pouvoir programmer ni déplacer',async()=>{
+ const env={...base,IASELO_RECETTE:'true'},{db,pool,call,login,app}=await setup(env);
+ try{await app.programmeRecette();
+  const id=await createAccount(pool,{email:'ibode@iaselo.test',name:'IBODE test',passwordHash:await hashPassword('Infirmiere bloc 2026 test')}),at=new Date().toISOString();
+  await pool.query("UPDATE professional_profiles SET profession='infirmier',poste='bloc' WHERE user_id=$1",[id]);await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);
+  const ibode=await login('ibode@iaselo.test','Infirmiere bloc 2026 test');
+  const doc=(await (await call('GET','/api/workspace',undefined,ibode)).json()).documents.find(d=>d.key==='management/reservations');
+  assert.ok(doc.data.some(r=>D.etapeCourante(r)),'le programme fictif a déjà des étapes franchies');
+  const r=doc.data.find(r=>r.state==='Réservée'&&!D.etapeCourante(r)&&!r.source);const step=D.appliquer(r,'arrivee',r.start.slice(0,11)+'07:00','').reservation;
+  const put=(data,rev)=>call('POST','/api/workspace/commit',{documents:[{key:'management/reservations',revision:rev,data,operation:crypto.randomUUID(),reason:'déroulement'}]},ibode);
+  const moved=await put(doc.data.map(x=>x.id===r.id?{...step,start:r.start.slice(0,11)+'07:00'}:x),doc.revision);assert.equal(moved.status,403,'déplacer : refusé');
+  const ok=await put(doc.data.map(x=>x.id===r.id?step:x),doc.revision);assert.equal(ok.status,200,JSON.stringify(await ok.clone().json()));
+  const saved=(await ok.json()).documents[0].data.find(x=>x.id===r.id);assert.ok(saved.etapes.arrivee);
+ }finally{await db.close()}
+});
