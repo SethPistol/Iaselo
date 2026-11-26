@@ -21,11 +21,12 @@ const MENUS={
  unassigned:['professionalAccess']
 };
 // Administrateur des habilitations : gestion de la clinique en plus de son métier.
-const ADMIN=['indicateurs','professionalAccess','pilotage','droits','protocoles','activity','billing'];
+// « Bloc & lits » : l'administrateur y gère les plages opératoires des chirurgiens (26/11/2026).
+const ADMIN=['indicateurs','professionalAccess','pilotage','droits','protocoles','regulation','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
 function menuPourProfil(profession,isAdmin,poste){
- const base=MENUS[profession==='infirmier'&&poste!=='bloc'?'infirmier_etage':profession]||MENUS.unassigned;
+ const base=MENUS[profession==='infirmier'&&!['bloc','cadre'].includes(poste)?'infirmier_etage':profession]||MENUS.unassigned;
  const vues=isAdmin?[...base,...ADMIN.filter(v=>!base.includes(v))]:[...base];
  return vues;
 }

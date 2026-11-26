@@ -86,3 +86,15 @@ html body .management .eyebrow { display: none; }
 .bl-ann-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--i-line); border-radius: 10px; font-size: 14px; }
 .bl-ann-list li > span:not(.bl-tag) { color: var(--i-mut); flex: 1 1 220px; }
 .bl-tag.is-proposed { padding: 2px 8px; border-radius: 999px; }
+/* Plages opératoires des chirurgiens (semaine type) */
+.bl-tag.is-ok { background: var(--i-acc-soft); color: var(--i-acc-ink); padding: 2px 8px; border-radius: 999px; }
+.bl-tag.is-block { padding: 2px 8px; border-radius: 999px; }
+.bl-plages-semaine { display: grid; gap: 8px; margin-top: 14px; }
+.bl-plages-jour { display: grid; grid-template-columns: 110px 1fr; gap: 12px; align-items: start; padding: 10px 0; border-top: 1px solid var(--i-line); }
+.bl-plages-jour > strong { font-size: 15px; padding-top: 6px; }
+.bl-plages-jour > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.bl-plage-chip { display: inline-flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 10px; background: var(--i-acc-soft); color: var(--i-acc-ink); font-size: 14px; }
+.bl-plage-chip small { color: var(--i-mut); font-size: 12.5px; }
+.bl-plage-chip.is-edit { outline: 2px solid var(--i-acc); }
+#plan-plage h4 { margin: 0 0 12px; font-size: 17px; }
+@media (max-width: 640px) { .bl-plages-jour { grid-template-columns: 1fr; gap: 6px; } }
