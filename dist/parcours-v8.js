@@ -567,7 +567,7 @@ function prescriptions(){
   <label>Catégorie<select name="category">${optionHTML(['Médicament','Examen biologique','Surveillance','Soin infirmier'],'Médicament')}</select></label>
   <label class="wide">Consignes de démonstration<textarea name="instructions" required></textarea></label>
  </div><div class="actions"><button class="primary">Ajouter au brouillon</button>${window.IaseloProtocolesUI?'<button type="button" class="secondary pr-reprendre" id="rx-protocole">Reprendre un protocole</button>':''}</div></form>`:''}
- <div id="rxlist">${rows.map(({rx,index})=>`<article class="rx">
+ <div id="rxlist">${rows.map(({rx,index})=>`<article class="rx" data-rx-index="${index}">
  <div class="row"><strong>${esc(rx.name)}</strong><span class="pill ${rx.validated?'good':'warn'}">${rx.validated?'Validée médicalement · simulation':'Brouillon'}</span></div>
  <p class="muted">${esc(rx.category)} · ${esc(rx.author)}${rx.validatedAt?' · Validée le '+esc(rx.validatedAt):''}${rx.protocole?' · Protocole '+esc(rx.protocole.nom)+' (version '+esc(rx.protocole.version)+')':''}</p>
  <p class="preserve">${esc(rx.instructions)}</p>
@@ -593,6 +593,18 @@ function prescriptions(){
    <label class="wide">Commentaire ou motif si non réalisée<textarea name="note" maxlength="1000"></textarea></label>
   </div><p role="alert" class="warn"></p><button class="primary">Enregistrer l’exécution</button></form></details>`}
  </article>`).join('')||'<p class="muted">Aucune prescription disponible pour ce séjour.</p>'}</div>`;
+ // Contrôle de sécurité du traitement en cours (securite-traitement.js) : bandeau, pastilles, validation avec justificatif.
+ const validerLignes=(indices,fiches,justificatif)=>{
+  if(!physician()||p()!==stay)return;
+  indices.forEach((i,k)=>{const rx=stay.rx[i];if(!rx||rx.validated)return;
+   rx.validated=true;rx.validatedAt=new Date().toLocaleString('fr-FR');
+   const f=fiches?.[k];if(f)rx.securite={...f,par:role};
+   event('Validation médicale simulée · '+rx.name+(f&&f.niveauMax>=3?' · contrôle de sécurité : alerte de niveau '+f.niveauMax+', justificatif : '+justificatif:''),'Prescription');
+  });
+  if(justificatif&&fiches?.some(f=>f&&f.niveauMax>=3))event('Contrôle de sécurité du traitement · validation malgré alerte(s) de niveau 3 ou 4 · justificatif : '+justificatif,'Sécurité médicamenteuse');
+  detail();
+ };
+ window.IaseloSecuriteUI?.decorer($('#content'),stay,{physician:physician(),valider:validerLignes});
  const draft=$('#rxform');
  if(draft)draft.onsubmit=e=>{
   e.preventDefault();
@@ -631,12 +643,10 @@ function prescriptions(){
   event('Ligne du brouillon ajustée · '+(avant===name?name:avant+' → '+name),'Prescription');detail();
  });
  document.querySelectorAll('[data-validate]').forEach(button=>button.onclick=()=>{
-  const rx=stay.rx[Number(button.dataset.validate)];
+  const index=Number(button.dataset.validate),rx=stay.rx[index];
   if(!physician()||p()!==stay||!rx||rx.validated)return;
-  rx.validated=true;
-  rx.validatedAt=new Date().toLocaleString('fr-FR');
-  event('Validation médicale simulée · '+rx.name,'Prescription');
-  detail();
+  if(window.IaseloSecuriteUI){window.IaseloSecuriteUI.avantValidation(stay,[index],{physician:true,valider:validerLignes});return}
+  validerLignes([index],null,'');
  });
  document.querySelectorAll('[data-execute]').forEach(form=>{
   const status=form.elements.namedItem('status');
