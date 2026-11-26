@@ -37,15 +37,16 @@ function enrichir(l){
 }
 
 /* Lignes contrôlées : prescriptions médicamenteuses du séjour + traitement personnel déclaré en consultation. */
-function lignes(stay){
- const rx=(stay?.rx||[]).map((l,i)=>({...enrichir(l),_src:'rx',_i:i}));
+// doc : document contrôlé à la place des prescriptions postopératoires (prémédication, ordonnance de sortie).
+function lignes(stay,doc){
+ const rx=doc?(doc.lignes||[]).map((l,i)=>({category:'Médicament',...enrichir(l),_src:'doc',_i:i})):(stay?.rx||[]).map((l,i)=>({...enrichir(l),_src:'rx',_i:i}));
  const perso=R().traitementPersonnel(stay).map((l,i)=>({...enrichir(l),_src:'perso',_i:i}));
  return [...rx,...perso];
 }
 const allergiesFn=()=>root.IaseloAmeliorations?.controleAllergies||null;
-function analyser(stay){
+function analyser(stay,doc){
  const S=R();const t=S.terrain(stay);
- return S.analyser(lignes(stay),{terrain:t,allergies:allergiesFn()});
+ return S.analyser(lignes(stay,doc),{terrain:t,allergies:allergiesFn()});
 }
 function itemRx(res,index){return res.lignes.find(it=>it.ligne._src==='rx'&&it.ligne._i===index)}
 const visibles=(it,min)=>it.alertes.filter(a=>a.n>=min);
@@ -54,9 +55,9 @@ const visibles=(it,min)=>it.alertes.filter(a=>a.n>=min);
 function compteursHTML(c,min=0){
  return `<span class="st-levels" role="group" aria-label="Alertes par niveau">${[4,3,2,1,0].map(n=>`<span class="st-level st-n${n}${n<min?' is-off':''}" title="${ESC(NOM_N[n])}"><b>${LIB_N[n]}</b><small>${c.niveaux[n]}</small></span>`).join('')}</span>`;
 }
-function bandeau(stay){
+function bandeau(stay,doc){
  if(!R())return '';
- const res=analyser(stay),med=res.lignes.filter(it=>it.securisee);
+ const res=analyser(stay,doc),med=res.lignes.filter(it=>it.securisee);
  if(!res.lignes.length)return '';
  const c=res.compteurs,max=[4,3,2,1,0].find(n=>c.niveaux[n]>0);
  const non=res.lignes.filter(it=>!it.securisee&&it.ligne.category==='Médicament').length;
@@ -103,8 +104,9 @@ function resumeLigne(it){
  if(L.duree&&L.duree.jours)parts.push('pendant '+L.duree.jours+' jour(s)');
  return parts.join(' · ');
 }
-function statutLigne(l){return l._src==='perso'?'<span class="st-tag is-perso">Traitement personnel</span>':l.validated?'<span class="st-tag is-ok">Validée</span>':'<span class="st-tag is-draft">Brouillon</span>'}
-function tableHTML(res,reg,focus){
+let etiquetteDoc='Document';
+function statutLigne(l){return l._src==='doc'?`<span class="st-tag is-draft">${ESC(etiquetteDoc)}</span>`:l._src==='perso'?'<span class="st-tag is-perso">Traitement personnel</span>':l.validated?'<span class="st-tag is-ok">Validée</span>':'<span class="st-tag is-draft">Brouillon</span>'}
+function tableHTML(res,reg,focus,src='rx'){
  const S=R(),cols=S.COLONNES,sec=res.lignes.filter(it=>it.securisee);
  const lignesVis=sec.filter(it=>!reg.avec||visibles(it,reg.min).length);
  const parCol=Object.fromEntries(cols.map(c=>[c.id,sec.reduce((s,it)=>s+it.alertes.filter(a=>a.col===c.id&&a.n>=reg.min).length,0)]));
@@ -115,7 +117,7 @@ function tableHTML(res,reg,focus){
   return `<ul class="st-alerts">${l.map(a=>`<li class="st-n${a.n}">${icone(a.n)}<div><b>${ESC(S.NOMS_COL[a.col])} · ${ESC(a.titre)}</b><span class="st-lvl">Niveau ${LIB_N[a.n]} · ${ESC(NOM_N[a.n])}</span><p>${ESC(a.texte)}</p>${a.cat?`<p class="st-cat">Conduite à tenir : ${ESC(a.cat)}</p>`:''}${a.avec!=null?`<p class="st-mut">Avec : ${ESC(res.lignes[a.avec]?.ligne?.name||'')}</p>`:''}</div></li>`).join('')}</ul>`};
  return `<div class="st-scroll"><table class="st-table">
   <thead><tr><th scope="col" class="st-rxcol">Prescription</th>${cols.map(c=>`<th scope="col" title="${ESC(c.aide)}"><span>${ESC(c.label)}</span><small>(${parCol[c.id]})</small></th>`).join('')}</tr></thead>
-  <tbody>${lignesVis.map(it=>`<tr class="st-row${it.ligne._src==='rx'&&it.ligne._i===focus?' is-focus':''}${it.ligne._src==='perso'?' is-perso':''}" data-st-row="${it.index}">
+  <tbody>${lignesVis.map(it=>`<tr class="st-row${it.ligne._src===src&&it.ligne._i===focus?' is-focus':''}${it.ligne._src==='perso'?' is-perso':''}" data-st-row="${it.index}">
    <th scope="row" class="st-rxcol"><div class="st-rxname">${ESC(it.ligne.name)} ${statutLigne(it.ligne)}</div>
     ${resumeLigne(it)?`<div class="st-rxposo">${ESC(resumeLigne(it))}</div>`:''}
     ${it.ligne.instructions?`<div class="st-rxins">${ESC(it.ligne.instructions)}</div>`:''}
@@ -130,18 +132,19 @@ function terrainHTML(t){
 
 function ouvrir(stay,opts={}){
  if(!R())return;
- const reg=reglages();let res=analyser(stay),focus=opts.focus??null;
+ const doc=opts.doc||null;etiquetteDoc=doc?.etiquette||'Document';
+ const reg=reglages();let res=analyser(stay,doc),focus=opts.focus??null;
  const indicesValidation=opts.indices||null;// lignes à valider (null : consultation)
- const peutValider=!!opts.physician&&typeof opts.valider==='function';
+ const peutValider=doc?typeof doc.valider==='function'&&opts.signature===true:!!opts.physician&&typeof opts.valider==='function';
+ const SRC=doc?'doc':'rx';
  const d=document.createElement('dialog');d.className='st-dialog';d.setAttribute('aria-labelledby','st-title');
  document.body.append(d);
  const brouillons=()=>(stay.rx||[]).map((r,i)=>({r,i})).filter(x=>!x.r.validated&&x.r.category==='Médicament').map(x=>x.i);
- const cibles=()=>indicesValidation||brouillons();
+ const cibles=()=>doc?(doc.lignes||[]).map((_,i)=>i):indicesValidation||brouillons();
  function rendre(){
   const c=res.compteurs,non=res.lignes.filter(it=>!it.securisee);
-  const cib=cibles(),bloq=R().bloquantes(res,SEUIL_JUSTIFICATIF,cib).filter(it=>it.ligne._src==='rx').map(it=>it.ligne._i);
-  const bloqIdx=res.lignes.filter(it=>it.ligne._src==='rx'&&cib.includes(it.ligne._i)&&it.securisee).map(it=>it.index);
-  d.innerHTML=`<div class="st-head"><h2 id="st-title">Alertes du contrôle de sécurité du traitement en cours</h2><button type="button" class="icon" data-st-close aria-label="Fermer">×</button></div>
+  const cib=cibles(),bloq=res.lignes.filter(it=>it.ligne._src===SRC&&cib.includes(it.ligne._i)&&it.securisee&&it.alertes.some(a=>a.n>=SEUIL_JUSTIFICATIF)).map(it=>it.ligne._i);
+  d.innerHTML=`<div class="st-head"><h2 id="st-title">Alertes du contrôle de sécurité ${doc?'· '+ESC(doc.titre):'du traitement en cours'}</h2><button type="button" class="icon" data-st-close aria-label="Fermer">×</button></div>
   ${terrainHTML(res.terrain)}
   <div class="st-toolbar">
    <label class="st-min">Niveau minimum<select data-st-min>${[4,3,2,1,0].map(n=>`<option value="${n}" ${reg.min===n?'selected':''}>${LIB_N[n]} · ${ESC(NOM_N[n])}</option>`).join('')}</select></label>
@@ -150,7 +153,7 @@ function ouvrir(stay,opts={}){
    <button type="button" class="secondary st-detail-btn${reg.detail?' is-on':''}" data-st-detailall aria-pressed="${reg.detail}">Détail</button>
    <div class="st-seg" role="group" aria-label="Prescriptions affichées"><span>Prescriptions</span><button type="button" class="${reg.avec?'':'is-on'}" data-st-avec="0" aria-pressed="${!reg.avec}">Toutes</button><button type="button" class="${reg.avec?'is-on':''}" data-st-avec="1" aria-pressed="${reg.avec}">Avec alertes</button></div>
   </div>
-  ${tableHTML(res,reg,focus)}
+  ${tableHTML(res,reg,focus,SRC)}
   <div class="st-cellpop" hidden></div>
   <details class="st-non" ${non.length?'':'hidden'}><summary>${ICON.chevron}Les prescriptions non envoyées à la sécurisation (${non.length})</summary>
    <ul>${non.map(it=>`<li><b>${ESC(it.ligne.name)}</b> ${statutLigne(it.ligne)}<span class="st-mut"> · ${ESC(it.raison)}</span></li>`).join('')}</ul>
@@ -159,10 +162,10 @@ function ouvrir(stay,opts={}){
    <label>Justificatif de la validation${bloq.length?' <span class="st-req">obligatoire : '+bloq.length+' ligne(s) avec une alerte de niveau 3 ou 4</span>':' <span class="st-mut">(facultatif)</span>'}
    <textarea name="justificatif" maxlength="1000" ${bloq.length?'required minlength="10"':''} placeholder="Ex. : association maintenue après avis, ECG et kaliémie prévus ; dose vérifiée pour le poids…"></textarea></label>
    <p class="st-err" role="alert"></p>
-   <div class="st-foot"><p class="st-mut">${cib.length} ligne(s) à valider : ${cib.map(i=>ESC(stay.rx[i]?.name||'')).join(', ')}</p><div class="actions"><button type="button" class="secondary" data-st-close>Annuler</button><button class="primary">${cib.length>1?'Valider les '+cib.length+' lignes':'Valider la ligne'}</button></div></div>
-  </form>`:`<div class="st-foot"><p class="st-mut">${peutValider?'Aucune ligne médicamenteuse au brouillon.':'Lecture seule : la validation est réservée au médecin prescripteur.'}</p><div class="actions"><button type="button" class="secondary" data-st-close>Fermer</button></div></div>`}
+   <div class="st-foot"><p class="st-mut">${doc?ESC(doc.titre)+' : '+cib.length+' médicament(s)':cib.length+' ligne(s) à valider : '+cib.map(i=>ESC(stay.rx[i]?.name||'')).join(', ')}</p><div class="actions"><button type="button" class="secondary" data-st-close>Annuler</button><button class="primary">${doc?ESC(doc.action||'Valider'):cib.length>1?'Valider les '+cib.length+' lignes':'Valider la ligne'}</button></div></div>
+  </form>`:`<div class="st-foot"><p class="st-mut">${doc?(doc.note||''):peutValider?'Aucune ligne médicamenteuse au brouillon.':'Lecture seule : la validation est réservée au médecin prescripteur.'}</p><div class="actions"><button type="button" class="secondary" data-st-close>Fermer</button></div></div>`}
   <p class="st-source">Base de règles IASELO (molécules courantes en périopératoire ; thésaurus des interactions de l’ANSM, RCP de la BDPM, liste de l’AMA). Elle ne remplace pas une base de données médicamenteuse agréée ni la lecture du RCP. Règles à faire relire par la pharmacie.</p>`;
-  brancher(bloq,bloqIdx);
+  brancher(bloq);
  }
  function brancher(bloq){
   d.querySelectorAll('[data-st-close]').forEach(b=>b.onclick=()=>d.close());
@@ -191,6 +194,7 @@ function ouvrir(stay,opts={}){
    const just=String(f.justificatif.value||'').trim(),err=f.querySelector('.st-err');
    if(bloq.length&&!R().justificatifValide(just)){err.textContent='Indiquez le justificatif de la validation (10 caractères au moins) : il est tracé dans le dossier.';f.justificatif.focus();return}
    const cib=cibles();
+   if(doc){d.close();doc.valider(ficheDoc(res,just),just);return}
    const fiches=cib.map(i=>fiche(res,i,just));
    d.close();opts.valider(cib,fiches,just);
   };
@@ -200,7 +204,7 @@ function ouvrir(stay,opts={}){
  d.addEventListener('close',()=>d.remove());
  rendre();d.showModal();
  // Substances de la BDPM : relance l'analyse quand le catalogue est disponible (médicaments saisis par nom commercial).
- if(!bdpm)chargerBdpm().then(b=>{if(b&&d.open){res=analyser(stay);rendre()}});
+ if(!bdpm)chargerBdpm().then(b=>{if(b&&d.open){res=analyser(stay,doc);rendre()}});
 }
 // Trace enregistrée sur la ligne validée.
 function fiche(res,index,justificatif){
@@ -211,6 +215,32 @@ function fiche(res,index,justificatif){
   alertes:al.filter(a=>a.n>=2).slice(0,12).map(a=>({col:a.col,n:a.n,titre:a.titre})),
   justificatif:max!=null&&max>=SEUIL_JUSTIFICATIF?justificatif:(justificatif||'')};
 }
+// Trace d'un document signé (toutes ses lignes).
+function ficheDoc(res,justificatif){
+ const its=res.lignes.filter(it=>it.ligne._src==='doc'),al=its.flatMap(it=>it.alertes.map(a=>({...a,ligne:it.ligne.name})));
+ const max=al.length?Math.max(...al.map(a=>a.n)):null,c={4:0,3:0,2:0,1:0,0:0};al.forEach(a=>c[a.n]++);
+ return {at:new Date().toISOString(),lignes:its.length,nonSecurisees:its.filter(it=>!it.securisee).map(it=>it.ligne.name).slice(0,12),niveauMax:max,compteurs:c,
+  alertes:al.filter(a=>a.n>=2).slice(0,15).map(a=>({ligne:a.ligne,col:a.col,n:a.n,titre:a.titre})),justificatif:justificatif||''};
+}
+/* Document (prémédication, ordonnance de sortie) : signature directe sans alerte de niveau 3 ou 4, sinon écran du
+   contrôle avec justificatif obligatoire. doc = {titre, etiquette, action, lignes:[{name,instructions,ponctuel}], valider(fiche, justificatif)}. */
+function controlerDocument(stay,doc){
+ if(!R()){doc.valider(null,'');return}
+ const res=analyser(stay,doc);
+ if(!res.lignes.some(it=>it.ligne._src==='doc'&&it.alertes.some(a=>a.n>=SEUIL_JUSTIFICATIF))){doc.valider(ficheDoc(res,''),'');return}
+ ouvrir(stay,{doc,signature:true});
+}
+// Bandeau de synthèse placé avant l'élément ancre ; le bouton ouvre le contrôle en consultation.
+function decorerDocument(ancre,stay,doc){
+ if(!R()||!ancre)return;
+ ancre.parentElement?.querySelector(':scope>[data-st-band]')?.remove();
+ if(!(doc.lignes||[]).length)return;
+ const html=bandeau(stay,doc);if(!html)return;
+ ancre.insertAdjacentHTML('beforebegin',html);
+ const band=ancre.previousElementSibling;band.querySelector('b').textContent='Contrôle de sécurité · '+doc.titre;
+ band.querySelector('[data-st-open]').onclick=()=>ouvrir(stay,{doc:{...doc,note:doc.note||'Le contrôle est refait à la signature.'}});
+}
+const ligneSignee=s=>s?`<p class="st-trace">${ICON.shield}Contrôle de sécurité du traitement effectué${s.niveauMax!=null?' · niveau le plus élevé '+ESC(LIB_N[s.niveauMax]):' · aucune alerte'}${s.justificatif?' · justificatif : « '+ESC(s.justificatif)+' »':''}</p>`:'';
 /* Validation d'une ou plusieurs lignes : directe s'il n'y a pas d'alerte de niveau 3 ou 4, sinon écran du contrôle
    avec justificatif obligatoire. valider(indices, fiches, justificatif) applique la validation. */
 function avantValidation(stay,indices,opts){
@@ -220,5 +250,5 @@ function avantValidation(stay,indices,opts){
  ouvrir(stay,{...opts,indices,focus:indices[0]});
 }
 
-root.IaseloSecuriteUI={bandeau,decorer,ouvrir,avantValidation,analyser,SEUIL_JUSTIFICATIF};
+root.IaseloSecuriteUI={bandeau,decorer,ouvrir,avantValidation,analyser,controlerDocument,decorerDocument,ligneSignee,SEUIL_JUSTIFICATIF};
 })(window);

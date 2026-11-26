@@ -146,6 +146,7 @@ window.createPrescriptionsPreop=function(ctx){
     <div class="pp-side">
      <section class="v-card pp-actions">
       ${x.signed?`<p class="pp-signed">${ICON.sign}<span>Signée par <b>${esc(x.signed.name)}</b> le ${esc(fmt(x.signed.at))}</span></p>`:''}
+      ${x.signed&&x.securite?.version===x.draft.version?window.IaseloSecuriteUI?.ligneSignee(x.securite)||'':''}
       <div id="pp-check"></div>
       ${editable&&window.IaseloProtocolesUI?`<button type="button" class="secondary pr-reprendre" id="pp-protocole">Reprendre un protocole</button>`:''}
       ${x.protocoles.length?`<p class="pr-repris">Protocoles repris : ${x.protocoles.slice(0,5).map(r=>`<b>${esc(r.nom)}</b> (version ${r.version}, ${esc(fmt(r.at))}, ${esc(r.par)})`).join(' · ')}</p>`:''}
@@ -176,8 +177,17 @@ window.createPrescriptionsPreop=function(ctx){
   if(form)bindRemove();
   const rl=$('#pp-reload-trt');if(rl)rl.onclick=()=>{sync();x.draft.traitements.items=R.traitementsProposes(s,V);panel();toast('Consignes reprises depuis le dossier')};
   form?.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>{const ta=form.querySelector('[name=autres]'),q=QUICK[b.dataset.quick];if(!ta.value.includes(q))ta.value=(ta.value.trim()?ta.value.trim()+'\n':'')+q;sync()});
+  // Contrôle de sécurité du traitement (securite-traitement.js) : prémédication + traitement personnel du dossier.
+  const docSecurite=()=>({titre:'Prescriptions préopératoires',etiquette:'Prémédication',action:'Signer les prescriptions',
+   lignes:x.draft.premed.filter(r=>r.drug).map(r=>({name:r.drug,instructions:[r.dose,r.moment].filter(Boolean).join(' · '),ponctuel:true}))});
+  const ancre=$('#pp-check');if(ancre&&window.IaseloSecuriteUI)window.IaseloSecuriteUI.decorerDocument(ancre,s,docSecurite());
   const sg=$('#pp-sign');if(sg)sg.onclick=async()=>{
    sync();const res=R.controler(x.draft,{allergies:allergies(s),A,surgeryDate:surgeryDate(s)});showCheck(res);if(!res.ok){toast('Corrigez les points signalés avant de signer');return}
+   if(window.IaseloSecuriteUI)window.IaseloSecuriteUI.controlerDocument(s,{...docSecurite(),valider:(fiche,just)=>{if(cur()?.id===s.id&&!x.signed)signer(fiche,just)}});else signer(null,'');
+  };
+  const signer=async(fiche,just)=>{
+   if(fiche)x.securite={...fiche,par:who(),version:x.draft.version};
+   if(fiche&&fiche.niveauMax>=3)trace(s,'Contrôle de sécurité du traitement · prescriptions préopératoires signées malgré alerte(s) de niveau '+fiche.niveauMax+' · justificatif : '+just+' ('+who()+')');
    const p=profile();
    x.signed={at:new Date().toISOString(),name:who(),userId:p?.user_id||'',rpps:p?.rpps||'',specialty:job()==='chirurgien'||ctx.role()==='Chirurgien'?'Chirurgie':'Anesthésie-réanimation',version:x.draft.version,hash:await sha(R.canonique(x.draft))};
    x.history.unshift({version:x.draft.version,at:x.signed.at,by:x.signed.name});x.history=x.history.slice(0,20);

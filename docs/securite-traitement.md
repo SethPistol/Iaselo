@@ -4,7 +4,7 @@ Demande de Romain (26/11/2026) : reproduire l'écran E-med « Alertes du contrô
 
 ## Où
 
-Dossier › Prescription et suivi postopératoire › Prescriptions postopératoires :
+Dossier › Prescription et suivi postopératoire › Prescriptions postopératoires (et, depuis le 26/11, prescriptions préopératoires : prémédication contrôlée à la signature ; ordonnance de sortie : contrôlée à l’enregistrement, mêmes règles et même justificatif) :
 
 - bandeau de synthèse (compteurs par niveau) et bouton « Ouvrir le contrôle » ;
 - pastille « Contrôle : niveau N » sur chaque ligne ;

@@ -428,9 +428,9 @@ function analyser(lignes,opts={}){
   if(it.securisee&&!l.personnel){
    if(!L.dose)add(it,'manquant',2,'Dose absente','Aucune dose lisible (ex. « 1 g », « 4 mg ») dans les consignes.');
    if(!L.voie)add(it,'manquant',2,'Voie absente','Voie d’administration non précisée (IV, SC, PO…).');
-   if(!L.rythme&&!L.siBesoin)add(it,'manquant',1,'Rythme absent','Fréquence ou horaires d’administration non précisés.');
+   if(!L.rythme&&!L.siBesoin&&!l.ponctuel)add(it,'manquant',1,'Rythme absent','Fréquence ou horaires d’administration non précisés.');
    if(L.siBesoin&&!L.max&&!(L.rythme&&L.rythme.intervalleH))add(it,'manquant',1,'« Si besoin » sans limite','Préciser l’intervalle minimal et le nombre maximal de prises par 24 h.');
-   if(!L.duree)add(it,'manquant',0,'Durée absente','Durée du traitement ou date de fin non précisée (ex. « pendant 2 jours », « jusqu’à la sortie »).');
+   if(!L.duree&&!l.ponctuel)add(it,'manquant',0,'Durée absente','Durée du traitement ou date de fin non précisée (ex. « pendant 2 jours », « jusqu’à la sortie »).');
   }
   if(!it.securisee)continue;
   for(const m of it.mols){

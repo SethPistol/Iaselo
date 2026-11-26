@@ -808,6 +808,8 @@ function printDischargeDocument(html){
   sheet.remove();
  }
 }
+const docSortie=items=>({titre:'Ordonnance de sortie',etiquette:'Sortie',action:'Enregistrer l’ordonnance',
+ lignes:(items||[]).filter(i=>i?.drug).map(i=>({name:i.drug,instructions:[i.dose,i.route,i.frequency,i.duration,i.notes].filter(Boolean).join(' · ')}))});
 function dischargeRx(){
  const stay=p(),saved=stay.discharge.ordinance;
  const write=physician();
@@ -834,6 +836,7 @@ function dischargeRx(){
  </form>`:''}
  <section class="discharge-rx-preview"><h4>Aperçu imprimable</h4>
   ${write&&saved?'<button class="primary" id="print-discharge-rx" type="button">Imprimer l’ordonnance</button>':''}
+  ${saved?.securite?window.IaseloSecuriteUI?.ligneSignee(saved.securite)||'':''}
   ${doc}
  </section>`;
  if(!write)return;
@@ -859,6 +862,7 @@ function dischargeRx(){
   });
  }
  renderItems();
+ window.IaseloSecuriteUI?.decorerDocument($('#discharge-rx-error'),stay,docSortie(items));
  $('#discharge-rx-add').onclick=()=>{
   items=[...readItems(),{}];
   invalidatePreview();
@@ -923,11 +927,19 @@ function dischargeRx(){
    data.signature=saved.signature;
   }
   if(!physician()||p()!==stay||$('#discharge-rx-form')!==form)return;
-  stay.discharge.ordinance=data;
-  if(stay.identityDocumentReview)stay.identityDocumentReview.ordinance=false;
-  event('Ordonnance de sortie préparée · '+data.header.doctor,'Sortie');
-  detail();
-  $('#print-discharge-rx').focus();
+  const enregistrer=(fiche,justificatif)=>{
+   if(!physician()||p()!==stay)return;
+   if(fiche)data.securite={...fiche,par:role};
+   stay.discharge.ordinance=data;
+   if(stay.identityDocumentReview)stay.identityDocumentReview.ordinance=false;
+   if(fiche&&fiche.niveauMax>=3)event('Contrôle de sécurité du traitement · ordonnance de sortie enregistrée malgré alerte(s) de niveau '+fiche.niveauMax+' · justificatif : '+justificatif,'Sécurité médicamenteuse');
+   event('Ordonnance de sortie préparée · '+data.header.doctor,'Sortie');
+   detail();
+   $('#print-discharge-rx')?.focus();
+  };
+  // Contrôle de sécurité du traitement (securite-traitement.js) : justificatif exigé si alerte de niveau 3 ou 4.
+  if(window.IaseloSecuriteUI){window.IaseloSecuriteUI.controlerDocument(stay,{...docSortie(data.items),valider:enregistrer});return}
+  enregistrer(null,'');
  };
  const print=$('#print-discharge-rx');
  if(print)print.onclick=()=>{if(physician()&&p()===stay&&!preview.hidden)printDischargeDocument(dischargeRxDoc(stay.id,saved))};

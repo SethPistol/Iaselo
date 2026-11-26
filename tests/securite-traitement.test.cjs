@@ -100,3 +100,12 @@ test('validation : justificatif exigé pour une alerte de niveau 3 ou 4',()=>{
  assert.ok(S.MOLECULES.every(m=>m.nom&&m.a.length&&Array.isArray(m.c)),'base de règles bien formée');
  assert.ok(S.INTERACTIONS.every(([,, n])=>[1,2,3,4].includes(n)));
 });
+
+test('documents ponctuels (prémédication) : ni rythme ni durée exigés',()=>{
+ const res=S.analyser([rx('Atarax 25 mg','2 cp · La veille au soir',{ponctuel:true})],{terrain:terrainFictif({age:80})});
+ assert.deepEqual(alertes(res,0,'manquant').map(a=>a.titre),[]);
+ assert.ok(alertes(res,0,'misesEnGarde').some(a=>/Sujet âgé/.test(a.texte)));
+ const sortie=S.analyser([rx('Kétoprofène 100 mg LP','1 cp · Orale · 2 fois par jour · 5 jours'),rx('Ibuprofène 400 mg','1 cp · Orale · 3 fois par jour · 3 jours')],{terrain:terrainFictif()});
+ assert.equal(S.bloquantes(sortie,3).length,2,'deux AINS sur l’ordonnance de sortie');
+ assert.equal(alertes(sortie,0,'posologie').some(a=>/Durée maximale/.test(a.titre)),false,'5 jours de kétoprofène : durée maximale respectée');
+});
