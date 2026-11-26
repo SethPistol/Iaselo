@@ -19,7 +19,7 @@ test('plannings infirmiers : le cadre valide, les infirmières lisent sans modif
  const {db,pool,call,login,api}=await monter(true);
  try{
   const at=new Date().toISOString(),password='Mot de passe de test 2026',c={};
-  for(const [job,poste] of [['infirmier','cadre'],['infirmier','bloc'],['infirmier','etage'],['anesthesiste',''],['secretariat','']]){
+  for(const [job,poste] of [['infirmier','cadre'],['infirmier','cadre-etage'],['infirmier','bloc'],['infirmier','etage'],['anesthesiste',''],['secretariat','']]){
    const email=job+poste+'@example.test',id=await createAccount(pool,{email,name:'Nom '+job+' '+poste,passwordHash:await hashPassword(password)});
    await pool.query('UPDATE professional_profiles SET profession=$2,poste=$3,updated_at=$4 WHERE user_id=$1',[id,job,poste,at]);await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);
    await pool.query('UPDATE auth_users SET must_change_password=0 WHERE id=$1',[id]);c[poste||job]={id,cookie:await login(email,password)}}
@@ -76,6 +76,14 @@ test('plannings infirmiers : le cadre valide, les infirmières lisent sans modif
   await assert.rejects(pool.query("UPDATE nurse_schedule_versions SET motif='x'"));await assert.rejects(pool.query('DELETE FROM nurse_schedule_versions'));
   const log=(await pool.query("SELECT action,result FROM professional_access_log WHERE target LIKE 'plannings-infirmiers%'")).rows;
   assert.ok(log.some(x=>x.action==='planning-valide')&&log.some(x=>x.action==='planning-enregistre')&&log.filter(x=>x.result==='denied').length>=8);
+  // Cadre d'étage : gère l'étage et, en remplacement, le bloc ; garde les droits d'une infirmière d'étage ailleurs.
+  const ce=c['cadre-etage'].cookie;r=await api(ce,'GET','?mois='+m);assert.equal(r.data.service,'etage','service par défaut : le sien');assert.deepEqual(r.data.services,['etage','bloc']);assert.equal(r.data.peutGerer,true);
+  r=await api(ce,'GET','?service=bloc&mois='+m);assert.equal(r.data.planning.version,5);
+  r=await api(ce,'POST','',{action:'enregistrer',service:'bloc',mois:m,version:5,planning:p2,motif:'Remplacement du cadre de bloc'});assert.equal(r.status,200);assert.equal(r.data.statut,'modifie');
+  r=await api(ce,'POST','',{action:'valider',service:'bloc',mois:m,version:6,motif:'Validé en remplacement du cadre de bloc'});assert.equal(r.status,200);
+  assert.equal((await api(ibloc,'GET','?service=bloc&mois='+m)).data.planning.validePar,'Nom infirmier cadre-etage');
+  r=await api(cadre,'POST','',{action:'enregistrer',service:'etage',mois:m,planning:p1});assert.equal(r.status,200,'le cadre de bloc gère aussi l’étage');
+  assert.equal((await call('GET','/api/workspace/ouverture-salles',undefined,ce)).status,403,'cadre d’étage : pas de droits du bloc');
   // Comptes de test de recette : cadre et infirmières.
   for(const e of [RECETTE_CADRE_EMAIL,...RECETTE_INFIRMIERES.map(x=>x.email)])assert.equal((await pool.query('SELECT id FROM auth_users WHERE email=$1',[e])).rows.length,1);
   assert.ok(RECETTE_CADRE_PASSWORD);

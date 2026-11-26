@@ -137,7 +137,7 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   if(!PROFESSIONS.includes(profession))return Response.json({error:'Métier inconnu.'},{status:400});
   // Infirmier(ère) : poste de bloc (check-list HAS, ouverture des salles) ou d'étage. Par défaut : étage.
   // Pharmacie : pharmacien (par défaut) ou préparateur en pharmacie.
-  const poste=profession==='infirmier'?String(d.poste||'etage'):profession==='pharmacien'?String(d.poste||'pharmacien'):'';if(poste&&!(profession==='infirmier'?['bloc','etage','cadre']:['pharmacien','preparateur']).includes(poste))return Response.json({error:'Poste inconnu : bloc, étage ou cadre de bloc (infirmier), pharmacien ou préparateur (pharmacie).'},{status:400});
+  const poste=profession==='infirmier'?String(d.poste||'etage'):profession==='pharmacien'?String(d.poste||'pharmacien'):'';if(poste&&!(profession==='infirmier'?['bloc','etage','cadre','cadre-etage']:['pharmacien','preparateur']).includes(poste))return Response.json({error:'Poste inconnu : bloc, étage, cadre de bloc ou cadre d’étage (infirmier), pharmacien ou préparateur (pharmacie).'},{status:400});
   if(rpps&&!/^\d{11}$/.test(rpps))return Response.json({error:'Le RPPS comporte 11 chiffres.'},{status:400});
   // Le motif n'est plus demandé dans le formulaire : la trace garde un libellé par défaut.
   const motif=reason||'Création du compte par l’administrateur';

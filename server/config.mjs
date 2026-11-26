@@ -8,7 +8,7 @@ export const RECETTE_CHIRURGIEN_EMAIL='chirurgien@iaselo.test',RECETTE_CHIRURGIE
 // Compte cadre de bloc de test (26/11/2026), créé uniquement en recette : infirmier(ère) au poste « cadre ».
 export const RECETTE_CADRE_EMAIL='cadre@iaselo.test',RECETTE_CADRE_PASSWORD='Cadre de bloc IASELO 2026';
 // Comptes infirmier(ère)s de test (26/11/2026), créés uniquement en recette : consultation des plannings en lecture seule.
-export const RECETTE_INFIRMIERES=[{email:'infirmiere.bloc@iaselo.test',password:'Infirmiere bloc IASELO 2026',name:'Infirmière de bloc (recette)',poste:'bloc'},{email:'infirmiere.etage@iaselo.test',password:'Infirmiere etage IASELO 2026',name:'Infirmière d’étage (recette)',poste:'etage'}];
+export const RECETTE_INFIRMIERES=[{email:'infirmiere.bloc@iaselo.test',password:'Infirmiere bloc IASELO 2026',name:'Infirmière de bloc (recette)',poste:'bloc'},{email:'infirmiere.etage@iaselo.test',password:'Infirmiere etage IASELO 2026',name:'Infirmière d’étage (recette)',poste:'etage'},{email:'cadre.etage@iaselo.test',password:'Cadre etage IASELO 2026',name:'Cadre d’étage (recette)',poste:'cadre-etage'}];
 export function recette(env=process.env){return env.IASELO_RECETTE==='true'}
 function recetteEnv(env){
  if(!recette(env))return env;const out={...env};

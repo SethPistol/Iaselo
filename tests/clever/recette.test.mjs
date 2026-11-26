@@ -10,7 +10,7 @@ test('recette : configuration déduite de Clever Cloud, sans réglage manuel',()
 });
 test('recette : compte de test créé une seule fois, affiché uniquement en recette',async()=>{
  const db=new PGlite(),pool=pgPool(db);try{await migrate(pool);await bootstrap(pool,{IASELO_RECETTE:'true'});await bootstrap(pool,{IASELO_RECETTE:'true'});
- const {rows}=await pool.query('SELECT email,password_hash FROM auth_users WHERE email<>ALL($1)',[['chirurgien@iaselo.test','cadre@iaselo.test','infirmiere.bloc@iaselo.test','infirmiere.etage@iaselo.test']]);assert.equal(rows.length,1);assert.equal(rows[0].email,RECETTE_EMAIL);assert.equal(await verifyPassword(RECETTE_PASSWORD,rows[0].password_hash),true);
+ const {rows}=await pool.query('SELECT email,password_hash FROM auth_users WHERE email<>ALL($1)',[['chirurgien@iaselo.test','cadre@iaselo.test','infirmiere.bloc@iaselo.test','infirmiere.etage@iaselo.test','cadre.etage@iaselo.test']]);assert.equal(rows.length,1);assert.equal(rows[0].email,RECETTE_EMAIL);assert.equal(await verifyPassword(RECETTE_PASSWORD,rows[0].password_hash),true);
  const {rows:[member]}=await pool.query("SELECT role FROM workspace_members WHERE role='owner'");assert.equal(member.role,'owner');
  const {rows:teams}=await pool.query('SELECT DISTINCT t.label FROM care_teams t JOIN professional_teams m ON m.team_id=t.id ORDER BY t.label');assert.deepEqual(teams.map(t=>t.label),['Chirurgie','Endoscopie','Séjour médical']);}finally{await db.close()}
  assert.match(loginPage('',true),/Serveur de recette/);assert.doesNotMatch(loginPage('',false),/Recette IASELO|demo@iaselo/);

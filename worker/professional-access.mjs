@@ -37,6 +37,8 @@ export async function professionalAccess(env,request,user,member,at){
  // Pharmacie (26/11/2026) : poste « pharmacien » (titulaire, adjoint) ou « preparateur ». Le préparateur ne fait ni
  // l'analyse ni la validation pharmaceutique des prescriptions, et ne valide pas les commandes aux fournisseurs.
  const poste=job==='infirmier'?(['bloc','cadre'].includes(profile.poste)?profile.poste:'etage'):job==='pharmacien'?(profile.poste==='preparateur'?'preparateur':'pharmacien'):'',bloc=job!=='infirmier'||poste!=='etage',cadre=job==='infirmier'&&poste==='cadre';
+ // Cadre d'étage (26/11/2026) : droits d'une infirmière d'étage (poste « etage ») + gestion des plannings infirmiers.
+ const cadreEtage=job==='infirmier'&&profile.poste==='cadre-etage';
  // Annonce chirurgicale (24/11/2026, demande de Romain) : chirurgien, anesthésiste, secrétariat et cadre de bloc ; ils peuvent aussi créer le séjour d'un nouveau patient.
  const annonceJob=['chirurgien','anesthesiste','secretariat'].includes(job)||cadre,createJob=['anesthesiste','chirurgien','secretariat'].includes(job)||cadre;
  if(!active||['unassigned','administration'].includes(job))allowed.clear();
@@ -174,7 +176,7 @@ export async function professionalAccess(env,request,user,member,at){
  function policyGuard(){return DB.prepare('INSERT INTO workspace_write_checks(operation,valid) VALUES(?,CASE WHEN (SELECT revision FROM professional_policy_revision WHERE id=1)=? THEN 1 ELSE 0 END)').bind('policy-'+crypto.randomUUID(),epoch);}
  // Périmètre d'un élément de liste partagée (même règle que merge) : voir worker/items.mjs.
  function inScope(row,key,id){const [group,name]=key.split('/');if(name==='patientDrafts')return allowed.has(id);if(group==='identities'||['pmsi','invoices'].includes(name))return Array.isArray(row)&&(name==='reviews'?String(row[0]).split('|').every(x=>allowed.has(x)):allowed.has(row[0]));return allowed.has(row?.patient)}
- return {get planningError(){return nursingError||planningError},profile:{...profile,poste,isAdmin},teams,allowed,epoch,active,job,poste,bloc,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,inScope,policyGuard,log,fileReferences};
+ return {get planningError(){return nursingError||planningError},profile:{...profile,poste,cadreEtage,isAdmin},teams,allowed,epoch,active,job,poste,cadreEtage,bloc,isAdmin,nursingPeople,planningOccupancy,canRead,filter,keyWrite,authorizeDocs,inScope,policyGuard,log,fileReferences};
 }
 export {professions};
 export async function professionalRoutes(acl,request,env,json,body){
@@ -206,7 +208,7 @@ export async function professionalRoutes(acl,request,env,json,body){
  if(path==='/api/workspace/access/account'){
   const existing=await DB.prepare('SELECT * FROM professional_profiles WHERE user_id=?').bind(d.userId||'').first();
   if(!existing||!Object.hasOwn(professions,d.profession)||typeof d.active!=='boolean'||d.userId===user&&!d.active)return json({error:'Compte, métier ou état invalide. Le propriétaire ne peut pas désactiver son propre compte.'},400);
-  const poste=d.profession==='infirmier'?String(d.poste||(existing.profession==='infirmier'&&existing.poste)||'etage'):d.profession==='pharmacien'?String(d.poste||(existing.profession==='pharmacien'&&existing.poste)||'pharmacien'):'';if(poste&&!(d.profession==='infirmier'?['bloc','etage','cadre']:['pharmacien','preparateur']).includes(poste))return json({error:'Poste invalide : bloc, étage ou cadre de bloc pour un(e) infirmier(ère), pharmacien ou préparateur pour la pharmacie.'},400);
+  const poste=d.profession==='infirmier'?String(d.poste||(existing.profession==='infirmier'&&existing.poste)||'etage'):d.profession==='pharmacien'?String(d.poste||(existing.profession==='pharmacien'&&existing.poste)||'pharmacien'):'';if(poste&&!(d.profession==='infirmier'?['bloc','etage','cadre','cadre-etage']:['pharmacien','preparateur']).includes(poste))return json({error:'Poste invalide : bloc, étage, cadre de bloc ou cadre d’étage pour un(e) infirmier(ère), pharmacien ou préparateur pour la pharmacie.'},400);
   const rpps=String(d.rpps||'').trim();if(rpps&&!/^1\d{10}$/.test(rpps))return json({error:'RPPS déclaratif invalide : onze chiffres commençant par 1 attendus.'},400);
   if(rpps&&await DB.prepare('SELECT user_id FROM professional_profiles WHERE rpps=? AND user_id<>?').bind(rpps,d.userId).first())return json({error:'Ce RPPS est déjà renseigné sur un autre compte.'},409);
   await DB.prepare('UPDATE professional_profiles SET profession=?,active=?,rpps=?,updated_at=?,updated_by=? WHERE user_id=?').bind(d.profession,d.active?1:0,rpps,now,user,d.userId).run();if(Object.hasOwn(existing,'poste'))await DB.prepare('UPDATE professional_profiles SET poste=? WHERE user_id=?').bind(poste,d.userId).run();await acl.log('account-permissions',d.userId,'allowed',reason,JSON.stringify({before:{profession:existing.profession,poste:existing.poste||'',active:!!existing.active,rppsDeclared:!!existing.rpps},after:{profession:d.profession,poste,active:d.active,rppsDeclared:!!rpps}}));return json({saved:true});

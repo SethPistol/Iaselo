@@ -59,11 +59,11 @@ root.createPlanningsInfirmiers=function(ctx){
   if(!data){host.innerHTML='<p class="j-empty">Chargement…</p>';return}
   const pl=data.planning;let html=entete();
   if(cadre()){
-   const al=R.alertes(travail,mois),presents=new Set(travail.personnes.map(p=>p.userId).filter(Boolean)),dispo=(data.comptes||[]).filter(c=>!presents.has(c.userId)&&(service==='bloc'?c.poste!=='etage':c.poste==='etage'||c.poste==='cadre'));
+   const al=R.alertes(travail,mois),presents=new Set(travail.personnes.map(p=>p.userId).filter(Boolean)),dispo=(data.comptes||[]).filter(c=>!presents.has(c.userId)&&(service==='bloc'?c.poste!=='etage':c.poste!=='bloc'));
    html+=`<p class="pi-sub">Cliquez sur un outil puis sur les cases du planning. Les infirmier(ère)s ne voient que la dernière version <b>validée</b>.</p>
    <div class="pi-outils no-print" role="toolbar" aria-label="Codes du planning">${R.ORDRE.map(k=>`<button type="button" class="pi-tag pi-${R.CODES[k].ton} ${outil===k?'active':''}" data-pi-outil="${k}" title="${esc(R.CODES[k].label)}"><b>${esc(k)}</b> ${esc(R.CODES[k].label)}</button>`).join('')}<button type="button" class="pi-tag ${outil==='gomme'?'active':''}" data-pi-outil="gomme"><b>⌫</b> Effacer</button><button type="button" class="pi-tag ${outil==='detail'?'active':''}" data-pi-outil="detail"><b>✎</b> Horaires et remarque</button></div>
    ${grille(travail,true,null)}
-   <div class="pi-ajout no-print"><label>Ajouter une personne<select id="pi-compte"><option value="">Compte infirmier(ère)…</option>${dispo.map(c=>`<option value="${esc(c.userId)}">${esc(c.nom)} · ${c.poste==='cadre'?'cadre':c.poste==='bloc'?'bloc':'étage'}</option>`).join('')}</select></label><label>ou sans compte (intérim, renfort)<input id="pi-libre" maxlength="80" placeholder="Nom et prénom"></label><label>Fonction<input id="pi-fonction" maxlength="60" placeholder="IDE, IBODE, IADE, AS…"></label><button type="button" class="secondary" data-pi-ajouter>Ajouter</button>${!travail.personnes.length?'<button type="button" class="secondary" data-pi-reprendre>Reprendre l’équipe du mois précédent</button>':''}</div>
+   <div class="pi-ajout no-print"><label>Ajouter une personne<select id="pi-compte"><option value="">Compte infirmier(ère)…</option>${dispo.map(c=>`<option value="${esc(c.userId)}">${esc(c.nom)} · ${({cadre:'cadre de bloc','cadre-etage':'cadre d’étage',bloc:'bloc',etage:'étage'})[c.poste]||'étage'}</option>`).join('')}</select></label><label>ou sans compte (intérim, renfort)<input id="pi-libre" maxlength="80" placeholder="Nom et prénom"></label><label>Fonction<input id="pi-fonction" maxlength="60" placeholder="IDE, IBODE, IADE, AS…"></label><button type="button" class="secondary" data-pi-ajouter>Ajouter</button>${!travail.personnes.length?'<button type="button" class="secondary" data-pi-reprendre>Reprendre l’équipe du mois précédent</button>':''}</div>
    ${al.length?`<section class="notice warn pi-alertes"><strong>${al.length} alerte${al.length>1?'s':''} (repos de 11 h, 48 h par semaine, 6 jours d’affilée)</strong><ul>${al.slice(0,30).map(a=>`<li>${esc(a.message)}</li>`).join('')}</ul>${al.length>30?`<p>… et ${al.length-30} autre(s).</p>`:''}<p>Vous pouvez valider malgré tout en indiquant le motif : il est conservé dans l’historique.</p></section>`:''}
    <div class="pi-actions no-print"><label>Motif ${pl&&pl.statut!=='brouillon'||al.length?'(exigé : planning déjà validé ou alertes)':'(facultatif)'}<input id="pi-motif" maxlength="300" placeholder="Ex. : remplacement d’un arrêt, échange accepté par les deux agents"></label>
     <button type="button" class="primary" data-pi-enregistrer ${envoi||!modifie?'disabled':''}>Enregistrer${modifie?' les modifications':''}</button>
@@ -71,7 +71,7 @@ root.createPlanningsInfirmiers=function(ctx){
    ${legende()}
    <details class="pi-hist no-print" ${historique?'open':''}><summary>Historique des versions et validations</summary><div id="pi-hist">${historique?historiqueHtml():'<p class="pi-sub">Chargement…</p>'}</div></details>`;
   }else{
-   html+=`<p class="notice pi-lecture">Lecture seule : ce planning est préparé et validé par le cadre. Pour un échange ou une absence, adressez-vous à votre cadre.</p>`;
+   html+=`<p class="notice pi-lecture">Lecture seule : ce planning est préparé et validé par un cadre. Pour un échange ou une absence, adressez-vous à votre cadre.</p>`;
    if(!pl)html+='<p class="notice">Le planning de ce mois n’est pas encore validé par le cadre.</p>';
    else{
     if(pl.miseAJourEnCours)html+='<p class="notice warn">Le cadre prépare une mise à jour de ce planning : la version ci-dessous reste celle qui s’applique jusqu’à sa validation.</p>';
@@ -121,7 +121,7 @@ root.createPlanningsInfirmiers=function(ctx){
    const sel=$('#pi-compte').value,libre=$('#pi-libre').value.trim(),fonction=$('#pi-fonction').value.trim();
    const compte=(data.comptes||[]).find(c=>c.userId===sel);if(!compte&&libre.length<3){toast?.('Choisissez un compte ou saisissez un nom.');return}
    const id='p-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-   travail.personnes.push({id,nom:compte?compte.nom:libre,fonction:fonction||(compte?(compte.poste==='cadre'?'Cadre':'IDE'):'Renfort'),userId:compte?.userId||null});modifie=true;draw()});
+   travail.personnes.push({id,nom:compte?compte.nom:libre,fonction:fonction||(compte?(compte.poste.startsWith('cadre')?'Cadre':'IDE'):'Renfort'),userId:compte?.userId||null});modifie=true;draw()});
   host.querySelector('[data-pi-reprendre]')?.addEventListener('click',async()=>{try{const j=await api('?'+new URLSearchParams({service,mois:R.moisVoisin(mois,-1)}));if(!j.planning?.personnes?.length){toast?.('Pas de planning le mois précédent.');return}travail.personnes=j.planning.personnes.map(p=>({...p}));modifie=true;draw()}catch(e){toast?.(e.message)}});
   host.querySelector('[data-pi-enregistrer]')?.addEventListener('click',()=>envoyer('enregistrer'));
   host.querySelector('[data-pi-valider]')?.addEventListener('click',()=>envoyer('valider'));

@@ -5,7 +5,8 @@
 //  POST /api/workspace/plannings-infirmiers {action:'valider', service, mois, version, motif?}                 cadre
 //
 // Droits, contrôlés ici et non par l'écran :
-//  - le cadre (infirmier(ère) au poste « cadre ») prépare, modifie et valide les plannings du bloc et de l'étage ;
+//  - les cadres (cadre de bloc, poste « cadre », et cadre d'étage, poste « cadre-etage ») préparent, modifient et valident
+//    les plannings ; chacun peut gérer le planning de l'autre service (remplacement, demande de Romain du 26/11/2026) ;
 //  - les infirmier(ère)s de bloc et d'étage lisent la dernière version VALIDÉE du planning de leur service, sans
 //    jamais voir un brouillon ni pouvoir enregistrer ou valider ; l'administrateur lit (direction des soins) ;
 //  - les autres métiers sont refusés.
@@ -23,10 +24,10 @@ const STATUTS={brouillon:'Brouillon',valide:'Validé',modifie:'Modifié depuis l
 
 export async function staffPlanningsInfirmiersApi(request,env,acl){
  const url=new URL(request.url);if(url.pathname!=='/api/workspace/plannings-infirmiers')return null;
- const DB=env.DB,cadre=acl.active&&acl.job==='infirmier'&&acl.poste==='cadre',admin=acl.active&&acl.isAdmin,infirmier=acl.active&&acl.job==='infirmier';
+ const DB=env.DB,cadreBloc=acl.active&&acl.job==='infirmier'&&acl.poste==='cadre',cadre=cadreBloc||acl.active&&acl.cadreEtage===true,admin=acl.active&&acl.isAdmin,infirmier=acl.active&&acl.job==='infirmier';
  if(!cadre&&!admin&&!infirmier){await acl.log('read','plannings-infirmiers','denied','Plannings réservés aux infirmier(ère)s, au cadre et à l’administrateur');return json({error:'Plannings infirmiers : réservés aux infirmier(ère)s, au cadre et à l’administrateur.'},403)}
  // Services lisibles : le cadre et l'administrateur voient les deux ; une infirmière voit celui de son poste.
- const services=cadre||admin?['bloc','etage']:[acl.poste==='bloc'?'bloc':'etage'];
+ const services=cadre?(cadreBloc?['bloc','etage']:['etage','bloc']):admin?['bloc','etage']:[acl.poste==='bloc'?'bloc':'etage'];
  const uid=acl.profile.user_id,gestion=cadre;
  const nomActeur=async()=>(await DB.prepare('SELECT display_name FROM professional_profiles WHERE user_id=?').bind(uid).first())?.display_name||uid;
  if(env.RECETTE===true)await semerRecette(DB).catch(e=>console.error('plannings_recette',e?.message||e));
@@ -43,7 +44,7 @@ export async function staffPlanningsInfirmiersApi(request,env,acl){
   }
   const base={service,mois,services,services_libelles:P.SERVICES,peutGerer:gestion,monId:uid};
   if(gestion||admin){
-   const comptes=gestion?(await DB.prepare("SELECT user_id,display_name,poste FROM professional_profiles WHERE profession='infirmier' AND active=1 ORDER BY display_name").all()).results.map(r=>({userId:r.user_id,nom:r.display_name,poste:r.poste==='cadre'?'cadre':r.poste==='bloc'?'bloc':'etage'})):[];
+   const comptes=gestion?(await DB.prepare("SELECT user_id,display_name,poste FROM professional_profiles WHERE profession='infirmier' AND active=1 ORDER BY display_name").all()).results.map(r=>({userId:r.user_id,nom:r.display_name,poste:['cadre','cadre-etage','bloc'].includes(r.poste)?r.poste:'etage'})):[];
    await acl.log('read',cible,'allowed',gestion?'Planning (cadre)':'Planning (lecture administrateur)');
    return json({...base,comptes,planning:row?{statut:row.statut,statutLibelle:STATUTS[row.statut],version:Number(row.version),hash:row.hash,miseAJour:row.updated_at,par:row.updated_by_name,valideLe:row.validated_at,validePar:row.validated_by_name,versionValidee:row.validated_version==null?null:Number(row.validated_version),...JSON.parse(row.data)}:null});
   }
@@ -55,7 +56,7 @@ export async function staffPlanningsInfirmiersApi(request,env,acl){
  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
  let d;try{d=await body(request)}catch{return json({error:'Requête illisible.'},400)}
  const action=String(d.action||''),service=String(d.service||''),mois=String(d.mois||''),cible='plannings-infirmiers/'+service+'/'+mois;
- if(!gestion){await acl.log('write',cible,'denied','Seul le cadre prépare et valide les plannings');return json({error:'Seul le cadre peut modifier ou valider un planning. Vous le consultez en lecture seule.'},403)}
+ if(!gestion){await acl.log('write',cible,'denied','Seuls les cadres préparent et valident les plannings');return json({error:'Seul un cadre (de bloc ou d’étage) peut modifier ou valider un planning. Vous le consultez en lecture seule.'},403)}
  if(!Object.hasOwn(P.SERVICES,service)||!P.moisOk(mois))return json({error:'Service ou mois invalide.'},400);
  const at=new Date().toISOString(),motif=String(d.motif||'').trim().slice(0,300),nom=await nomActeur();
  const row=await DB.prepare('SELECT * FROM nurse_schedules WHERE service=? AND mois=?').bind(service,mois).first();
@@ -100,7 +101,7 @@ export async function staffPlanningsInfirmiersApi(request,env,acl){
 const FICTIFS={bloc:['Camille Fictif-Martin','Léa Fictif-Bernard','Hugo Fictif-Petit','Inès Fictif-Robert','Nora Fictif-Garnier','Théo Fictif-Faure'],etage:['Manon Fictif-Leroy','Julie Fictif-Moreau','Sarah Fictif-Girard','Lucas Fictif-Blanc','Emma Fictif-Roux','Chloé Fictif-Henry']};
 const CYCLES={bloc:['J','J','R','J','J','R','R','J','R','R','G','R','R','A'],etage:['M','M','S','S','R','R','N','N','R','R','M','S','R','R']};
 export function planningFictif(service,mois,comptes=[]){
- const personnes=[...comptes.filter(c=>service==='bloc'?c.poste!=='etage':c.poste==='etage').map((c,i)=>({id:'compte-'+(i+1),nom:c.nom,fonction:c.poste==='cadre'?'Cadre':service==='bloc'?'IBODE / IDE de bloc':'IDE',userId:c.userId})),
+ const personnes=[...comptes.filter(c=>service==='bloc'?['bloc','cadre'].includes(c.poste):['etage','cadre-etage'].includes(c.poste)).map((c,i)=>({id:'compte-'+(i+1),nom:c.nom,fonction:c.poste.startsWith('cadre')?'Cadre':service==='bloc'?'IBODE / IDE de bloc':'IDE',userId:c.userId})),
   ...FICTIFS[service].map((nom,i)=>({id:'demo-'+service+'-'+(i+1),nom,fonction:service==='bloc'?(i%2?'IADE':'IBODE'):(i===5?'Aide-soignant(e)':'IDE'),userId:null}))];
  const affectations={},cycle=CYCLES[service];
  personnes.forEach((p,i)=>{const ligne={};P.joursDuMois(mois).forEach((d,j)=>{
@@ -118,9 +119,10 @@ async function semerRecette(DB){
  if(await DB.prepare('SELECT 1 AS x FROM nurse_schedules LIMIT 1').first())return;
  if(await DB.prepare('SELECT 1 AS x FROM nurse_schedule_versions LIMIT 1').first())return;
  const comptes=(await DB.prepare("SELECT u.email,p.user_id,p.display_name,p.poste FROM professional_profiles p JOIN auth_users u ON u.id=p.user_id WHERE u.email LIKE '%@iaselo.test' AND p.profession='infirmier'").all()).results.map(r=>({userId:r.user_id,nom:r.display_name,poste:r.poste,email:r.email}));
- const auteur=comptes.find(c=>c.poste==='cadre'),at=new Date().toISOString(),uid=auteur?.userId||'recette',nom=auteur?.nom||'Cadre de bloc (recette)';
+ const at=new Date().toISOString();
  const m0=moisCourant(),m1=P.moisVoisin(m0,1),statements=[];
  for(const service of ['bloc','etage'])for(const [mois,valide] of [[m0,true],[m1,false]]){
+  const auteur=comptes.find(c=>c.poste===(service==='bloc'?'cadre':'cadre-etage'))||comptes.find(c=>c.poste==='cadre'),uid=auteur?.userId||'recette',nom=auteur?.nom||'Cadre (recette)';
   const planning=planningFictif(service,mois,comptes),texte=P.canonique(planning),hash=sha(texte);
   statements.push(DB.prepare('INSERT INTO nurse_schedules(service,mois,statut,version,data,hash,updated_at,updated_by,updated_by_name,validated_version,validated_at,validated_by_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING').bind(service,mois,valide?'valide':'brouillon',valide?2:1,texte,hash,at,uid,nom,valide?2:null,valide?at:null,valide?nom:null));
   statements.push(DB.prepare("INSERT INTO nurse_schedule_versions(service,mois,version,action,statut,motif,alertes,data,hash,actor,actor_name,at) VALUES(?,?,1,'creation','brouillon','Planning fictif de recette',?,?,?,?,?,?) ON CONFLICT DO NOTHING").bind(service,mois,P.alertes(planning,mois).length,texte,hash,uid,nom,at));
