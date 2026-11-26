@@ -159,13 +159,7 @@ function controler(dossier={},contexte={},maintenant=new Date()){
  const sansTarif=actes.filter(a=>a.tarif===null||a.tarif===undefined||a.tarif==='');if(sansTarif.length)pose('facture','alerte','Tarif CCAM inconnu pour '+[...new Set(sansTarif.map(a=>a.code))].join(', ')+' (nomenclature non chargée sur le serveur) : honoraires et participation de l’assuré estimés sans ces actes.','');
  if(!/^\d{1,4}$/.test(t(f.ghs)))pose('facture','bloquant','GHS à reprendre du groupage du logiciel PMSI (numéro de 1 à 4 chiffres).','ghs');
  if(t(f.ghs)&&!(num(f.ghsTarif)>0))pose('facture','bloquant','Tarif du GHS (arrêté tarifaire de l’année, secteur ex-OQN) à saisir.','ghsTarif');
- for(const v of contexte.devis||[])if(num(v.depassement)>=SEUIL_DEVIS&&v.statut!=='signe')pose('facture','bloquant','Dépassement d’honoraires de '+v.depassement+' € sans devis signé par le patient (obligatoire dès 70 €).','devis');
- // Dépassements saisis sur les actes : devis signé obligatoire dès 70 € par praticien.
- const depPrat={};for(const a of actes){const dep=num(a.depassement)||0;if(dep>0){const k=String(a.activite)==='4'||/:c:/.test(a.cle||'')?'anesthésiste':'chirurgien';depPrat[k]=(depPrat[k]||0)+dep}}
- const devisSigne=(contexte.devis||[]).some(v=>v.statut==='signe');
- for(const [k,m] of Object.entries(depPrat))if(m>=SEUIL_DEVIS&&!devisSigne)pose('facture','bloquant','Dépassement d’honoraires de '+arrondi(m)+' € ('+k+') sans devis signé par le patient (obligatoire dès 70 €).','devis');
- if(ex?.depassementInterdit&&Object.keys(depPrat).length)pose('facture','bloquant','Patient '+(d.exoneration==='c2s'?'C2S':'AME')+' : dépassements d’honoraires interdits sur les actes (sauf exigence particulière du patient).','devis');
- if(ex?.depassementInterdit&&(contexte.devis||[]).some(v=>num(v.depassement)>0))pose('facture','bloquant','Patient '+(d.exoneration==='c2s'?'C2S':'AME')+' : dépassements d’honoraires interdits (sauf exigence particulière du patient).','devis');
+ // Dépassements d’honoraires : aucun blocage de la facture (montant, devis, C2S ou AME), à la demande de Romain (26/11/2026).
  const dl=delaiFacturation(p.sortie,maintenant);if(dl&&dl.reste<0)pose('facture','bloquant','Délai de facturation d’un an dépassé depuis le '+dl.limite+' : créance prescrite.','');else if(dl&&dl.reste<60)pose('facture','alerte','Plus que '+dl.reste+' jours pour facturer (limite '+dl.limite+').','');
  const compte=s=>out.filter(x=>x.section===s&&x.niveau==='bloquant').length;
  return {constats:out,pret:{droits:!compte('droits'),pmsi:!compte('droits')&&!compte('pmsi'),facture:!compte('droits')&&!compte('pmsi')&&!compte('facture')},bloquants:out.filter(x=>x.niveau==='bloquant').length,alertes:out.filter(x=>x.niveau==='alerte').length};

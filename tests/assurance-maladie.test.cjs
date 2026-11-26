@@ -36,10 +36,11 @@ test('contrôles : points bloquants attendus',()=>{
  const c=A.controler({droits:{...droitsOk,nature:'41',acquisition:'aucune'},pmsi:{...pmsiOk,modeSortie:'7',dp:''},facture:{}},
   {...ctxOk,actes:[{code:'NEKA020',activite:'4',date:'2026-12-01',dim:false,tarif:100}],dmi:[{gtin:'0'.repeat(14),enSus:true}],devis:[{depassement:150,statut:'envoye'}]},new Date('2026-11-25'));
  const m=c.constats.filter(x=>x.niveau==='bloquant').map(x=>x.message).join('\n');
- for(const attendu of [/date de l’accident/,/Droits non vérifiés/,/destination/,/Diagnostic principal/,/validation du médecin DIM/,/hors du séjour/,/extension documentaire/,/code LPP/,/lot ou numéro de série/,/GHS/,/devis signé/])assert.match(m,attendu);
+ for(const attendu of [/date de l’accident/,/Droits non vérifiés/,/destination/,/Diagnostic principal/,/validation du médecin DIM/,/hors du séjour/,/extension documentaire/,/code LPP/,/lot ou numéro de série/,/GHS/])assert.match(m,attendu);
+ assert.doesNotMatch(m,/devis/,'dépassement sans devis : plus de blocage');
  assert.equal(c.pret.droits,false);assert.equal(A.etape({},c).cle,'droits');
  const c2=A.controler({droits:{...droitsOk,exoneration:'c2s'},pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'10'}},{...ctxOk,devis:[{depassement:30,statut:'signe'}]});
- assert.match(c2.constats.map(x=>x.message).join(),/dépassements d’honoraires interdits/);
+ assert.doesNotMatch(c2.constats.map(x=>x.message).join(),/dépassements d’honoraires interdits/,'C2S : plus de blocage');
 });
 
 test('contrôles : délai de facturation d’un an',()=>{
@@ -82,13 +83,10 @@ test('facture : valeur de chaque acte et dépassements saisis sur les actes',()=
  const p=A.preFacture({droits:droitsOk,pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},ctx);
  assert.deepEqual(p.honoraires.map(h=>[h.code,h.montant,h.depassement,h.total]),[['NEKA020',470,300,770],['NEKA020',200,50,250]]);
  assert.equal(p.depassements,350);assert.equal(p.sourceDepassements,'actes');assert.equal(p.totalHonoraires,1020);
- // Devis non signé : 300 € (chirurgien) bloque ; 50 € (anesthésiste) n'atteint pas le seuil.
- let c=A.controler({droits:droitsOk,pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},ctx,new Date('2026-11-25'));
- assert.ok(c.constats.some(x=>/300 € \(chirurgien\) sans devis signé/.test(x.message)));assert.ok(!c.constats.some(x=>/anesthésiste\) sans devis/.test(x.message)));
- c=A.controler({droits:droitsOk,pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},{...ctx,devis:[{depassement:300,statut:'signe'}]},new Date('2026-11-25'));
- assert.ok(!c.constats.some(x=>/sans devis signé/.test(x.message)));
- c=A.controler({droits:{...droitsOk,exoneration:'c2s'},pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},{...ctx,devis:[{statut:'signe'}]},new Date('2026-11-25'));
- assert.ok(c.constats.some(x=>/C2S : dépassements d’honoraires interdits sur les actes/.test(x.message)));
+ // Aucun blocage lié aux dépassements (montant, devis, C2S, AME) : demande de Romain du 26/11/2026.
+ for(const [droits,devis] of [[droitsOk,[]],[{...droitsOk,exoneration:'c2s'},[{depassement:200,statut:'propose'}]],[{...droitsOk,exoneration:'ame'},[]]]){
+  const c=A.controler({droits,pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},{...ctx,devis},new Date('2026-11-25'));
+  assert.ok(!c.constats.some(x=>/[Dd]épassement|devis/.test(x.message)),JSON.stringify(c.constats))}
  // Sans dépassement sur les actes : ceux des devis comptent.
  assert.equal(A.preFacture({droits:droitsOk,pmsi:pmsiOk,facture:{}},{...ctxOk,devis:[{depassement:80,statut:'signe'}]}).sourceDepassements,'devis');
 });

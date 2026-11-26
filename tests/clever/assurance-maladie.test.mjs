@@ -59,8 +59,7 @@ test('Assurance maladie : droits, PMSI, facture, retours',async()=>{
   assert.equal((await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{depassements:{'chir:1':'abc'}}})).status,400);
   r=await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{tarifs:{'chir:4':'150,5'},depassements:{'chir:1':'100'}}});assert.equal(r.status,200);
   let hono=r.data.dossier.preFacture.honoraires;assert.deepEqual(hono.map(h=>[h.cle,h.montant,h.depassement,h.total,h.tarifSource]),[['chir:1',470.49,100,570.49,'ccam'],['chir:4',150.5,0,150.5,'facturation']]);
-  assert.ok(r.data.dossier.constats.some(c=>/100 € \(chirurgien\) sans devis signé/.test(c.message)),'devis obligatoire dès 70 €');
-  assert.equal((await api(fac,'POST','/marche/assurance',{action:'transmettre',stay:'AM1'})).status,400,'dépassement sans devis : bloqué');
+  assert.ok(!r.data.dossier.constats.some(c=>/devis/.test(c.message)),'aucun blocage lié aux dépassements');
   r=await api(fac,'POST','/marche/assurance',{action:'facture',stay:'AM1',facture:{depassements:{'chir:1':'0'}}});assert.equal(r.data.dossier.preFacture.depassementsActes,0);
   t1=await api(fac,'POST','/marche/assurance',{action:'transmettre',stay:'AM1'});assert.equal(t1.status,200,JSON.stringify(t1.data));
   const ref=t1.data.dossier.facture.reference;assert.match(ref,/^FAC-/);assert.equal(t1.data.dossier.statut,'transmise');
