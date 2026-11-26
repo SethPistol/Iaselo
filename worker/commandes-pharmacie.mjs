@@ -1,5 +1,8 @@
 // IASELO · commandes de la pharmacie aux fournisseurs (26/11/2026, demande de Romain).
 //  GET  /api/workspace/pharmacie                     livret, commandes récentes et en cours (réceptions, étapes)
+//  Demandes des services : POST {action:'demander', service, lignes, note, urgent}                   infirmier(ère), anesthésiste
+//                           POST {action:'demande-prendre'|'demande-delivrer'|'demande-refuser'|'demande-annuler'|
+//                                 'demande-accuser', id, version, ...}
 //  POST /api/workspace/pharmacie {action:'article', id?, version?, article, motif}                 pharmacien
 //  POST /api/workspace/pharmacie {action:'creer', fournisseur, lignes, note, urgent}               pharmacie
 //  POST /api/workspace/pharmacie {action:'modifier'|'soumettre'|'valider'|'renvoyer'|'rouvrir'|'envoyer'|
@@ -24,20 +27,77 @@ export async function staffCommandesPharmacieApi(request,env,acl){
  const articles=async()=>(await DB.prepare('SELECT * FROM pharmacy_articles ORDER BY nom').all()).results.map(article);
  async function commande(row,{evenements=true}={}){
   if(!row)return null;const d=JSON.parse(row.data);
-  const receptions=(await DB.prepare('SELECT * FROM pharmacy_receptions WHERE order_id=? ORDER BY at,id').bind(row.id).all()).results.map(r=>({id:r.id,ligne:Number(r.ligne),articleId:r.article_id,quantite:Number(r.quantite),conforme:Number(r.conforme),lot:r.lot,peremption:r.peremption,par:r.actor_name,profil:r.actor_profil,at:r.at,...JSON.parse(r.data)}));
+  const receptions=(await DB.prepare('SELECT * FROM pharmacy_receptions WHERE order_id=? ORDER BY at,ligne,id').bind(row.id).all()).results.map(r=>({id:r.id,ligne:Number(r.ligne),articleId:r.article_id,quantite:Number(r.quantite),conforme:Number(r.conforme),lot:r.lot,peremption:r.peremption,par:r.actor_name,profil:r.actor_profil,at:r.at,...JSON.parse(r.data)}));
   const ev=evenements?(await DB.prepare('SELECT version,action,statut,motif,actor_name,actor_profil,at,hash FROM pharmacy_order_events WHERE order_id=? ORDER BY id').bind(row.id).all()).results.map(e=>({version:Number(e.version),action:e.action,statut:e.statut,motif:e.motif,par:e.actor_name,profil:e.actor_profil,at:e.at,hash:e.hash})):[];
   return {id:row.id,numero:row.numero,fournisseur:row.fournisseur,statut:row.statut,version:Number(row.version),total:Number(row.total_centimes),creeLe:row.created_at,creePar:row.created_by,creeParNom:row.created_by_name,miseAJour:row.updated_at,...d,receptions,evenements:ev};
  }
+ const voit=R.voitCommandes({job:acl.job,isAdmin:acl.isAdmin});
+ async function demande(row){
+  if(!row)return null;const d=JSON.parse(row.data);
+  const ev=(await DB.prepare('SELECT version,action,statut,motif,actor_name,actor_profil,at,hash FROM pharmacy_request_events WHERE request_id=? ORDER BY id').bind(row.id).all()).results.map(e=>({version:Number(e.version),action:e.action,statut:e.statut,motif:e.motif,par:e.actor_name,profil:e.actor_profil,at:e.at,hash:e.hash}));
+  return {id:row.id,numero:row.numero,service:row.service,statut:row.statut,version:Number(row.version),creeLe:row.created_at,creePar:row.created_by,creeParNom:row.created_by_name,creeParMetier:row.created_by_job,miseAJour:row.updated_at,...d,evenements:ev};
+ }
+ // Stock de la pharmacie (Circuit du médicament › Stocks), lu dans le dossier partagé pour contrôler les délivrances.
+ const stock=async()=>{const r=await DB.prepare("SELECT data FROM workspace_documents WHERE key='management/lots'").first();try{const v=r?JSON.parse(r.data):[];return Array.isArray(v)?v:[]}catch{return []}};
  if(request.method==='GET'){
-  const rows=(await DB.prepare("SELECT * FROM pharmacy_orders WHERE statut IN ('brouillon','a_valider','validee','envoyee','partielle') OR updated_at>=? ORDER BY updated_at DESC LIMIT 300").bind(new Date(Date.now()-120*864e5).toISOString()).all()).results;
-  const commandes=[];for(const r of rows)commandes.push(await commande(r));
-  await acl.log('read','pharmacie','allowed','Commandes de la pharmacie');
-  return json({profil:p,moi,aujourdhui:jour(),articles:await articles(),commandes,statuts:R.STATUTS,modes:R.MODES_ENVOI});
+  const depuis=new Date(Date.now()-120*864e5).toISOString(),commandes=[],demandes=[];
+  if(voit){const rows=(await DB.prepare("SELECT * FROM pharmacy_orders WHERE statut IN ('brouillon','a_valider','validee','envoyee','partielle') OR updated_at>=? ORDER BY updated_at DESC LIMIT 300").bind(depuis).all()).results;for(const r of rows)commandes.push(await commande(r))}
+  const dr=(await DB.prepare("SELECT * FROM pharmacy_requests WHERE statut IN ('demandee','en_preparation','delivree') OR updated_at>=? ORDER BY updated_at DESC LIMIT 300").bind(new Date(Date.now()-45*864e5).toISOString()).all()).results;for(const r of dr)demandes.push(await demande(r));
+  const livret=(await articles()).filter(a=>voit||a.actif);
+  await acl.log('read','pharmacie','allowed',voit?'Commandes et demandes de la pharmacie':'Demandes à la pharmacie');
+  return json({profil:p,voitCommandes:voit,moi,aujourdhui:jour(),articles:livret,commandes,demandes,statuts:R.STATUTS,modes:R.MODES_ENVOI,services:R.SERVICES,statutsDemande:R.STATUTS_DEMANDE,serviceParDefaut:R.serviceParDefaut({job:acl.job,poste:acl.poste}),medecin:acl.job==='anesthesiste'});
  }
  if(request.method!=='POST')return json({error:'Méthode refusée.'},405);
  let d;try{d=await body(request)}catch{return json({error:'Requête illisible.'},400)}
  const action=String(d.action||''),at=new Date().toISOString(),motif=String(d.motif||'').trim().slice(0,400);
  const refuse=async(message,cible='pharmacie',status=403)=>{await acl.log('write',cible,'denied',message);return json({error:message},status)};
+
+ // Demandes des services à la pharmacie.
+ if(action==='demander'||action.startsWith('demande-')){
+  const nom=await nomActeur();
+  async function etapeD(row,act,statut,data,{motifEtape=motif,init=null}={}){
+   const version=row?Number(row.version)+1:1,id=row?.id||randomUUID(),texte=JSON.stringify(data);
+   for(let essai=0;essai<3;essai++){
+    let num=row?.numero;if(!row){const an=at.slice(0,4);num=R.numeroDemande(an,Number((await DB.prepare('SELECT COUNT(*) AS n FROM pharmacy_requests WHERE numero LIKE ?').bind('DEM-'+an+'-%').first()).n)+1+essai)}
+    const st=[row?DB.prepare('UPDATE pharmacy_requests SET statut=?,version=?,data=?,updated_at=? WHERE id=? AND version=?').bind(statut,version,texte,at,id,row.version)
+     :DB.prepare('INSERT INTO pharmacy_requests(id,numero,service,statut,version,data,created_at,created_by,created_by_name,created_by_job,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,num,init.service,statut,version,texte,at,moi,nom,acl.job,at),
+     DB.prepare('INSERT INTO pharmacy_request_events(request_id,version,action,statut,motif,data,hash,actor,actor_name,actor_profil,at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,version,act,statut,motifEtape,texte,sha(texte),moi,nom,p,at)];
+    let out;try{out=await DB.batch(st)}catch(e){if(!row&&/unique|duplicate/i.test(e.message))continue;return json({error:'La demande a été modifiée sur un autre poste : rechargez-la.'},409)}
+    if(row&&!out[0].meta.changes)return json({error:'La demande a été modifiée sur un autre poste : rechargez-la.'},409);
+    await acl.log('pharmacie-demande-'+act,'pharmacie/demande/'+num,'allowed',R.STATUTS_DEMANDE[statut],motifEtape);
+    return json({ok:true,demande:await demande(await DB.prepare('SELECT * FROM pharmacy_requests WHERE id=?').bind(id).first())});
+   }
+   return json({error:'Numérotation de la demande impossible : réessayez.'},409);
+  }
+  if(action==='demander'){
+   const r=R.refusDemande('demander',p);if(r)return refuse(r);
+   const v=R.controlerDemande(d,(await articles()),{medecin:acl.job==='anesthesiste'});if(!v.ok)return json({error:v.errors.join(' ')},400);
+   const {service,...reste}=v.demande;
+   return etapeD(null,'demande','demandee',{...reste,demandeur:{nom,metier:acl.job}},{init:{service},motifEtape:R.SERVICES[service]});
+  }
+  const row=await DB.prepare('SELECT * FROM pharmacy_requests WHERE id=?').bind(String(d.id||'')).first();
+  if(!row)return refuse('Demande introuvable.','pharmacie',404);
+  const dm=await demande(row);
+  if(Number(d.version)!==dm.version)return json({error:'La demande a été modifiée sur un autre poste : rechargez-la avant de continuer.',demande:dm},409);
+  const act=action.slice(8),r=R.refusDemande(act==='prendre'?'prendre':act,p,dm,moi);if(r)return refuse(r,'pharmacie/demande/'+dm.numero);
+  const {id:_i,numero:_n,service:_s,statut:_st,version:_v,creeLe:_c,creePar:_cp,creeParNom:_cn,creeParMetier:_cm,miseAJour:_m,evenements:_e,...data}=dm;
+  const exiger=()=>motif.length<5?json({error:'Indiquez le motif (5 caractères au moins) : il est conservé dans l’historique.'},400):null;
+  if(act==='prendre')return etapeD(row,'prise-en-charge','en_preparation',{...data,priseEnCharge:{at,par:nom}},{motifEtape:''});
+  if(act==='annuler'){const e=exiger();if(e)return e;return etapeD(row,'annulation','annulee',data)}
+  if(act==='refuser'){const e=exiger();if(e)return e;return etapeD(row,'refus','refusee',{...data,refus:{at,par:nom,motif}})}
+  if(act==='delivrer'){
+   const c=R.controlerDelivrance(dm,d.lignes,await stock(),jour(),await articles());if(!c.ok)return json({error:c.errors.join(' '),errors:c.errors},400);
+   const delivrance={id:randomUUID(),at,par:nom,profil:p,lignes:c.lignes,avertissements:c.avertissements};
+   const n=c.lignes.reduce((x,l)=>x+l.delivre,0),partiel=c.lignes.some((l,i)=>l.delivre<dm.lignes[i].quantite);
+   const res=await etapeD(row,'delivrance','delivree',{...data,delivrance},{motifEtape:n+' unité(s) délivrée(s)'+(partiel?' · délivrance partielle':'')});
+   if(res.status!==200)return res;const out=await res.json();return json({...out,avertissements:c.avertissements});
+  }
+  if(act==='accuser'){
+   const ecart=!!d.ecart;if(ecart){const e=exiger();if(e)return e}
+   return etapeD(row,'reception','recue',{...data,reception:{at,par:nom,ecart,motif:ecart?motif:''}},{motifEtape:ecart?'Écart : '+motif:''});
+  }
+  return json({error:'Action inconnue.'},400);
+ }
 
  // Livret des produits : création et mise à jour par le pharmacien, versions conservées.
  if(action==='article'){

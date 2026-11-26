@@ -19,9 +19,12 @@ async function api(body){
 }
 root.createCommandesPharmacie=function(ctx){
  const {$,esc,toast}=ctx;
- let s={onglet:'atraiter',donnees:null,erreur:'',detail:null,edition:null,article:null,filtre:'en-cours',message:''};
+ let s={onglet:'atraiter',donnees:null,erreur:'',detail:null,edition:null,article:null,filtre:'en-cours',message:'',demande:null,nouvelleDemande:null};
  const P=()=>s.donnees?.profil,pharma=()=>P()==='pharmacien',ecrit=()=>['pharmacien','preparateur'].includes(P());
  const refus=(a,c)=>R().refus(a,P(),c,s.donnees?.moi);
+ const service=()=>P()==='service',refusD=(a,d)=>R().refusDemande(a,P(),d,s.donnees?.moi);
+ const TON_D={demandee:'warn',en_preparation:'acc',delivree:'acc',recue:'ok',refusee:'crit',annulee:'crit'};
+ const chipD=d=>`<span class="cp-chip ${TON_D[d.statut]||''}">${esc(R().STATUTS_DEMANDE[d.statut]||d.statut)}</span>`;
  const lots=()=>ctx.lots?.()||[];
  const auj=()=>s.donnees?.aujourdhui||new Date().toISOString().slice(0,10);
  const chip=c=>`<span class="cp-chip ${TON[c.statut]||''}">${esc(R().STATUTS[c.statut]||c.statut)}</span>`;
@@ -37,27 +40,31 @@ root.createCommandesPharmacie=function(ctx){
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bouton);else bouton();
  setTimeout(bouton,1500);
 
- async function charger(){s.erreur='';try{s.donnees=await api();if(s.detail)s.detail=s.donnees.commandes.find(c=>c.id===s.detail.id)||s.detail}catch(e){s.erreur=e.message;if(!s.donnees)s.donnees=null}dessiner()}
+ async function charger(){s.erreur='';try{const premier=!s.donnees;s.donnees=await api();if(premier&&service())s.onglet='demandes';if(s.detail)s.detail=s.donnees.commandes.find(c=>c.id===s.detail.id)||s.detail;if(s.demande)s.demande=s.donnees.demandes.find(d=>d.id===s.demande.id)||s.demande}catch(e){s.erreur=e.message;if(!s.donnees)s.donnees=null}dessiner()}
  function render(){
   $('#title').textContent='Commandes pharmacie';$('#stats').hidden=true;$('#new').hidden=true;document.body.classList.remove('j-home');
   document.querySelectorAll('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='commandesPharmacie'));
   $('#workspace').innerHTML='<section class="panel"><div class="content cp-wrap" id="cp-host"><p class="cp-mut">Chargement des commandes…</p></div></section>';
-  s.onglet='atraiter';s.detail=null;s.edition=null;s.article=null;charger();
+  s.onglet=service()?'demandes':'atraiter';s.detail=null;s.edition=null;s.article=null;s.demande=null;s.nouvelleDemande=null;charger();
  }
  function dessiner(){
   const host=$('#cp-host');if(!host)return;
   if(!s.donnees){host.innerHTML=`<p class="notice warn">${esc(s.erreur||'Commandes disponibles sur le serveur de la clinique.')}</p>`;return}
-  const onglets=[['atraiter','À traiter'],['commandes','Commandes'],['livret','Livret des produits']];
-  const tete=`<div class="cp-head"><div><p class="cp-mut">${esc(R().PROFILS[P()]||'Lecture seule (administrateur)')} · ${P()==='preparateur'?'vous préparez, soumettez, transmettez et réceptionnez ; le pharmacien valide.':P()==='pharmacien'?'vous validez les commandes et tenez le livret ; le préparateur prépare et réceptionne.':'les commandes sont passées par la pharmacie.'}</p></div>${ecrit()?'<button type="button" class="primary" id="cp-nouvelle">Nouvelle commande</button>':''}</div>
-   <div class="tabs cp-tabs" role="tablist">${onglets.map(([k,l])=>`<button type="button" data-cp-onglet="${k}" class="${s.onglet===k&&!s.detail&&!s.edition?'active':''}" aria-pressed="${s.onglet===k}">${l}</button>`).join('')}</div>
+  $('#title').textContent=service()?'Demandes à la pharmacie':'Commandes pharmacie';
+  const onglets=service()?[['demandes','Demandes du service'],...(s.donnees.voitCommandes?[['commandes','Commandes fournisseurs'],['livret','Livret des produits']]:[])]:[['atraiter','À traiter'],['demandes','Demandes des services'],['commandes','Commandes fournisseurs'],['livret','Livret des produits']];
+  const tete=`<div class="cp-head"><div><p class="cp-mut">${service()?'Demandez à la pharmacie les produits du livret pour votre service ; elle les délivre par lot, vous accusez réception.'+(s.donnees.medecin?' Les stupéfiants sont demandés par un médecin.':''):esc(R().PROFILS[P()]||'Lecture seule (administrateur)')+' · '}${service()?'':P()==='preparateur'?'vous préparez, soumettez, transmettez et réceptionnez ; le pharmacien valide.':P()==='pharmacien'?'vous validez les commandes et tenez le livret ; le préparateur prépare et réceptionne.':'les commandes sont passées par la pharmacie.'}</p></div>${ecrit()?'<button type="button" class="primary" id="cp-nouvelle">Nouvelle commande</button>':''}${service()?'<button type="button" class="primary" id="cp-nouvelle-demande">Nouvelle demande</button>':''}</div>
+   <div class="tabs cp-tabs" role="tablist">${onglets.map(([k,l])=>`<button type="button" data-cp-onglet="${k}" class="${s.onglet===k&&!s.detail&&!s.edition&&!s.demande&&!s.nouvelleDemande?'active':''}" aria-pressed="${s.onglet===k}">${l}</button>`).join('')}</div>
    ${s.erreur?`<p class="notice warn">${esc(s.erreur)}</p>`:''}${s.message?`<p class="notice cp-ok">${esc(s.message)}</p>`:''}<div id="cp-body"></div>`;
   host.innerHTML=tete;s.message='';
-  host.querySelectorAll('[data-cp-onglet]').forEach(b=>b.onclick=()=>{s.onglet=b.dataset.cpOnglet;s.detail=null;s.edition=null;s.article=null;dessiner()});
+  host.querySelectorAll('[data-cp-onglet]').forEach(b=>b.onclick=()=>{s.onglet=b.dataset.cpOnglet;s.detail=null;s.edition=null;s.article=null;s.demande=null;s.nouvelleDemande=null;dessiner()});
+  $('#cp-nouvelle-demande')?.addEventListener('click',()=>{s.nouvelleDemande={service:s.donnees.serviceParDefaut||'bloc',lignes:[],note:'',urgent:false};s.demande=null;dessiner()});
   $('#cp-nouvelle')?.addEventListener('click',()=>{s.edition={fournisseur:'',lignes:[],note:'',urgent:false};s.detail=null;dessiner()});
   const body=$('#cp-body');
+  if(s.nouvelleDemande)return formDemande(body);
+  if(s.demande)return detailDemande(body,s.demande);
   if(s.edition)return edition(body);
   if(s.detail)return detail(body,s.detail);
-  ({atraiter,commandes,livret})[s.onglet](body);
+  ({atraiter,commandes,livret,demandes})[s.onglet](body);
  }
 
  /* ---------- À traiter ---------- */
@@ -66,9 +73,12 @@ root.createCommandesPharmacie=function(ctx){
   const C=s.donnees.commandes,par=st=>C.filter(c=>c.statut===st);
   const props=R().propositions(s.donnees.articles,lots(),C,auj()),groupes=R().groupesProposition(props);
   const hors=R().receptionsHorsStock(C,lots());
+  const D=s.donnees.demandes||[],dAtraiter=D.filter(d=>['demandee','en_preparation'].includes(d.statut)),sortiesManquantes=R().sortiesHorsStock(D,lots());
   const bloc=(titre,liste,aide)=>liste.length?`<h3 class="cp-h3">${titre} <span class="cp-count">${liste.length}</span></h3>${aide?`<p class="cp-mut">${aide}</p>`:''}${table(['Commande','Fournisseur','État','Lignes','Total HT','Mise à jour'],liste.map(ligneCmd))}`:'';
-  body.innerHTML=`<div class="cp-metrics">${[[par('a_valider').length,'à valider par le pharmacien'],[par('validee').length,'à transmettre au fournisseur'],[par('envoyee').length+par('partielle').length,'livraisons attendues'],[props.length,'produits sous le seuil']].map(([n,l])=>`<article class="management-metric"><strong>${n}</strong><span>${l}</span></article>`).join('')}</div>
+  body.innerHTML=`<div class="cp-metrics">${[[dAtraiter.length,'demandes des services à délivrer'],[par('a_valider').length,'à valider par le pharmacien'],[par('validee').length,'à transmettre au fournisseur'],[par('envoyee').length+par('partielle').length,'livraisons attendues'],[props.length,'produits sous le seuil']].map(([n,l])=>`<article class="management-metric"><strong>${n}</strong><span>${l}</span></article>`).join('')}</div>
    ${hors.length?`<p class="notice warn">${hors.length} lot(s) reçu(s) conforme(s) pas encore entré(s) dans le stock de la pharmacie. ${ctx.canWriteLots?.()?'<button type="button" class="primary" id="cp-integrer">Les entrer en stock</button>':'Un compte de la pharmacie rattaché à une équipe doit les entrer en stock.'}</p>`:''}
+   ${sortiesManquantes.length?`<p class="notice warn">${sortiesManquantes.length} délivrance(s) pas encore déduite(s) du stock. ${ctx.canWriteLots?.()?'<button type="button" class="primary" id="cp-sorties">Les déduire du stock</button>':''}</p>`:''}
+   ${dAtraiter.length?`<h3 class="cp-h3">Demandes des services à délivrer <span class="cp-count">${dAtraiter.length}</span></h3>${tableDemandes(dAtraiter)}`:''}
    ${bloc('À valider par le pharmacien',par('a_valider'),pharma()?'Relisez les lignes et validez : la commande engage la pharmacie.':'')}
    ${bloc('Validées, à transmettre',par('validee'))}
    ${bloc('Livraisons attendues',[...par('envoyee'),...par('partielle')],'Ouvrez la commande à l’arrivée du colis pour enregistrer la réception (lots, péremptions, conformité).')}
@@ -79,6 +89,8 @@ root.createCommandesPharmacie=function(ctx){
   liens(body);
   body.querySelectorAll('[data-cp-prop]').forEach(b=>b.onclick=()=>{const g=groupes[Number(b.dataset.cpProp)];s.edition={fournisseur:g.fournisseur,lignes:g.lignes.map(p=>({articleId:p.article.id,quantite:p.proposee})),note:'Réapprovisionnement sur seuil minimum',urgent:false};dessiner()});
   $('#cp-integrer')?.addEventListener('click',()=>integrer(hors));
+  $('#cp-sorties')?.addEventListener('click',()=>{const L=lots();let n=0;for(const d of sortiesManquantes)n+=R().appliquerSorties(L,d.delivrance.id,d.delivrance.lignes);ctx.saveLots?.();toast(n+' sortie(s) de stock enregistrée(s)');dessiner()});
+  lienDemandes(body);
  }
  function integrer(hors){
   const L=lots();let n=0;
@@ -206,6 +218,85 @@ root.createCommandesPharmacie=function(ctx){
    <table><thead><tr><th>Produit</th><th>Code</th><th>Conditionnement</th><th>Quantité</th><th>Prix unitaire HT</th><th>Montant HT</th></tr></thead><tbody>${lignes}</tbody></table><p><b>Total HT : ${R().euros(c.total)}</b></p>${c.note?'<p>'+esc(c.note)+'</p>':''}
    <div class="s"><p>Préparée par ${esc(c.creeParNom)}<br>le ${esc(frDT(c.creeLe))}</p><p>${c.validation?'Validée par le pharmacien '+esc(c.validation.par)+'<br>le '+esc(frDT(c.validation.at)):'<b>Non validée par le pharmacien : ne pas transmettre.</b>'}</p></div></html>`);
   w.document.close();w.print();
+ }
+
+ /* ---------- Demandes des services ---------- */
+ function tableDemandes(liste){return table(['Demande','Service','État','Produits','Demandée par','Mise à jour'],liste.map(d=>[`<button type="button" class="textbutton cp-num" data-cp-demande="${esc(d.id)}">${esc(d.numero)}</button>${d.urgent?' <span class="cp-flag crit">Urgent</span>':''}${R().demandeSensible(d)?' <span class="cp-flag stup">Pharmacien</span>':''}`,esc(s.donnees.services[d.service]||d.service),chipD(d),esc(d.lignes.map(l=>l.quantite+' × '+l.nom).join(', ')),esc(d.creeParNom),esc(frDT(d.miseAJour))]))}
+ function lienDemandes(body){body.querySelectorAll('[data-cp-demande]').forEach(b=>b.onclick=()=>{s.demande=s.donnees.demandes.find(d=>d.id===b.dataset.cpDemande);dessiner()})}
+ function demandes(body){
+  const f=s.filtre,D=(s.donnees.demandes||[]).filter(d=>f==='toutes'||(f==='en-cours'?R().DEMANDES_EN_COURS.includes(d.statut):!R().DEMANDES_EN_COURS.includes(d.statut)));
+  body.innerHTML=`<div class="pr-filtres">${[['en-cours','En cours'],['closes','Reçues, refusées, annulées'],['toutes','Toutes']].map(([k,l])=>`<button type="button" class="pr-filtre ${f===k?'is-on':''}" data-cp-filtre="${k}">${l}</button>`).join('')}</div>
+   ${tableDemandes(D)}<p class="cp-mut">Demandes en cours et demandes closes des 45 derniers jours, tous services.</p>`;
+  body.querySelectorAll('[data-cp-filtre]').forEach(b=>b.onclick=()=>{s.filtre=b.dataset.cpFiltre;dessiner()});lienDemandes(body);
+ }
+ function formDemande(body){
+  const e=s.nouvelleDemande,A=s.donnees.articles.filter(a=>a.actif&&(!a.stupefiant||s.donnees.medecin)),art=id=>s.donnees.articles.find(a=>a.id===id);
+  const rows=e.lignes.map((l,i)=>[l.horsLivret?esc(l.nom)+' <span class="cp-flag warn">hors livret</span><br><span class="cp-mut">'+esc(l.justification)+'</span>':esc(art(l.articleId)?.nom||'?')+' '+flags(art(l.articleId)||{}),`<input type="number" min="1" step="1" value="${esc(l.quantite)}" data-cp-dq="${i}" class="cp-qte" aria-label="Quantité"> ${esc(l.horsLivret?l.unite||'unité':art(l.articleId)?.unite||'')}`,`<button type="button" class="textbutton" data-cp-dsuppr="${i}">Retirer</button>`]);
+  body.innerHTML=`<h3 class="cp-h3">Nouvelle demande à la pharmacie</h3>
+   <div class="formgrid cp-form"><label>Service<select id="cp-service">${Object.entries(s.donnees.services).map(([k,l])=>`<option value="${k}" ${k===e.service?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+   <label class="cp-check"><input type="checkbox" id="cp-durgent" ${e.urgent?'checked':''}> Demande urgente</label>
+   <label class="wide">Note pour la pharmacie<textarea id="cp-dnote" maxlength="600">${esc(e.note)}</textarea></label></div>
+   <h4>Produits demandés</h4>${table(['Produit','Quantité',''],rows)}
+   <div class="cp-ajout"><label>Produit du livret<select id="cp-darticle"><option value="">Choisir…</option>${A.map(a=>`<option value="${esc(a.id)}">${esc(a.nom)}${a.stupefiant?' · stupéfiant':''}</option>`).join('')}</select></label><label>Quantité<input type="number" id="cp-dq" min="1" step="1" value="1" class="cp-qte"></label><button type="button" class="secondary" id="cp-dajouter">Ajouter</button></div>
+   <details class="cp-hors"><summary>Produit hors livret</summary><div class="cp-ajout"><label>Désignation<input id="cp-hnom" maxlength="160" data-medicament autocomplete="off"></label><label>Quantité<input type="number" id="cp-hq" min="1" step="1" value="1" class="cp-qte"></label><label>Justification (indication, patient)<input id="cp-hj" maxlength="300"></label><button type="button" class="secondary" id="cp-hajouter">Ajouter</button></div><p class="cp-mut">Un produit hors livret est délivré par le pharmacien, qui peut refuser ou proposer un équivalent.</p></details>
+   ${s.donnees.medecin?'':'<p class="cp-mut">Les stupéfiants sont demandés par un médecin (anesthésiste).</p>'}
+   <p role="alert" class="management-error" id="cp-derr"></p>
+   <div class="cp-actions"><button type="button" class="primary" id="cp-denvoyer">Envoyer à la pharmacie</button><button type="button" class="secondary" id="cp-dabandon">Abandonner</button></div>`;
+  const lire=()=>{e.service=$('#cp-service').value;e.urgent=$('#cp-durgent').checked;e.note=$('#cp-dnote').value;body.querySelectorAll('[data-cp-dq]').forEach(i=>{e.lignes[Number(i.dataset.cpDq)].quantite=Number(i.value)})};
+  body.querySelectorAll('[data-cp-dsuppr]').forEach(b=>b.onclick=()=>{lire();e.lignes.splice(Number(b.dataset.cpDsuppr),1);dessiner()});
+  $('#cp-dajouter').onclick=()=>{lire();const id=$('#cp-darticle').value,q=Number($('#cp-dq').value);if(!id||!(q>0)){$('#cp-derr').textContent='Choisissez un produit et une quantité.';return}const d=e.lignes.find(l=>l.articleId===id);if(d)d.quantite=Number(d.quantite)+q;else e.lignes.push({articleId:id,quantite:q});dessiner()};
+  $('#cp-hajouter').onclick=()=>{lire();const nom=$('#cp-hnom').value.trim(),q=Number($('#cp-hq').value),j=$('#cp-hj').value.trim();if(nom.length<3||!(q>0)||j.length<5){$('#cp-derr').textContent='Produit hors livret : désignation, quantité et justification requises.';return}e.lignes.push({horsLivret:true,nom,quantite:q,justification:j});dessiner()};
+  $('#cp-dabandon').onclick=()=>{s.nouvelleDemande=null;dessiner()};
+  $('#cp-denvoyer').onclick=async ev=>{lire();ev.target.disabled=true;try{const r=await api({action:'demander',...e});s.nouvelleDemande=null;s.demande={id:r.demande.id};await charger();s.demande=s.donnees.demandes.find(d=>d.id===r.demande.id)||r.demande;s.message='Demande '+r.demande.numero+' envoyée à la pharmacie.';dessiner()}catch(err){$('#cp-derr').textContent=err.message;ev.target.disabled=false}};
+ }
+ function detailDemande(body,d){
+  const peut=a=>!refusD(a,d),del=d.delivrance;
+  const lignes=d.lignes.map((l,i)=>{const x=del?.lignes?.find(y=>y.ligne===i);return [esc(l.nom)+' '+flags(l)+(l.horsLivret?' <span class="cp-flag warn">hors livret</span><br><span class="cp-mut">'+esc(l.justification)+'</span>':''),l.quantite+' × '+esc(l.unite||''),x?String(x.delivre)+(x.delivre<l.quantite?' <span class="cp-flag warn">partiel</span>':''):'—',x?esc(x.sorties.map(so=>so.quantite+' du lot '+so.lot+' (pér. '+frD(so.peremption)+')').join(', ')||'—'):'—',x?esc(x.motif||''):'']});
+  const ev=(d.evenements||[]).slice().reverse().map(e=>`<li><span class="cp-ev-date">${esc(frDT(e.at))}</span><strong>${esc(ACTIONS_D[e.action]||e.action)}</strong> par ${esc(e.par)} (${esc(e.profil==='service'?'service':R().PROFILS[e.profil]||e.profil)})${e.motif?' · '+esc(e.motif):''}<span class="cp-mut cp-hash">${esc(e.hash.slice(0,12))}</span></li>`).join('');
+  const act=[];
+  if(peut('prendre'))act.push('<button type="button" class="secondary" data-cp-dact="prendre">Prendre en charge</button>');
+  if(peut('delivrer'))act.push('<button type="button" class="primary" data-cp-dact="delivrer">Préparer la délivrance</button>');
+  if(peut('refuser'))act.push('<button type="button" class="textbutton cp-danger" data-cp-dact="refuser">Refuser la demande</button>');
+  if(peut('accuser'))act.push('<button type="button" class="primary" data-cp-dact="accuser">Accuser réception</button>');
+  if(peut('annuler'))act.push('<button type="button" class="textbutton cp-danger" data-cp-dact="annuler">Annuler la demande</button>');
+  const info=['demandee','en_preparation'].includes(d.statut)&&P()==='preparateur'&&R().demandeSensible(d)?'Stupéfiant ou produit hors livret : la délivrance revient au pharmacien.':'';
+  body.innerHTML=`<p><button type="button" class="textbutton" id="cp-retour">← Retour</button></p>
+   <div class="cp-dhead"><div><h3>${esc(d.numero)} ${chipD(d)}${d.urgent?' <span class="cp-flag crit">Urgent</span>':''}</h3>
+   <p class="cp-mut">${esc(s.donnees.services[d.service]||d.service)} · demandée par ${esc(d.creeParNom)} le ${esc(frDT(d.creeLe))}${del?' · délivrée par '+esc(del.par)+' le '+esc(frDT(del.at)):''}${d.reception?' · reçue par '+esc(d.reception.par)+' le '+esc(frDT(d.reception.at)):''}</p>
+   ${d.note?`<p class="cp-note">${esc(d.note)}</p>`:''}${d.refus?`<p class="notice warn">Refusée par ${esc(d.refus.par)} : ${esc(d.refus.motif)}</p>`:''}${d.reception?.ecart?`<p class="notice warn">Écart signalé à la réception : ${esc(d.reception.motif)}</p>`:''}</div></div>
+   ${table(['Produit','Demandé','Délivré','Lots','Motif'],lignes)}
+   ${info?`<p class="notice">${esc(info)}</p>`:''}${del?.avertissements?.length?`<p class="notice warn">${esc(del.avertissements.join(' '))}</p>`:''}
+   <div class="cp-actions">${act.join('')}</div><div id="cp-action"></div>
+   <h4>Étapes de la demande</h4><ol class="cp-ev">${ev||'<li>—</li>'}</ol>`;
+  $('#cp-retour').onclick=()=>{s.demande=null;dessiner()};
+  body.querySelectorAll('[data-cp-dact]').forEach(b=>b.onclick=()=>actionDemande(b.dataset.cpDact,d));
+ }
+ const ACTIONS_D={demande:'Demande envoyée','prise-en-charge':'Prise en charge par la pharmacie',delivrance:'Délivrée',refus:'Refusée',annulation:'Annulée',reception:'Reçue par le service'};
+ async function envoyerD(corps,okMsg){
+  const err=$('#cp-act-err');
+  try{const r=await api(corps);let msg=okMsg(r);
+   if(corps.action==='demande-delivrer'&&ctx.canWriteLots?.()){const n=R().appliquerSorties(lots(),r.demande.delivrance.id,r.demande.delivrance.lignes);if(n){ctx.saveLots?.();msg+=' Le stock est mis à jour.'}}
+   if(r.avertissements?.length)msg+=' '+r.avertissements.join(' ');
+   await charger();s.demande=s.donnees.demandes.find(x=>x.id===corps.id)||r.demande;s.message=msg;dessiner()}
+  catch(e){if(err)err.textContent=e.message;else toast(e.message);if(e.status===409)await charger()}
+ }
+ function actionDemande(a,d){
+  const zone=$('#cp-action'),base={action:'demande-'+a,id:d.id,version:d.version};
+  const motifForm=(titre,bouton,aide='')=>{zone.innerHTML=`<div class="cp-panel"><h4>${titre}</h4>${aide?`<p class="cp-mut">${aide}</p>`:''}<label>Motif (conservé dans l’historique)<textarea id="cp-motif" maxlength="400" required></textarea></label><p role="alert" class="management-error" id="cp-act-err"></p><button type="button" class="primary" id="cp-go">${bouton}</button></div>`;$('#cp-go').onclick=()=>envoyerD({...base,motif:$('#cp-motif').value},()=>titre+' : fait.')};
+  if(a==='prendre')return envoyerD(base,()=>'Demande '+d.numero+' prise en charge.');
+  if(a==='refuser')return motifForm('Refuser la demande','Refuser','Le service voit le motif (produit disponible ailleurs, équivalent proposé…).');
+  if(a==='annuler')return motifForm('Annuler la demande','Annuler la demande');
+  if(a==='accuser'){
+   zone.innerHTML=`<div class="cp-panel"><h4>Accuser réception · ${esc(d.numero)}</h4><p class="cp-mut">Vérifiez les produits et les quantités livrés au service.</p><label class="cp-check"><input type="checkbox" id="cp-ecart"> Écart constaté (produit manquant, abîmé, erreur)</label><label>Motif de l’écart<textarea id="cp-motif" maxlength="400"></textarea></label><p role="alert" class="management-error" id="cp-act-err"></p><button type="button" class="primary" id="cp-go">Confirmer la réception</button></div>`;
+   $('#cp-go').onclick=()=>envoyerD({...base,ecart:$('#cp-ecart').checked,motif:$('#cp-motif').value},()=>'Réception confirmée.');return}
+  if(a==='delivrer'){
+   const rows=d.lignes.map((l,i)=>{let reste=l.quantite;const dispo=R().lotsDisponibles(l,lots(),auj(),s.donnees.articles);
+    const champs=dispo.map(lot=>{const q=Math.min(reste,Number(lot.quantity)||0);reste-=q;return `<label class="cp-lot">Lot ${esc(lot.batch)} · pér. ${esc(frD(lot.expiry))} · ${esc(lot.quantity)} en stock<input type="number" min="0" max="${esc(lot.quantity)}" step="1" value="${q}" data-lot="${esc(lot.id)}" class="cp-qte"></label>`}).join('');
+    return `<fieldset class="cp-rec-l" data-ligne="${i}"><legend>${esc(l.nom)} ${flags(l)} <span class="cp-mut">· demandé ${l.quantite} × ${esc(l.unite||'')}</span></legend>${champs||'<p class="cp-mut wide">Aucun lot disponible en stock pour ce produit.</p>'}<label class="wide">Motif si quantité non délivrée (rupture, commande en cours…)<input name="motif" maxlength="300" value="${dispo.reduce((n,x)=>n+(Number(x.quantity)||0),0)<l.quantite?'Stock insuffisant':''}"></label></fieldset>`}).join('');
+   zone.innerHTML=`<div class="cp-panel"><h4>Délivrance · ${esc(d.numero)}</h4><p class="cp-mut">Lots proposés du premier au dernier périmé. Les quantités délivrées sortent du stock de la pharmacie.</p><div class="cp-rec">${rows}</div><p role="alert" class="management-error" id="cp-act-err"></p><button type="button" class="primary" id="cp-go">Enregistrer la délivrance</button></div>`;
+   $('#cp-go').onclick=()=>{const lignes=[...zone.querySelectorAll('.cp-rec-l')].map(f=>({ligne:Number(f.dataset.ligne),motif:f.querySelector('[name=motif]').value,sorties:[...f.querySelectorAll('[data-lot]')].map(i=>({lotId:i.dataset.lot,quantite:Number(i.value)})).filter(x=>x.quantite>0)}));
+    envoyerD({...base,lignes},()=>'Délivrance enregistrée.')};
+  }
  }
 
  /* ---------- Livret des produits ---------- */

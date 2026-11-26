@@ -18,6 +18,8 @@ const TUILES=[
  {id:'transfusion',titre:'Transfusion',texte:'Groupage, RAI, commande à l’EFS, contrôle ultime au lit, surveillance, effets indésirables, traçabilité.',jobs:['anesthesiste','chirurgien','infirmier']},
  {id:'agenda',titre:'Agenda des consultations',texte:'Plages des anesthésistes, rendez-vous, lien de prise de rendez-vous envoyé au patient.',jobs:['anesthesiste','chirurgien','secretariat']},
  {id:'honoraires',titre:'Honoraires & paiements',texte:'Devis signé par le patient, feuille de soins SESAM-Vitale, paiement en ligne de la chambre ou des compléments.',jobs:['anesthesiste','chirurgien','secretariat','facturation']},
+ // Demandes à la pharmacie (26/11/2026) : écran Commandes pharmacie, vue « service ».
+ {id:'pharmacie',vue:'commandesPharmacie',titre:'Demandes à la pharmacie',texte:'Demander des produits du livret pour le service, suivre la délivrance par la pharmacie, accuser réception.',jobs:['anesthesiste','infirmier']},
  {id:'logistique',titre:'Logistique du bloc',texte:'Brancardage, stérilisation des boîtes d’instruments, planning des équipes et des gardes.',jobs:['anesthesiste','chirurgien','infirmier','pharmacien','secretariat']},
  {id:'qualite',titre:'Qualité & sécurité',texte:'Déclarer un événement indésirable, suivi par la qualité, RMM, mode dégradé et classeur de secours.',jobs:['anesthesiste','chirurgien','infirmier','pharmacien','secretariat','dim','facturation','administration']},
  {id:'assurance',titre:'Assurance maladie',texte:'Droits du patient (ADRi, ROC), résumé PMSI validé par le DIM, facture du séjour, retours de paiement et rejets.',jobs:['secretariat','facturation','dim','anesthesiste','chirurgien']},
@@ -84,7 +86,7 @@ root.createMarche=function(ctx){
  async function dessiner(){
   const host=$('#mk-body');if(!host)return;const n=++chargement;
   try{
-   if(!outil){host.innerHTML=hub();host.querySelectorAll('[data-mk-outil]').forEach(b=>b.onclick=()=>{outil=b.dataset.mkOutil;render('outils')});compterHub(host);return}
+   if(!outil){host.innerHTML=hub();host.querySelectorAll('[data-mk-outil]').forEach(b=>b.onclick=()=>{const t=TUILES.find(x=>x.id===b.dataset.mkOutil);if(t?.vue){ctx.go(t.vue);return}outil=b.dataset.mkOutil;render('outils')});compterHub(host);return}
    const fn=OUTILS[outil];if(!fn){host.innerHTML='<p class="notice warn">Outil indisponible.</p>';return}
    const html=await fn.html(K);if(n!==chargement||!$('#mk-body'))return;host.innerHTML=html;
    host.querySelectorAll('[data-mk-onglet]').forEach(b=>b.onclick=()=>{const [c,k]=b.dataset.mkOnglet.split('|');etat[c].onglet=k;dessiner()});

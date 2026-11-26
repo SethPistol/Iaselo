@@ -10,10 +10,13 @@ test('profils : pharmacien, préparateur, lecture pour l’administrateur, refus
  assert.equal(R.profil({job:'pharmacien',poste:'pharmacien'}),'pharmacien');
  assert.equal(R.profil({job:'pharmacien',poste:''}),'pharmacien');
  assert.equal(R.profil({job:'pharmacien',poste:'preparateur'}),'preparateur');
- assert.equal(R.profil({job:'anesthesiste',isAdmin:true}),'lecteur');
- assert.equal(R.profil({job:'infirmier',poste:'cadre'}),null);
+ assert.equal(R.profil({job:'dim',isAdmin:true}),'lecteur');
+ assert.equal(R.profil({job:'anesthesiste',isAdmin:true}),'service');assert.ok(R.voitCommandes({job:'anesthesiste',isAdmin:true}));
+ assert.equal(R.profil({job:'infirmier',poste:'cadre'}),'service');assert.equal(R.voitCommandes({job:'infirmier'}),false);
+ assert.equal(R.profil({job:'secretariat'}),null);
+ assert.match(R.refus('creer','service'),/passées par la pharmacie/);
  assert.match(R.refus('lire',null),/pharmacien et au préparateur/);
- assert.equal(R.refus('lire','lecteur'),'');assert.match(R.refus('creer','lecteur'),/Lecture seule/);
+ assert.equal(R.refus('lire','lecteur'),'');assert.match(R.refus('creer','lecteur'),/lecture seule/);
 });
 
 test('circuit : le préparateur prépare et soumet, seul le pharmacien valide, renvoie, rouvre, solde',()=>{
@@ -103,4 +106,40 @@ test('entrée en stock : lot créé, même lot fusionné, réception jamais comp
  const c={...cmd,receptions:[{id:'r1',conforme:6},{id:'r2',conforme:4},{id:'r3',conforme:2},{id:'r4',conforme:0}]};
  assert.deepEqual(R.receptionsHorsStock([c],lots).map(x=>x.reception.id),['r3']);
  assert.equal(R.numero('2026',7),'CMD-2026-0007');
+});
+
+test('demandes des services : droits, stupéfiant par un médecin, hors livret justifié',()=>{
+ let v=R.controlerDemande({service:'bloc',lignes:[{articleId:'a1',quantite:2},{articleId:'a1',quantite:1},{articleId:'a2',quantite:1}]},A);
+ assert.match(v.errors.join(' '),/stupéfiant est demandé par un médecin/);
+ v=R.controlerDemande({service:'bloc',lignes:[{articleId:'a1',quantite:2},{articleId:'a1',quantite:1},{articleId:'a2',quantite:1}]},A,{medecin:true});
+ assert.ok(v.ok);assert.equal(v.demande.lignes[0].quantite,3);
+ assert.match(R.controlerDemande({service:'x',lignes:[]},A).errors.join(' '),/Service demandeur/);
+ assert.match(R.controlerDemande({service:'sspi',lignes:[{horsLivret:true,nom:'Dantrolène',quantite:1}]},A).errors[0],/justification/);
+ assert.ok(R.controlerDemande({service:'sspi',lignes:[{horsLivret:true,nom:'Dantrolène',quantite:1,justification:'Chariot hyperthermie maligne'}]},A).ok);
+ assert.equal(R.serviceParDefaut({job:'infirmier',poste:'etage'}),'hospitalisation');assert.equal(R.serviceParDefaut({job:'infirmier',poste:'bloc'}),'bloc');
+ const d={statut:'demandee',lignes:[{articleId:'a1'}]},ds={statut:'demandee',lignes:[{articleId:'a2',stupefiant:true}]};
+ assert.equal(R.refusDemande('demander','service'),'');assert.match(R.refusDemande('demander','preparateur'),/service/);
+ assert.equal(R.refusDemande('annuler','service',d),'');assert.match(R.refusDemande('annuler','service',{...d,statut:'en_preparation'}),/prise en charge/);
+ assert.equal(R.refusDemande('delivrer','preparateur',d),'');assert.match(R.refusDemande('delivrer','preparateur',ds),/pharmacien/);
+ assert.equal(R.refusDemande('delivrer','pharmacien',ds),'');
+ assert.match(R.refusDemande('refuser','preparateur',d),/Seul le pharmacien/);
+ assert.equal(R.refusDemande('accuser','service',{statut:'delivree'}),'');assert.match(R.refusDemande('accuser','pharmacien',{statut:'delivree'}),/service/);
+ assert.match(R.refusDemande('lire',null),/réservées/);
+});
+
+test('délivrance : lots du produit, stock suffisant, premier périmé, motif si partielle, sortie idempotente',()=>{
+ const lots=[{id:'L1',articleId:'a1',batch:'B1',expiry:'2027-01-01',quantity:2},{id:'L2',articleId:'a1',batch:'B2',expiry:'2028-01-01',quantity:10},{id:'L3',articleId:'a1',batch:'B3',expiry:'2026-01-01',quantity:5},{id:'L4',articleId:'a3',batch:'I',expiry:'2028-01-01',quantity:5}];
+ const d={lignes:[{articleId:'a1',nom:A[0].nom,quantite:5}]},j='2026-11-26';
+ assert.deepEqual(R.lotsDisponibles(d.lignes[0],lots,j,A).map(x=>x.id),['L1','L2'],'périmé exclu, FEFO');
+ assert.match(R.controlerDelivrance(d,[{ligne:0,sorties:[{lotId:'L4',quantite:1}]}],lots,j,A).errors[0],/autre produit/);
+ assert.match(R.controlerDelivrance(d,[{ligne:0,sorties:[{lotId:'L1',quantite:3}]}],lots,j,A).errors[0],/2 en stock/);
+ assert.match(R.controlerDelivrance(d,[{ligne:0,sorties:[{lotId:'L2',quantite:3}]}],lots,j,A).errors[0],/motif requis/);
+ let r=R.controlerDelivrance(d,[{ligne:0,sorties:[{lotId:'L2',quantite:3}],motif:'Rupture, commande en cours'}],lots,j,A);
+ assert.ok(r.ok);assert.match(r.avertissements[0],/B1 périme en premier/);
+ r=R.controlerDelivrance(d,[{ligne:0,sorties:[{lotId:'L1',quantite:2},{lotId:'L2',quantite:3}]}],lots,j,A);assert.ok(r.ok);assert.equal(r.avertissements.length,0);
+ assert.equal(R.appliquerSorties(lots,'D1',r.lignes),2);assert.equal(lots[0].quantity,0);assert.equal(lots[1].quantity,7);
+ assert.equal(R.appliquerSorties(lots,'D1',r.lignes),0,'idempotent');assert.equal(lots[1].quantity,7);
+ const dem=[{delivrance:{id:'D1',lignes:r.lignes}},{delivrance:{id:'D2',lignes:[{ligne:0,sorties:[{lotId:'L2',quantite:1}]}]}}];
+ assert.equal(R.sortiesHorsStock(dem,lots).length,1);
+ assert.match(R.controlerDelivrance(d,[],lots,j,A).errors[0],/motif requis/);
 });
