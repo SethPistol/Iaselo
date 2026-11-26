@@ -49,3 +49,15 @@ test('codage CCAM : chaque praticien ne modifie que sa partie',()=>{
  assert.equal(R.ecritureAutorisee('chirurgien',dim,avant),true,'le chirurgien efface la décision DIM de sa ligne en rouvrant');
  assert.equal(R.ecritureAutorisee('anesthesiste',dim,avant),false);
 });
+test('codage CCAM : valeur de l’acte saisie si absente de la CCAM et dépassement d’honoraires par acte',()=>{
+ const c=codage();c.lignes[0].activites['1'].depassement='150,50';c.lignes.push({id:'d',code:'ZZZZ999',activites:{'1':{coche:true,tarifSaisi:'80',depassement:20}},complements:{}});
+ const p=R.panneau(c,'chirurgien',ix),z=p.lignes.find(x=>x.code==='ZZZZ999');
+ assert.equal(z.pu,80);assert.ok(z.tarifManuel);assert.equal(p.lignes[0].depassement,150.5);
+ assert.equal(p.depassements,170.5);assert.equal(p.totalGeneral,Math.round((p.total+170.5)*100)/100);assert.ok(!p.incomplet);
+ const f=R.lignesFacturables(c,ix).find(x=>x.cle==='a:1');assert.equal(f.depassement,150.5);assert.equal(f.base,436.02);
+ c.lignes[0].activites['1'].depassement='abc';assert.match(R.erreurValidation(c,'chirurgien',{...ix,actes:[]}),/dépassement d’honoraires invalide/);
+ c.lignes[0].activites['1'].depassement=-5;assert.match(R.erreurValidation(c,'chirurgien',{...ix,actes:[]}),/dépassement/);
+ // Le dépassement fait partie de la part du praticien : l'anesthésiste ne peut pas le modifier.
+ const avant=codage(),apres=codage();apres.lignes[0].activites['1'].depassement=99;
+ assert.equal(R.ecritureAutorisee('anesthesiste',avant,apres),false);assert.equal(R.ecritureAutorisee('chirurgien',avant,apres),true);
+});

@@ -90,7 +90,7 @@ function associer(actes){
  const out=[];
  // Codes d'association posés par les praticiens dans l'écran de codage : ils font foi.
  if(actes.length&&actes.every(a=>Object.hasOwn(TAUX_ASSOCIATION,String(a.association??'')))){
-  for(const a of actes){const tarif=num(a.tarif)??0,taux=TAUX_ASSOCIATION[String(a.association)];out.push({...a,tarif,taux,montant:arrondi(tarif*taux),note:taux?'':'Codé sans facturation (code d’association 0)'})}
+  for(const a of actes){const tarif=num(a.tarif)??0,taux=TAUX_ASSOCIATION[String(a.association)],codage=a.montantCodage==null||a.montantCodage===''?null:num(a.montantCodage);out.push({...a,tarif,taux,montant:codage!=null&&codage>=0?codage:arrondi(tarif*taux),note:taux?'':'Codé sans facturation (code d’association 0)'})}
   return out;
  }
  for(const activite of ['1','4']){
@@ -160,6 +160,11 @@ function controler(dossier={},contexte={},maintenant=new Date()){
  if(!/^\d{1,4}$/.test(t(f.ghs)))pose('facture','bloquant','GHS à reprendre du groupage du logiciel PMSI (numéro de 1 à 4 chiffres).','ghs');
  if(t(f.ghs)&&!(num(f.ghsTarif)>0))pose('facture','bloquant','Tarif du GHS (arrêté tarifaire de l’année, secteur ex-OQN) à saisir.','ghsTarif');
  for(const v of contexte.devis||[])if(num(v.depassement)>=SEUIL_DEVIS&&v.statut!=='signe')pose('facture','bloquant','Dépassement d’honoraires de '+v.depassement+' € sans devis signé par le patient (obligatoire dès 70 €).','devis');
+ // Dépassements saisis sur les actes : devis signé obligatoire dès 70 € par praticien.
+ const depPrat={};for(const a of actes){const dep=num(a.depassement)||0;if(dep>0){const k=String(a.activite)==='4'||/:c:/.test(a.cle||'')?'anesthésiste':'chirurgien';depPrat[k]=(depPrat[k]||0)+dep}}
+ const devisSigne=(contexte.devis||[]).some(v=>v.statut==='signe');
+ for(const [k,m] of Object.entries(depPrat))if(m>=SEUIL_DEVIS&&!devisSigne)pose('facture','bloquant','Dépassement d’honoraires de '+arrondi(m)+' € ('+k+') sans devis signé par le patient (obligatoire dès 70 €).','devis');
+ if(ex?.depassementInterdit&&Object.keys(depPrat).length)pose('facture','bloquant','Patient '+(d.exoneration==='c2s'?'C2S':'AME')+' : dépassements d’honoraires interdits sur les actes (sauf exigence particulière du patient).','devis');
  if(ex?.depassementInterdit&&(contexte.devis||[]).some(v=>num(v.depassement)>0))pose('facture','bloquant','Patient '+(d.exoneration==='c2s'?'C2S':'AME')+' : dépassements d’honoraires interdits (sauf exigence particulière du patient).','devis');
  const dl=delaiFacturation(p.sortie,maintenant);if(dl&&dl.reste<0)pose('facture','bloquant','Délai de facturation d’un an dépassé depuis le '+dl.limite+' : créance prescrite.','');else if(dl&&dl.reste<60)pose('facture','alerte','Plus que '+dl.reste+' jours pour facturer (limite '+dl.limite+').','');
  const compte=s=>out.filter(x=>x.section===s&&x.niveau==='bloquant').length;
@@ -177,8 +182,10 @@ function preFacture(dossier={},contexte={}){
  const baseSejour=arrondi(lignes.filter(l=>l.base).reduce((s,l)=>s+l.montant,0));
  // Honoraires
  const asso=associer((contexte.actes||[]).filter(a=>a.dim));
- for(const a of asso)honoraires.push({cle:a.cle,code:a.code,activite:a.activite,association:a.association,modificateurs:a.modificateurs||'',libelle:a.libelle||'',tarif:a.tarif,montant:a.montant,note:a.note});
- const baseHonoraires=arrondi(honoraires.reduce((s,h)=>s+h.montant,0)),depassements=arrondi((contexte.devis||[]).reduce((s,v)=>s+(num(v.depassement)||0),0));
+ for(const a of asso){const dep=Math.max(0,num(a.depassement)||0);honoraires.push({cle:a.cle,code:a.code,activite:a.activite,association:a.association,modificateurs:a.modificateurs||'',libelle:a.libelle||'',tarif:a.tarif,tarifSource:a.tarifSource||'',montant:a.montant,depassement:dep,depassementSource:a.depassementSource||'',total:arrondi(a.montant+dep),note:a.note})}
+ const baseHonoraires=arrondi(honoraires.reduce((s,h)=>s+h.montant,0)),depassementsActes=arrondi(honoraires.reduce((s,h)=>s+h.depassement,0)),depassementsDevis=arrondi((contexte.devis||[]).reduce((s,v)=>s+(num(v.depassement)||0),0));
+ // Dépassements saisis sur les actes (codage ou facturation) ; à défaut, ceux des devis.
+ const depassements=depassementsActes>0?depassementsActes:depassementsDevis,sourceDepassements=depassementsActes>0?'actes':depassementsDevis>0?'devis':'';
  // Participation de l'assuré : PF 24 € si un acte ≥ 120 €, sinon ticket modérateur de 20 % ; exonérations.
  const acteLourd=(contexte.actes||[]).some(a=>(num(a.tarif)||0)>=SEUIL_PF24);
  let participation=0,motif='';
@@ -191,7 +198,7 @@ function preFacture(dossier={},contexte={}){
  else fjNote=ambulatoire?'Non dû en ambulatoire':'Non dû ('+ex.label+')';
  const chambre=Math.max(0,(num(f.chambreNuits)||0)*(num(f.chambrePrix)||0));
  const amo=arrondi(baseSejour+baseHonoraires-participation),complementaireOuPatient=arrondi(participation+fj+chambre+depassements);
- return {lignes,honoraires,baseSejour,baseHonoraires,participation,motifParticipation:motif,forfaitJournalier:fj,noteForfait:fjNote,chambre:arrondi(chambre),depassements,amo,resteAvantMutuelle:complementaireOuPatient,
+ return {lignes,honoraires,baseSejour,baseHonoraires,participation,motifParticipation:motif,forfaitJournalier:fj,noteForfait:fjNote,chambre:arrondi(chambre),depassements,depassementsActes,depassementsDevis,sourceDepassements,totalHonoraires:arrondi(baseHonoraires+depassementsActes),amo,resteAvantMutuelle:complementaireOuPatient,
   note:'Estimation de contrôle : la facture B2 et les FSE sont établies par les logiciels agréés de la clinique et des praticiens.'};
 }
 

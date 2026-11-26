@@ -75,3 +75,20 @@ test('HL7 BAR^P12 : diagnostics en DG1, actes en PR1 avec extension documentaire
  assert.ok(seg.some(s=>/^PR1\|1\|\|NEKA020\^\^CCAM\|4\^0\^\^2\|20261120/.test(s)),seg.join('\n'));
  assert.ok(seg.some(s=>s.startsWith('ZFM|8|8')));
 });
+
+test('facture : valeur de chaque acte et dépassements saisis sur les actes',()=>{
+ const actes=[{cle:'a:1',code:'NEKA020',activite:'1',date:'2026-11-20',dim:true,tarif:470,association:'1',montantCodage:470,depassement:300},{cle:'a:4',code:'NEKA020',activite:'4',date:'2026-11-20',dim:true,tarif:200,association:'1',depassement:50,extension:'2'}];
+ const ctx={...ctxOk,actes};
+ const p=A.preFacture({droits:droitsOk,pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},ctx);
+ assert.deepEqual(p.honoraires.map(h=>[h.code,h.montant,h.depassement,h.total]),[['NEKA020',470,300,770],['NEKA020',200,50,250]]);
+ assert.equal(p.depassements,350);assert.equal(p.sourceDepassements,'actes');assert.equal(p.totalHonoraires,1020);
+ // Devis non signé : 300 € (chirurgien) bloque ; 50 € (anesthésiste) n'atteint pas le seuil.
+ let c=A.controler({droits:droitsOk,pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},ctx,new Date('2026-11-25'));
+ assert.ok(c.constats.some(x=>/300 € \(chirurgien\) sans devis signé/.test(x.message)));assert.ok(!c.constats.some(x=>/anesthésiste\) sans devis/.test(x.message)));
+ c=A.controler({droits:droitsOk,pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},{...ctx,devis:[{depassement:300,statut:'signe'}]},new Date('2026-11-25'));
+ assert.ok(!c.constats.some(x=>/sans devis signé/.test(x.message)));
+ c=A.controler({droits:{...droitsOk,exoneration:'c2s'},pmsi:pmsiOk,facture:{ghs:'1',ghsTarif:'100'}},{...ctx,devis:[{statut:'signe'}]},new Date('2026-11-25'));
+ assert.ok(c.constats.some(x=>/C2S : dépassements d’honoraires interdits sur les actes/.test(x.message)));
+ // Sans dépassement sur les actes : ceux des devis comptent.
+ assert.equal(A.preFacture({droits:droitsOk,pmsi:pmsiOk,facture:{}},{...ctxOk,devis:[{depassement:80,statut:'signe'}]}).sourceDepassements,'devis');
+});
