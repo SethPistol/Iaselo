@@ -19,9 +19,9 @@ test('commandes de la pharmacie : circuit préparateur → pharmacien → fourni
    const id=await createAccount(pool,{email:nom+'@example.test',name:'Test '+nom,passwordHash:await hashPassword(password)});await pool.query('UPDATE professional_profiles SET profession=$2,poste=$3,updated_at=$4 WHERE user_id=$1',[id,job,poste,at]);
    await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);await pool.query('UPDATE auth_users SET must_change_password=0 WHERE id=$1',[id]);c[nom]=await login(nom+'@example.test',password)}
   const {pharma,prep,ide}=c;
-  assert.equal((await api(ide)).status,403,'infirmière : pas d’accès');
+  {const v=await api(ide);assert.equal(v.data.profil,'service');assert.deepEqual(v.data.commandes,[],'la cadre ne voit pas les commandes fournisseurs')}
   let r=await api(prep);assert.equal(r.status,200);assert.equal(r.data.profil,'preparateur');
-  assert.equal((await api(admin)).data.profil,'lecteur');
+  {const v=(await api(admin)).data;assert.equal(v.voitCommandes,true,'administrateur : commandes en lecture')}
   // Livret : pharmacien seulement, motif exigé en modification.
   const para={nom:'Paracétamol 10 mg/ml perfusion 100 ml',fournisseur:'Laboratoire A',prix:'1,20',stockMin:5,stockMax:20,unite:'flacon'};
   assert.equal((await api(prep,{action:'article',article:para})).status,403);
@@ -78,5 +78,57 @@ test('commandes de la pharmacie : circuit préparateur → pharmacien → fourni
   assert.equal(await commit(prep,e('validation')),403,'validation : pharmacien seulement');
   assert.equal(await commit(prep,e('analysis')),403,'analyse : pharmacien seulement');
   assert.equal(await commit(prep,e('reconciliation')),200,'conciliation : préparateur accepté');
+ }finally{await db.close()}
+});
+
+
+test('demandes des services : le service demande, la pharmacie délivre par lot, le service accuse réception',async()=>{
+ const db=new PGlite(),pool=pgPool(db);
+ try{
+  await migrate(pool);await bootstrap(pool,env);
+  const app=await makeApp({pool,bucket:{async put(){},async get(){return null}},cfg:config(env)});
+  const call=(method,route,data,cookie)=>app(new Request(origin+route,{method,headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},...(data!==undefined?{body:JSON.stringify(data)}:{})}));
+  const login=async(e,p)=>(await call('POST','/auth/login',{email:e,password:p})).headers.get('Set-Cookie').split(';')[0];
+  const admin=await login(RECETTE_EMAIL,RECETTE_PASSWORD);await call('GET','/api/workspace',undefined,admin);
+  const api=async(cookie,data)=>{const r=await call(data?'POST':'GET','/api/workspace/pharmacie',data,cookie);return {status:r.status,data:await r.json()}};
+  const at=new Date().toISOString(),password='Mot de passe de test 2026',c={};
+  for(const [nom,job,poste] of [['pharma','pharmacien','pharmacien'],['prep','pharmacien','preparateur'],['ide','infirmier','bloc'],['mar','anesthesiste',''],['sec','secretariat','']]){
+   const id=await createAccount(pool,{email:nom+'@example.test',name:'Test '+nom,passwordHash:await hashPassword(password)});await pool.query('UPDATE professional_profiles SET profession=$2,poste=$3,updated_at=$4 WHERE user_id=$1',[id,job,poste,at]);
+   await pool.query("INSERT INTO professional_teams(user_id,team_id,valid_from) VALUES($1,'demo-clinique',$2)",[id,at]);await pool.query('UPDATE auth_users SET must_change_password=0 WHERE id=$1',[id]);c[nom]=await login(nom+'@example.test',password)}
+  const {pharma,prep,ide,mar,sec}=c;
+  const a1=(await api(pharma,{action:'article',article:{nom:'Paracétamol 10 mg/ml perfusion',fournisseur:'Labo A',prix:'1',stockMin:2,stockMax:10,unite:'flacon'}})).data.article;
+  const a2=(await api(pharma,{action:'article',article:{nom:'Sufentanil 5 µg/ml',fournisseur:'Labo B',prix:'2',stockMin:1,stockMax:5,unite:'ampoule',stupefiant:true}})).data.article;
+  const lots=[{id:'L1',articleId:a1.id,drug:a1.nom,batch:'P1',expiry:'2027-06-01',quantity:4},{id:'L2',articleId:a1.id,drug:a1.nom,batch:'P2',expiry:'2028-06-01',quantity:10},{id:'L3',articleId:a2.id,drug:a2.nom,batch:'S1',expiry:'2028-01-01',quantity:3}];
+  await pool.query("INSERT INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES('management/lots',$1,1,'test',$2,'op-lots','test')",[JSON.stringify(lots),at]);
+  // Lecture : le service voit le livret et les demandes, pas les commandes aux fournisseurs.
+  assert.equal((await api(sec)).status,403);
+  let r=await api(ide);assert.equal(r.status,200);assert.equal(r.data.profil,'service');assert.equal(r.data.voitCommandes,false);assert.equal(r.data.serviceParDefaut,'bloc');assert.deepEqual(r.data.commandes,[]);
+  assert.equal((await api(ide,{action:'creer',fournisseur:'Labo A',lignes:[{articleId:a1.id,quantite:1}]})).status,403,'le service ne commande pas au fournisseur');
+  // Demande : stupéfiant réservé au médecin.
+  assert.equal((await api(ide,{action:'demander',service:'bloc',lignes:[{articleId:a2.id,quantite:1}]})).status,400);
+  assert.equal((await api(prep,{action:'demander',service:'bloc',lignes:[{articleId:a1.id,quantite:1}]})).status,403);
+  r=await api(ide,{action:'demander',service:'bloc',lignes:[{articleId:a1.id,quantite:8}],urgent:true});assert.equal(r.status,200,JSON.stringify(r.data));
+  let dm=r.data.demande;assert.match(dm.numero,/^DEM-\d{4}-0001$/);assert.equal(dm.statut,'demandee');
+  r=await api(prep,{action:'demande-prendre',id:dm.id,version:1});dm=r.data.demande;assert.equal(dm.statut,'en_preparation');
+  assert.equal((await api(ide,{action:'demande-annuler',id:dm.id,version:dm.version,motif:'Plus nécessaire'})).status,403,'trop tard pour annuler');
+  assert.equal((await api(prep,{action:'demande-delivrer',id:dm.id,version:dm.version,lignes:[{ligne:0,sorties:[{lotId:'L1',quantite:5}]}]})).status,400,'stock du lot dépassé');
+  assert.equal((await api(prep,{action:'demande-delivrer',id:dm.id,version:dm.version,lignes:[{ligne:0,sorties:[{lotId:'L1',quantite:4}]}]})).status,400,'partielle sans motif');
+  r=await api(prep,{action:'demande-delivrer',id:dm.id,version:dm.version,lignes:[{ligne:0,sorties:[{lotId:'L1',quantite:4},{lotId:'L2',quantite:2}],motif:'Rupture partielle, commande en cours'}]});
+  assert.equal(r.status,200,JSON.stringify(r.data));dm=r.data.demande;assert.equal(dm.statut,'delivree');assert.equal(dm.delivrance.lignes[0].delivre,6);
+  assert.equal((await api(prep,{action:'demande-accuser',id:dm.id,version:dm.version})).status,403);
+  assert.equal((await api(ide,{action:'demande-accuser',id:dm.id,version:dm.version,ecart:true,motif:''})).status,400);
+  r=await api(ide,{action:'demande-accuser',id:dm.id,version:dm.version,ecart:true,motif:'Un flacon manquant dans le bac'});assert.equal(r.data.demande.statut,'recue');
+  assert.deepEqual(r.data.demande.evenements.map(e=>[e.action,e.profil]),[['demande','service'],['prise-en-charge','preparateur'],['delivrance','preparateur'],['reception','service']]);
+  // Stupéfiant demandé par l'anesthésiste : délivré par le pharmacien seulement.
+  let st=(await api(mar,{action:'demander',service:'bloc',lignes:[{articleId:a2.id,quantite:2}]})).data.demande;assert.equal(st.statut,'demandee');
+  assert.equal((await api(prep,{action:'demande-delivrer',id:st.id,version:1,lignes:[{ligne:0,sorties:[{lotId:'L3',quantite:2}]}]})).status,403);
+  assert.equal((await api(pharma,{action:'demande-delivrer',id:st.id,version:1,lignes:[{ligne:0,sorties:[{lotId:'L3',quantite:2}]}]})).status,200);
+  // Refus motivé par le pharmacien, annulation par le service avant prise en charge.
+  const d3=(await api(ide,{action:'demander',service:'sspi',lignes:[{horsLivret:true,nom:'Dantrolène 20 mg',quantite:2,justification:'Chariot hyperthermie maligne'}]})).data.demande;
+  assert.equal((await api(prep,{action:'demande-refuser',id:d3.id,version:1,motif:'Hors livret'})).status,403);
+  assert.equal((await api(pharma,{action:'demande-refuser',id:d3.id,version:1,motif:'Disponible au bloc dans la mallette dédiée'})).data.demande.statut,'refusee');
+  const d4=(await api(ide,{action:'demander',service:'bloc',lignes:[{articleId:a1.id,quantite:1}]})).data.demande;
+  assert.equal((await api(ide,{action:'demande-annuler',id:d4.id,version:1,motif:'Doublon de demande'})).data.demande.statut,'annulee');
+  await assert.rejects(pool.query("UPDATE pharmacy_request_events SET motif='x'"));
  }finally{await db.close()}
 });

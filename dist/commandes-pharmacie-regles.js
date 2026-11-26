@@ -13,6 +13,12 @@
     - produits thermosensibles : réception refusée en stock sans confirmation de la chaîne du froid (2 à 8 °C) ;
     - péremption courte (moins de 90 jours) : acceptation explicite et motivée ;
     - médicaments dérivés du sang : lot obligatoire, traçabilité nominative assurée ensuite à la dispensation.
+   Demandes des services à la pharmacie (dotations, 26/11/2026) :
+    - l'infirmier(ère) (bloc, étage, cadre) ou l'anesthésiste demande des produits du livret pour son service ;
+      un produit hors livret est demandé avec une justification ; un stupéfiant n'est demandé que par un médecin ;
+    - la pharmacie prend en charge et délivre par lot (premier périmé, premier sorti), sans dépasser le stock ;
+      une quantité non délivrée est motivée (rupture, commande en cours) ; stupéfiant ou hors livret : pharmacien ;
+    - le service accuse réception (écart signalé avec un motif) ; le pharmacien peut refuser une demande, motivée.
    Fonctions pures partagées par l'écran (commandes-pharmacie.js) et le serveur (worker/commandes-pharmacie.mjs).
    Testées dans tests/commandes-pharmacie.test.cjs. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.IaseloCommandesPharmacie=api})(typeof self!=='undefined'?self:this,function(){
@@ -28,12 +34,16 @@ const PROFILS={pharmacien:'Pharmacien',preparateur:'Préparateur en pharmacie'};
 const MAX_LIGNES=80,PEREMPTION_COURTE=90;
 
 // Profil d'un compte pour ce module : pharmacien (titulaire, adjoint), préparateur, lecteur (administrateur) ou aucun.
+const METIERS_SERVICE=['infirmier','anesthesiste'];
 function profil(c){
  if(!c)return null;
  if(c.job==='pharmacien')return c.poste==='preparateur'?'preparateur':'pharmacien';
+ if(METIERS_SERVICE.includes(c.job))return 'service';
  if(c.isAdmin)return 'lecteur';
  return null;
 }
+// Les commandes aux fournisseurs restent visibles par la pharmacie et, en lecture, par l'administrateur.
+const voitCommandes=c=>!!c&&(c.job==='pharmacien'||!!c.isAdmin);
 
 /* ---------- Livret des articles commandables ---------- */
 function normaliserArticle(a){
@@ -94,7 +104,7 @@ function controlerCommande(cmd,{validation=false}={}){
 function refus(action,p,cmd,acteurId){
  const etat=cmd?.statut||'';
  if(!p)return 'Commandes de la pharmacie : réservées au pharmacien et au préparateur en pharmacie.';
- if(p==='lecteur')return action==='lire'?'':'Lecture seule : les commandes sont passées par la pharmacie.';
+ if(p==='lecteur'||p==='service')return action==='lire'&&p==='lecteur'?'':'Commandes aux fournisseurs : passées par la pharmacie (lecture seule pour l’administrateur).';
  const pharma=p==='pharmacien';
  switch(action){
   case 'lire':return '';
@@ -190,8 +200,92 @@ function receptionsHorsStock(commandes,lots){
  return (commandes||[]).flatMap(c=>(c.receptions||[]).filter(r=>r.conforme>0&&!vues.has(r.id)).map(r=>({commande:c,reception:r})));
 }
 
+/* ---------- Demandes des services à la pharmacie ---------- */
+const SERVICES={bloc:'Bloc opératoire',sspi:'SSPI',hospitalisation:'Hospitalisation',ambulatoire:'Ambulatoire',consultation:'Consultation d’anesthésie'};
+const STATUTS_DEMANDE={demandee:'Transmise à la pharmacie',en_preparation:'En préparation',delivree:'Délivrée',recue:'Reçue par le service',refusee:'Refusée',annulee:'Annulée'};
+const DEMANDES_EN_COURS=['demandee','en_preparation','delivree'];
+function serviceParDefaut(c){return c?.job==='infirmier'?(c.poste==='etage'||!c.poste?'hospitalisation':'bloc'):c?.job==='anesthesiste'?'bloc':''}
+// lignes : [{articleId, quantite}] ou [{horsLivret:true, nom, quantite, justification}]
+function controlerDemande(d,articles,{medecin=false}={}){
+ const errors=[],parId=new Map((articles||[]).map(a=>[a.id,a])),lignes=[];
+ const service=str(d?.service,30);if(!Object.hasOwn(SERVICES,service))errors.push('Service demandeur requis.');
+ for(const l of Array.isArray(d?.lignes)?d.lignes:[]){
+  const q=entier(l?.quantite,1,10000);
+  if(l?.horsLivret){const nom=str(l.nom,160),j=str(l.justification,300);
+   if(nom.length<3){errors.push('Produit hors livret : désignation requise.');continue}
+   if(q===null){errors.push(nom+' : quantité entière positive requise.');continue}
+   if(j.length<5){errors.push(nom+' : justification requise pour un produit hors livret (patient, indication).');continue}
+   lignes.push({horsLivret:true,articleId:'',nom,quantite:q,justification:j,unite:str(l.unite,30)||'unité',stupefiant:false,froid:false,mds:false});continue}
+  const a=parId.get(l?.articleId);if(!a||!a.actif){errors.push('Produit inconnu ou retiré du livret.');continue}
+  if(q===null){errors.push(a.nom+' : quantité entière positive requise.');continue}
+  if(a.stupefiant&&!medecin){errors.push(a.nom+' : un stupéfiant est demandé par un médecin (anesthésiste).');continue}
+  const deja=lignes.find(x=>x.articleId===a.id);if(deja){deja.quantite+=q;continue}
+  lignes.push({articleId:a.id,nom:a.nom,quantite:q,unite:a.unite||'boîte',stupefiant:!!a.stupefiant,froid:!!a.froid,mds:!!a.mds});
+ }
+ if(!lignes.length&&!errors.length)errors.push('Ajoutez au moins un produit.');
+ if(lignes.length>MAX_LIGNES)errors.push('Une demande compte au plus '+MAX_LIGNES+' lignes.');
+ return {ok:!errors.length,errors,demande:{service,lignes,note:str(d?.note,600),urgent:!!d?.urgent}};
+}
+const demandeSensible=d=>(d?.lignes||[]).some(l=>l.stupefiant||l.horsLivret);
+function refusDemande(action,p,d,moi){
+ const etat=d?.statut||'',pharmacie=['pharmacien','preparateur'].includes(p);
+ if(!p)return 'Demandes à la pharmacie : réservées aux soignants des services et à la pharmacie.';
+ switch(action){
+  case 'lire':return '';
+  case 'demander':return p==='service'?'':'La demande est faite par le service (infirmier(ère) ou anesthésiste).';
+  case 'annuler':return p!=='service'?'La pharmacie refuse une demande, elle ne l’annule pas.':etat==='demandee'?'':'Demande déjà prise en charge par la pharmacie : appelez-la.';
+  case 'prendre':return !pharmacie?'Prise en charge par la pharmacie.':etat==='demandee'?'':'Demande déjà prise en charge ou close.';
+  case 'delivrer':
+   if(!pharmacie)return 'Délivrance par la pharmacie.';
+   if(!['demandee','en_preparation'].includes(etat))return 'Demande déjà délivrée ou close.';
+   if(demandeSensible(d)&&p!=='pharmacien')return 'Stupéfiant ou produit hors livret : délivrance par le pharmacien.';
+   return '';
+  case 'refuser':return p!=='pharmacien'?'Seul le pharmacien refuse une demande.':['demandee','en_preparation'].includes(etat)?'':'Demande déjà délivrée ou close.';
+  case 'accuser':return p!=='service'?'L’accusé de réception est fait par le service.':etat==='delivree'?'':'Rien à réceptionner pour cette demande.';
+ }
+ return 'Action inconnue.';
+}
+// Lots disponibles pour une ligne, premier périmé en premier (FEFO).
+function lotsDisponibles(ligne,lots,aujourdhui,articles){
+ const a=ligne.articleId?(articles||[]).find(x=>x.id===ligne.articleId)||{id:ligne.articleId,nom:ligne.nom}:null;
+ return (lots||[]).filter(l=>!l.blocked&&!(l.expiry&&l.expiry<aujourdhui)&&(Number(l.quantity)||0)>0&&(a?lotDeLArticle(l,a):fold(l.drug)===fold(ligne.nom)))
+  .sort((x,y)=>String(x.expiry).localeCompare(String(y.expiry)));
+}
+// saisies : [{ligne, sorties:[{lotId, quantite}], motif}]
+function controlerDelivrance(d,saisies,lots,aujourdhui,articles){
+ const errors=[],avertissements=[],lignes=[],pris=new Map();
+ const parLigne=new Map((Array.isArray(saisies)?saisies:[]).map(x=>[Number(x?.ligne),x]));
+ (d.lignes||[]).forEach((l,i)=>{
+  const s=parLigne.get(i)||{},dispo=lotsDisponibles(l,lots,aujourdhui,articles),sorties=[];let total=0;
+  for(const so of Array.isArray(s.sorties)?s.sorties:[]){
+   const q=entier(so?.quantite,0,10000);if(!q)continue;
+   const lot=dispo.find(x=>x.id===so.lotId);if(!lot){errors.push(l.nom+' : lot introuvable, bloqué, périmé ou d’un autre produit.');continue}
+   const deja=pris.get(lot.id)||0;if(deja+q>Number(lot.quantity)){errors.push(l.nom+' : lot '+lot.batch+' : '+(Number(lot.quantity)-deja)+' en stock seulement.');continue}
+   pris.set(lot.id,deja+q);total+=q;sorties.push({lotId:lot.id,lot:lot.batch,peremption:lot.expiry,quantite:q});
+  }
+  if(total>l.quantite)errors.push(l.nom+' : '+total+' délivré(s) pour '+l.quantite+' demandé(s).');
+  const motif=str(s.motif,300);
+  if(total<l.quantite&&motif.length<5)errors.push(l.nom+' : motif requis pour la quantité non délivrée (rupture, commande en cours…).');
+  const premier=dispo[0];if(premier&&sorties.length&&!sorties.some(x=>x.lotId===premier.id))avertissements.push(l.nom+' : le lot '+premier.batch+' périme en premier (premier périmé, premier sorti).');
+  lignes.push({ligne:i,delivre:total,sorties,motif});
+ });
+ if(!errors.length&&lignes.every(x=>!x.delivre)&&!lignes.every(x=>x.motif))errors.push('Rien à délivrer : indiquez les quantités ou refusez la demande.');
+ return {ok:!errors.length,errors,avertissements,lignes};
+}
+// Sortie du stock (Circuit du médicament › Stocks), idempotente par délivrance.
+function appliquerSorties(lots,delivranceId,lignes){
+ let n=0;
+ for(const l of lignes||[])for(const so of l.sorties||[]){const lot=lots.find(x=>x.id===so.lotId);if(!lot)continue;const cle=delivranceId+':'+so.lotId+':'+l.ligne;if((lot.sorties||[]).includes(cle))continue;lot.quantity=Math.max(0,(Number(lot.quantity)||0)-so.quantite);lot.sorties=[...(lot.sorties||[]),cle];n++}
+ return n;
+}
+function sortiesHorsStock(demandes,lots){
+ const vues=new Set((lots||[]).flatMap(l=>l.sorties||[]));
+ return (demandes||[]).filter(d=>d.delivrance&&(d.delivrance.lignes||[]).some(l=>(l.sorties||[]).some(so=>(lots||[]).some(x=>x.id===so.lotId)&&!vues.has(d.delivrance.id+':'+so.lotId+':'+l.ligne))));
+}
+const numeroDemande=(annee,n)=>'DEM-'+annee+'-'+String(n).padStart(4,'0');
+
 /* ---------- Numérotation ---------- */
 const numero=(annee,n)=>'CMD-'+annee+'-'+String(n).padStart(4,'0');
 
-return {STATUTS,EN_COURS,MODES_ENVOI,PROFILS,MAX_LIGNES,PEREMPTION_COURTE,fold,profil,normaliserArticle,validerArticle,ligneDepuisArticle,normaliserLignes,total,euros,controlerCommande,refus,stockArticle,recuConforme,reliquat,enCoursArticle,propositions,groupesProposition,controlerReception,statutApresReception,lotPourStock,integrerAuStock,receptionsHorsStock,numero,ajouterJours};
+return {METIERS_SERVICE,voitCommandes,SERVICES,STATUTS_DEMANDE,DEMANDES_EN_COURS,serviceParDefaut,controlerDemande,demandeSensible,refusDemande,lotsDisponibles,controlerDelivrance,appliquerSorties,sortiesHorsStock,numeroDemande,STATUTS,EN_COURS,MODES_ENVOI,PROFILS,MAX_LIGNES,PEREMPTION_COURTE,fold,profil,normaliserArticle,validerArticle,ligneDepuisArticle,normaliserLignes,total,euros,controlerCommande,refus,stockArticle,recuConforme,reliquat,enCoursArticle,propositions,groupesProposition,controlerReception,statutApresReception,lotPourStock,integrerAuStock,receptionsHorsStock,numero,ajouterJours};
 });
