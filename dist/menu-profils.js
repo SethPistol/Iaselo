@@ -10,10 +10,10 @@
 const MENUS={
  // Télésuivi des patients (27/11/2026) : médecins et infirmier(ère)s.
  anesthesiste:['priorities','controle','patients','telesuivi','releve','regulation','ouvertureSalles','pharmacy','questionnaireSend','preadmissions','tasks','droits'],
- chirurgien:['priorities','controle','patients','telesuivi','regulation','pmsi','questionnaireSend','preadmissions','tasks','droits'],
- infirmier:['priorities','controle','patients','telesuivi','releve','identity','regulation','planningsInfirmiers','ouvertureSalles','pharmacy','tasks'],
+ chirurgien:['priorities','controle','surveillance','patients','telesuivi','regulation','pmsi','questionnaireSend','preadmissions','tasks','droits'],
+ infirmier:['priorities','controle','surveillance','patients','telesuivi','releve','identity','regulation','planningsInfirmiers','ouvertureSalles','pharmacy','tasks'],
  // Infirmier(ère) d'étage : sans l'ouverture des salles (ni la check-list HAS, masquée dans le dossier).
- infirmier_etage:['priorities','controle','patients','telesuivi','releve','identity','regulation','planningsInfirmiers','pharmacy','tasks'],
+ infirmier_etage:['priorities','controle','surveillance','patients','telesuivi','releve','identity','regulation','planningsInfirmiers','pharmacy','tasks'],
  secretariat:['priorities','controle','patients','telephonie','preadmissions','identity','questionnaireSend','regulation','tasks'],
  // Pharmacien et préparateur en pharmacie : même menu ; les droits (validation) diffèrent côté serveur.
  pharmacien:['controle','patients','pharmacy','commandesPharmacie','tasks'],

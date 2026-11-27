@@ -2358,6 +2358,9 @@ if(telEcran){const renderBeforeTel=render;render=function(){if(view==='telephoni
 // Reprise des dossiers d'E-med (dist/reprise-emed.js) : HL7 v2, HPRIM Santé, FHIR R4, CSV, après relecture.
 const repriseEcran=window.createRepriseEmed?.({esc,toast,patients,teams:()=>careTeams,role:()=>role,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(repriseEcran){const renderBeforeReprise=render;render=function(){if(view==='repriseEmed'){closeCroDictation();repriseEcran.render();return}renderBeforeReprise()}}
+// Surveillance des lits (dist/surveillance-centrale.js) : alertes de tous les patients présents, saisie vocale des constantes.
+const surveillanceEcran=window.createSurveillanceCentrale?.({esc,toast,patients,role:()=>role,view:()=>view,peutSaisir:()=>nurseProfile()||role==='Anesthésiste',open:(id,nextTab)=>{sejoursNav.dossier();if(view==='patients'&&tab==='consult'&&p())captureConsult();selected=id;tab=nextTab||(nurseProfile()?'follow':'consult');view='patients';filter='Tous';query='';render()},go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(surveillanceEcran){const renderBeforeSurv=render;render=function(){if(view==='surveillance'){closeCroDictation();surveillanceEcran.render();return}renderBeforeSurv()}}
 // Plannings infirmiers (dist/plannings-infirmiers.js) : préparés et validés par le cadre, consultés en lecture seule par les infirmier(ère)s.
 const planningsInfirmiers=window.createPlanningsInfirmiers?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(planningsInfirmiers){const renderBeforePlannings=render;render=function(){if(view==='planningsInfirmiers'){closeCroDictation();planningsInfirmiers.render();return}renderBeforePlannings()}}
