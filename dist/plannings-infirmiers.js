@@ -8,6 +8,7 @@ root.createPlanningsInfirmiers=function(ctx){
  const {$,esc,toast}=ctx,R=root.IaseloPlanningsInfirmiers;if(!R)return null;
  const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4m8-4v4M3.5 10h17"/><path d="M7.5 13.5h2m2.5 0h2m2.5 0h0M7.5 16.5h2m2.5 0h2"/></svg>';
  const JOURS=['D','L','M','M','J','V','S'];
+ let auto=null,avantAuto=null;
  let service='',mois='',data=null,erreur='',outil='J',travail=null,modifie=false,envoi=false,chargement=0,historique=null,vueEquipe=false;
  const fmtDate=iso=>iso?new Date(iso).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})+' à '+new Date(iso).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';
  const nomMois=m=>{const [a,n]=m.split('-').map(Number);const s=new Date(Date.UTC(a,n-1,15)).toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'});return s.charAt(0).toUpperCase()+s.slice(1)};
@@ -21,7 +22,7 @@ root.createPlanningsInfirmiers=function(ctx){
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bouton);else bouton();
  async function api(q,options){const r=await fetch('/api/workspace/plannings-infirmiers'+(q||''),{cache:'no-store',...(options||{}),headers:{'Content-Type':'application/json'}});const j=await r.json().catch(()=>({error:'Réponse du serveur illisible.'}));if(!r.ok){const e=Error(j.error||'Service indisponible.');e.status=r.status;throw e}return j}
  const cadre=()=>!!data?.peutGerer;
- async function charger(){
+ async function charger(){auto=null;avantAuto=null;
   const n=++chargement;erreur='';historique=null;
   try{const j=await api('?'+new URLSearchParams({...(service?{service}:{}),mois}));if(n!==chargement)return;data=j;service=j.service;
    travail=j.planning?{personnes:j.planning.personnes.map(p=>({...p})),affectations:JSON.parse(JSON.stringify(j.planning.affectations||{}))}:{personnes:[],affectations:{}};modifie=false}
@@ -50,6 +51,26 @@ root.createPlanningsInfirmiers=function(ctx){
    ${lignes.length?`<ul class="pi-prog-jours">${lignes.slice(0,12).map(([d,x])=>`<li class="pi-b-${x.niveau}" title="${esc(x.alertes.join(' '))}"><b>${esc(jour(d))}</b> ${x.prevu} / ${x.besoin}${x.ecart<0?` <em>(${x.ecart})</em>`:''}${x.soir&&x.alertes.some(a=>/soir/.test(a))?' · soir non couvert':''}</li>`).join('')}${lignes.length>12?`<li>… et ${lignes.length-12} autre(s) jour(s)</li>`:''}</ul><p class="pi-sub">Prévus / nécessaires par jour ; survolez un jour pour le détail.</p>`:''}
    <p class="pi-sub">Calcul : ${esc(data.programme.reglages.parSalle)} infirmier(ère)s par salle ouverte (vacations et interventions du programme), plus la SSPI (1 infirmier(ère), 2 agents à partir de ${esc(data.programme.reglages.sspiSeuilDeuxAgents)} patients présents, art. D.6124-101 CSP). Réglages à confirmer par l’établissement.</p></section>`;
  }
+ // Proposition automatique (4e veille, lot E) : ne remplit que les cases vides ; le cadre relit, enregistre et valide.
+ function autoHtml(){
+  const A=root.IaseloPlanningAuto;if(!A)return '';
+  const et=A.ETAGE_DEFAUT,bloc=service==='bloc';
+  return `<details class="pi-auto no-print" ${auto?'open':''}><summary>Proposer le planning automatiquement</summary>
+   <p class="pi-sub">Remplit seulement les cases vides : congés, absences, formations et postes déjà saisis sont gardés. Respecte le repos de 11 h, 48 h par semaine, 5 jours d’affilée et 3 nuits d’affilée au plus, et répartit heures, nuits et week-ends. Rien n’est enregistré tant que vous ne cliquez pas sur « Enregistrer ».</p>
+   ${bloc?`<p class="pi-sub">Besoin repris du programme opératoire (salles ouvertes, SSPI, fin tardive → un poste du soir).${data?.programme?'':' <b>Aucun programme disponible pour ce mois.</b>'}</p>`
+    :`<div class="pi-auto-r">${[['M','Matin'],['S','Soir'],['N','Nuit']].map(([k,l])=>`<label>${l} (par jour)<input type="number" min="0" max="12" value="${auto?.etage?.[k]??et[k]}" data-pi-auto="${k}"></label>`).join('')}</div>`}
+   <p class="pi-auto-b"><button type="button" class="secondary" data-pi-proposer ${travail?.personnes?.length?'':'disabled'}>Proposer</button>${avantAuto?'<button type="button" class="secondary" data-pi-annuler-auto>Annuler la proposition</button>':''}</p>
+   ${auto?.resultat?`<p class="notice ${auto.resultat.manques.length?'warn':''}"><span><strong>${auto.resultat.ajouts.length} poste(s) placé(s)${auto.resultat.manques.length?`, ${auto.resultat.manques.length} non pourvu(s)`:', besoin couvert'}</strong>. Écart d’heures entre agents : ${auto.resultat.ecartHeures} h.${auto.resultat.manques.length?`<br>À pourvoir (renfort, intérim, heures supplémentaires) : ${esc(auto.resultat.manques.slice(0,15).map(m=>m.jour.slice(8,10)+'/'+m.jour.slice(5,7)+' '+R.CODES[m.code].label.toLowerCase()).join(', '))}${auto.resultat.manques.length>15?'…':''}`:''}</span></p>`:''}</details>`;
+ }
+ function lierAuto(host){
+  host.querySelector('[data-pi-proposer]')?.addEventListener('click',()=>{
+   const A=root.IaseloPlanningAuto,etage={};host.querySelectorAll('[data-pi-auto]').forEach(i=>etage[i.dataset.piAuto]=Math.max(0,Math.min(12,Number(i.value)||0)));
+   if(!avantAuto)avantAuto=JSON.parse(JSON.stringify(travail));
+   const r=A.proposer(avantAuto,mois,{service,besoins:data?.programme?.besoins||{},etage:{...A.ETAGE_DEFAUT,...etage}});
+   travail={personnes:r.planning.personnes.map(p=>({...p})),affectations:r.planning.affectations};auto={etage,resultat:r};modifie=true;draw();
+   toast?.(r.ajouts.length+' poste(s) proposé(s). Relisez puis enregistrez.')});
+  host.querySelector('[data-pi-annuler-auto]')?.addEventListener('click',()=>{travail=avantAuto;avantAuto=null;auto=null;draw();toast?.('Proposition annulée.')});
+ }
  function legende(){return `<div class="pi-legende">${R.ORDRE.map(k=>{const c=R.CODES[k];return `<span class="pi-tag pi-${c.ton}"><b>${esc(k)}</b> ${esc(c.label)}${c.debut?' '+esc(c.debut)+'–'+esc(c.fin):''}</span>`}).join('')}</div>`}
  function monPlanning(planning,monUser){
   const moi=planning.personnes.find(p=>p.userId===monUser);if(!moi)return '<p class="notice">Vous ne figurez pas sur ce planning. Voyez avec votre cadre.</p>';
@@ -72,6 +93,7 @@ root.createPlanningsInfirmiers=function(ctx){
    const al=R.alertes(travail,mois),presents=new Set(travail.personnes.map(p=>p.userId).filter(Boolean)),dispo=(data.comptes||[]).filter(c=>!presents.has(c.userId)&&(service==='bloc'?c.poste!=='etage':c.poste!=='bloc'));
    html+=`<p class="pi-sub">Cliquez sur un outil puis sur les cases du planning. Les infirmier(ère)s ne voient que la dernière version <b>validée</b>.</p>
    <div class="pi-outils no-print" role="toolbar" aria-label="Codes du planning">${R.ORDRE.map(k=>`<button type="button" class="pi-tag pi-${R.CODES[k].ton} ${outil===k?'active':''}" data-pi-outil="${k}" title="${esc(R.CODES[k].label)}"><b>${esc(k)}</b> ${esc(R.CODES[k].label)}</button>`).join('')}<button type="button" class="pi-tag ${outil==='gomme'?'active':''}" data-pi-outil="gomme"><b>⌫</b> Effacer</button><button type="button" class="pi-tag ${outil==='detail'?'active':''}" data-pi-outil="detail"><b>✎</b> Horaires et remarque</button></div>
+   ${autoHtml()}
    ${grille(travail,true,null)}
    <div class="pi-ajout no-print"><label>Ajouter une personne<select id="pi-compte"><option value="">Compte infirmier(ère)…</option>${dispo.map(c=>`<option value="${esc(c.userId)}">${esc(c.nom)} · ${({cadre:'cadre de bloc','cadre-etage':'cadre d’étage',bloc:'bloc',etage:'étage'})[c.poste]||'étage'}</option>`).join('')}</select></label><label>ou sans compte (intérim, renfort)<input id="pi-libre" maxlength="80" placeholder="Nom et prénom"></label><label>Fonction<input id="pi-fonction" maxlength="60" placeholder="IDE, IBODE, IADE, AS…"></label><button type="button" class="secondary" data-pi-ajouter>Ajouter</button>${!travail.personnes.length?'<button type="button" class="secondary" data-pi-reprendre>Reprendre l’équipe du mois précédent</button>':''}</div>
    ${al.length?`<section class="notice warn pi-alertes"><strong>${al.length} alerte${al.length>1?'s':''} (repos de 11 h, 48 h par semaine, 6 jours d’affilée)</strong><ul>${al.slice(0,30).map(a=>`<li>${esc(a.message)}</li>`).join('')}</ul>${al.length>30?`<p>… et ${al.length-30} autre(s).</p>`:''}<p>Vous pouvez valider malgré tout en indiquant le motif : il est conservé dans l’historique.</p></section>`:''}
@@ -119,6 +141,7 @@ root.createPlanningsInfirmiers=function(ctx){
   dlg.showModal();
  }
  function lier(host){
+  lierAuto(host);
   host.querySelectorAll('[data-pi-service]').forEach(b=>b.onclick=()=>{if(modifie&&!quitter())return;service=b.dataset.piService;data=null;draw();charger()});
   host.querySelectorAll('[data-pi-mois]').forEach(b=>b.onclick=()=>{if(modifie&&!quitter())return;const d=Number(b.dataset.piMois);mois=d?R.moisVoisin(mois,d):moisActuel();data=null;draw();charger()});
   host.querySelectorAll('[data-pi-vue]').forEach(b=>b.onclick=()=>{vueEquipe=b.dataset.piVue==='equipe';draw()});

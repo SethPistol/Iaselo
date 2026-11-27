@@ -57,3 +57,6 @@ button.pi-tag{cursor:pointer}button.pi-tag.active{border-color:var(--i-acc,#1f6b
 .pi-programme{display:block!important}.pi-programme>strong{display:block;margin-bottom:6px}
 .pi-prog-jours{list-style:none;display:flex;flex-wrap:wrap;gap:6px;padding:0!important}.pi-prog-jours li{padding:3px 10px;border-radius:999px;background:#fff;border:1px solid var(--border,#d6dde2);font-size:13px}
 .pi-prog-jours li.pi-b-crit{border-color:#e7a7a2;color:#9b1c25}.pi-prog-jours li em{font-style:normal;font-weight:700}
+/* Proposition automatique (4e veille, lot E) */
+.pi-auto{border:1px solid var(--border,#d6dde2);border-radius:12px;padding:10px 14px;margin:10px 0}.pi-auto summary{cursor:pointer;font-weight:600}
+.pi-auto-r{display:flex;gap:12px;flex-wrap:wrap}.pi-auto-r label{display:grid;gap:4px;font-size:14px}.pi-auto-r input{width:7em}.pi-auto-b{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
