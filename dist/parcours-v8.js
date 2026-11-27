@@ -2331,6 +2331,9 @@ if(commandesPharmacie){const renderBeforeCommandes=render;render=function(){if(v
 // Activité & occupation (dist/indicateurs.js) : chiffres agrégés pour l'administration, calculés par le serveur.
 const indicateursModule=window.createIndicateurs?.({$,esc,toast,sectors:serviceSectors,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(indicateursModule){const renderBeforeIndicateurs=render;render=function(){if(view==='indicateurs'){closeCroDictation();indicateursModule.render();return}renderBeforeIndicateurs()}}
+// Coût par séjour (4e veille, lot F) : direction, facturation, DIM, administrateur.
+const coutSejourModule=window.createCoutSejour?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(coutSejourModule){const renderBeforeCouts=render;render=function(){if(view==='coutsSejour'){closeCroDictation();coutSejourModule.render();return}renderBeforeCouts()}}
 
 // Annonce chirurgicale pour un patient pas encore connu, puis consultation d’anesthésie lancée depuis l’annonce (dist/annonce-patient.js).
 {const renderHooks=[];const annoncePatient=window.createAnnoncePatient?.({$,esc,toast,role:()=>role,writer:()=>annonceWriter(),canCreate:()=>canCreateStay(),teams:()=>careTeams,checkIdentity:identity=>identityWorkspace.checkNew(identity),add:stay=>patients.unshift(stay),current:p,tab:()=>tab,
