@@ -12,3 +12,7 @@ coverage/
 /modeles/
 dist/assets/ccam.json
 dist/assets/referentiels.json
+
+# Console des installations : liste et scripts avec secrets, jamais versionnés
+installations.json
+installation-*.sh

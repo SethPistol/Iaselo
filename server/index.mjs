@@ -1,5 +1,5 @@
 import http from 'node:http';import fs from 'node:fs/promises';import {createReadStream,existsSync} from 'node:fs';import {Readable} from 'node:stream';import path from 'node:path';import {fileURLToPath} from 'node:url';
-import {workspaceApi} from '../worker/workspace.mjs';import {fhirApi} from '../worker/fhir.mjs';import {interopEntrantApi,patientMarcheApi} from '../worker/marche.mjs';import {config} from './config.mjs';import {createPool,migrate,postgresBinding} from './database.mjs';import {cellarBinding} from './storage.mjs';import {bootstrap,createAuth,loginPage} from './auth.mjs';import {brevoMessaging} from './brevo.mjs';import {createPsc} from './interop/psc.mjs';import {createConnectors} from './interop/index.mjs';import {tourneeRappels} from '../worker/rappels-auto.mjs';import {rechargerCcamIndex} from '../worker/ccam-ref.mjs';
+import {workspaceApi} from '../worker/workspace.mjs';import {createEtablissement} from './etablissement.mjs';import {instanceApi} from './instance.mjs';import {fhirApi} from '../worker/fhir.mjs';import {interopEntrantApi,patientMarcheApi} from '../worker/marche.mjs';import {config} from './config.mjs';import {createPool,migrate,postgresBinding} from './database.mjs';import {cellarBinding} from './storage.mjs';import {bootstrap,createAuth,loginPage} from './auth.mjs';import {brevoMessaging} from './brevo.mjs';import {createPsc} from './interop/psc.mjs';import {createConnectors} from './interop/index.mjs';import {tourneeRappels} from '../worker/rappels-auto.mjs';import {rechargerCcamIndex} from '../worker/ccam-ref.mjs';
 const root=path.resolve(fileURLToPath(new URL('../dist/',import.meta.url)));
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.svg':'image/svg+xml','.wasm':'application/wasm','.gz':'application/gzip','.mjs':'application/javascript; charset=utf-8','.onnx':'application/octet-stream','.txt':'text/plain; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8'};
 // Module de transcription vocale du compte rendu opératoire (Whisper small, ONNX), voir scripts/modele-whisper.mjs,
@@ -10,13 +10,17 @@ const modelesRoot=path.resolve(process.env.IASELO_MODELES_DIR||(existsSync(path.
 const modeleAutorise=/^\/modeles\/Xenova\/whisper-small\/(?:onnx\/(?:encoder_model_quantized|decoder_model_merged_quantized)\.onnx|[a-z_]+\.(?:json|txt))$/;
 export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),interopEnv={},connectors=createConnectors(interopEnv),psc=createPsc({env:interopEnv,baseUrl:cfg.baseUrl,secret:cfg.sessionSecret})}){
  const auth=await createAuth(pool,cfg,{psc}),DB=postgresBinding(pool);
+ // Identité de l'établissement de cette installation (nom, coordonnées, logos) : réglée par l'administrateur.
+ const etab=createEtablissement({pool,bucket});const appliquerEtab=async()=>{try{const e=await etab.lire();if(e.majLe&&messaging&&typeof messaging==='object')messaging.establishment=e.nom}catch(err){console.error('etablissement',err?.code||err?.message)}};await appliquerEtab();const etatInstance=instanceApi({pool,bucket,etab,cfg});
  // Rappels SMS automatiques (consentement J-2/J-1, suivi J+1) : lancés par start() toutes les 10 minutes.
  const rappels=opts=>tourneeRappels({DB,MESSAGING:messaging},{origin:cfg.baseUrl,...opts});
  const handle=async function handle(request){const url=new URL(request.url),pathname=url.pathname;
   if(pathname==='/healthz'){try{await pool.query('SELECT 1');return Response.json({status:'ok'})}catch{return Response.json({status:'unavailable'},{status:503})}}
   if(pathname==='/auth/psc/start'&&request.method==='GET')return auth.pscStart();
   if(pathname==='/auth/psc/callback'&&request.method==='GET')return auth.pscCallback(request);
-  if(pathname==='/login'&&request.method==='GET')return new Response(loginPage('',undefined,auth.pscEnabled()),{headers:{'Content-Type':mime['.html']}});
+  if(pathname==='/login'&&request.method==='GET')return new Response(await etab.substituer(loginPage('',undefined,auth.pscEnabled())),{headers:{'Content-Type':mime['.html']}});
+  if(pathname==='/api/etablissement')return etab.api(request,null,cfg.baseUrl);
+  if(pathname==='/api/instance/etat')return etatInstance(request);
   if(pathname==='/auth/login'&&request.method==='POST')return auth.login(request);
   if(pathname==='/auth/logout'&&request.method==='POST')return auth.logout(request);
   if(pathname==='/auth/lock'&&request.method==='POST')return auth.lock(request);
@@ -49,6 +53,7 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   // Liens personnels du patient : prise de rendez-vous, devis d'honoraires, paiement (date de naissance demandée) ; webhook du paiement.
   if(/^\/api\/(rdv|devis|paiement)\//.test(pathname))return patientMarcheApi(request,{DB,INTEROP_ENV:interopEnv,ESTABLISHMENT:messaging?.establishment||''});
   const staff=await auth.user(request);
+  if(pathname==='/api/admin/etablissement'){const r=await etab.api(request,staff,cfg.baseUrl);if(request.method==='POST'&&r.ok)await appliquerEtab();return r}
   if(pathname.startsWith('/api/workspace')){
    if(!staff)return Response.json({error:'Connexion professionnelle requise.'},{status:401});
    const headers=new Headers(request.headers);for(const k of [...headers.keys()])if(k.startsWith('oai-')||k==='cookie')headers.delete(k);
@@ -64,8 +69,9 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(['/', '/index.html','/consultation-modele.html'].includes(pathname)&&!staff)return new Response(null,{status:303,headers:{Location:await auth.nextStep(request)}});
   let name;try{name=decodeURIComponent(pathname)}catch{return new Response('Chemin invalide',{status:400})}if(name==='/')name='/index.html';
   if(name.split('/').some(x=>x.startsWith('.'))||name.startsWith('/server/'))return new Response('Introuvable',{status:404});
+  if(name==='/assets/marque/etablissement.webp'||name==='/assets/marque/etablissement-sombre.webp'){const r=await etab.logo(name.includes('sombre')?'sombre':'clair');if(r)return r}
   const file=path.resolve(root,'.'+name);if(!file.startsWith(root+path.sep))return new Response('Introuvable',{status:404});
-  try{const stat=await fs.stat(file);if(!stat.isFile())throw Error();return new Response(request.method==='HEAD'?null:await fs.readFile(file),{headers:{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'}})}catch{return new Response('Introuvable',{status:404})}
+  try{const stat=await fs.stat(file);if(!stat.isFile())throw Error();const ext=path.extname(file);return new Response(request.method==='HEAD'?null:(ext==='.html'||ext==='.js')?await etab.substituer(await fs.readFile(file,'utf8')):await fs.readFile(file),{headers:{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'}})}catch{return new Response('Introuvable',{status:404})}
  };
  handle.rappels=rappels;
  // Recette seulement : programme fictif du bloc chargé au démarrage s'il n'y a plus d'intervention de démonstration à venir.
