@@ -8,12 +8,14 @@
  function evitement(){
   const main=d.querySelector('main');if(!main||d.querySelector('.a11y-evitement'))return;
   if(!main.id)main.id='contenu';main.setAttribute('tabindex','-1');
-  const a=d.createElement('a');a.className='a11y-evitement';a.href='#'+main.id;a.textContent=(d.documentElement.lang||'fr').startsWith('en')?'Skip to content':'Aller au contenu';
+  const a=d.createElement('a');a.className='a11y-evitement';a.href='#'+main.id;a.textContent='Aller au contenu';// traduit par traduction-patient.js sur les pages patient
   a.addEventListener('click',ev=>{ev.preventDefault();main.focus();main.scrollIntoView()});
   d.body.prepend(a);
  }
- const base=d.title;
- function titre(){
+ const base0=d.documentElement.dataset.titreFr||d.title;
+ // Pages patient traduites : le titre de base suit la langue choisie (traduction-patient.js).
+ const baseActuelle=()=>window.IaseloLangue?.traduire?.(base0)??base0;
+ function titre(){const base=baseActuelle();
   const h=d.getElementById('title');if(!h)return;
   let cache=d.getElementById('a11y-h1');
   const h1Visible=[...d.querySelectorAll('h1')].some(x=>x!==cache&&visible(x));

@@ -1,6 +1,9 @@
-// IASELO · pages patient en français ou en anglais (bouton FR / EN en haut à droite, choix mémorisé sur l'appareil).
+// IASELO · pages patient traduites (choix de la langue en haut à droite, mémorisé sur l'appareil).
+// Français (texte d'origine), anglais (dictionnaire ci-dessous) et, chargés seulement à la demande depuis dist/langues/ :
+// espagnol, portugais, arabe (écriture de droite à gauche), italien, allemand (4e veille, lot H).
 // Traduction par dictionnaire de phrases complètes, appliquée aussi au contenu affiché ensuite (MutationObserver).
 // Un texte absent du dictionnaire reste en français. Les données saisies par la clinique (noms, actes) ne sont pas traduites.
+// Aucun appel réseau vers un service de traduction : rien de ce qui est affiché ne quitte l'appareil.
 (function(){
 'use strict';
 const EN={
@@ -331,35 +334,100 @@ const EN={
 "Écrivez votre question ci-dessous. L’équipe vous répond aux heures ouvrables.": "Write your question below. The team replies during working hours.",
 "Votre message est transmis à votre équipe, qui vous répond aux heures ouvrables. Ce service n’est pas lu la nuit ni le week-end.": "Your message has been sent to your care team, who will reply during working hours. This service is not read at night or at weekends.",
 "En attendant, ces conseils peuvent vous aider :": "In the meantime, this advice may help:",
-"Messagerie indisponible": "Messages unavailable"
+"Messagerie indisponible": "Messages unavailable",
+"Ma chambre": "My room",
+"Écran indisponible": "Screen unavailable",
+"En cas d’urgence, appuyez sur la sonnette de votre lit.": "In an emergency, press the call button on your bed.",
+"Bienvenue": "Welcome",
+"Pour afficher vos informations, indiquez votre date de naissance.": "To show your information, please enter your date of birth.",
+"Votre sortie": "Your discharge",
+"La date sera fixée par l’équipe.": "The date will be set by the team.",
+"L’équipe prépare ce qui reste avant votre départ.": "The team is preparing what remains before you leave.",
+"Demander à l’équipe": "Ask the team",
+"Demande non urgente : l’équipe la voit sur son écran et passe dès que possible.": "Non-urgent request: the team sees it on their screen and will come as soon as possible.",
+"J’ai besoin d’aide": "I need help",
+"J’ai mal": "I am in pain",
+"J’ai soif": "I am thirsty",
+"Aller aux toilettes": "Go to the toilet",
+"Autre demande": "Other request",
+"Ma douleur, de 0 (aucune) à 10 (la pire imaginable)": "My pain, from 0 (none) to 10 (worst imaginable)",
+"Votre demande": "Your request",
+"Vos demandes": "Your requests",
+"vue par l’équipe": "seen by the team",
+"envoyée": "sent",
+"Vos consignes pour le retour à domicile": "Your instructions for going home",
+"Demande envoyée à l’équipe.": "Request sent to the team.",
+"Lien incomplet. Demandez à l’équipe d’activer l’écran.": "Incomplete link. Ask the team to activate the screen.",
+"Date de sortie": "Discharge date",
+"Accord du médecin pour la sortie": "Doctor’s approval for discharge",
+"Ordonnance de sortie": "Discharge prescription",
+"Courrier pour votre médecin": "Letter for your doctor",
+"Consignes pour le retour à domicile": "Instructions for going home",
+"Retour à domicile": "Going home",
+"prêt": "ready",
+"en cours": "in progress",
+"Bonjour": "Hello",
+"Établissement": "Healthcare facility",
+"Proche": "Relative or friend",
+"Taxi conventionné": "Approved taxi",
+"VSL": "Light medical vehicle",
+"Ambulance": "Ambulance",
+"Transport en commun": "Public transport",
+"Langue": "Language",
+"Aller au contenu": "Skip to content"
 };
-const JOURS={lundi:'Monday',mardi:'Tuesday',mercredi:'Wednesday',jeudi:'Thursday',vendredi:'Friday',samedi:'Saturday',dimanche:'Sunday'};
-const MOIS={janvier:'January',février:'February',mars:'March',avril:'April',mai:'May',juin:'June',juillet:'July',août:'August',septembre:'September',octobre:'October',novembre:'November',décembre:'December'};
+// Paquet de langue : phrases + éléments des phrases composées (dates, rendez-vous, montants, écran en chambre).
+const PAQ_EN={code:'en',nom:'English',dir:'ltr',phrases:EN,
+ avis:'English translation for your information. Documents you sign are recorded in French, and the French version prevails.',
+ jours:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
+ mois:['January','February','March','April','May','June','July','August','September','October','November','December'],
+ date:(j,d,m)=>j+' '+d+' '+m,dateAn:(d,m,y)=>d+' '+m+' '+y,
+ t:{rdv:'Appointment confirmed on',a:'at',avec:'with',rappel:'You will receive a reminder.',reference:'reference',interv:'operation planned for {x}',secteur:'sector {x}',payer:'Pay {x}',le:'on {x}',
+  urgence:'Your message mentions {x}. Do not wait for your care team: call 15 (or 112) now.',prevue:'Planned for {x}',prevueVers:'Planned for {x} at about {h}',bonjour:'Hello {x}',retour:'Going home: {x}',accompagnant:'escort arranged',chambre:'{x} · room {n}'},
+ urg:{'une douleur dans la poitrine':'chest pain','une gêne pour respirer':'difficulty breathing','un saignement important':'heavy bleeding','un malaise':'feeling faint','un signe neurologique (paralysie, trouble de la parole)':'a neurological sign (weakness, speech problem)','une détresse':'distress'}};
+// Langues proposées (nom dans la langue elle-même). Les paquets autres que l'anglais sont dans dist/langues/<code>.js.
+const LANGUES=[['fr','Français'],['en','English'],['es','Español'],['pt','Português'],['ar','العربية'],['it','Italiano'],['de','Deutsch']];
+const PAQ={en:PAQ_EN};
+const JOURS_FR=['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+const MOIS_FR=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const remp=(s,o)=>String(s||'').replace(/\{(\w+)\}/g,(m,k)=>o[k]??m);
 const MOTIFS=[
- [/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) (\d{1,2}) (\S+)$/i,(m,j,d,mo)=>(JOURS[j.toLowerCase()]||j)+' '+d+' '+(MOIS[mo.toLowerCase()]||mo)],
- [/^(\d{1,2}) (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) (\d{4})$/i,(m,d,mo,y)=>d+' '+MOIS[mo.toLowerCase()]+' '+y],
- [/^Rendez-vous confirmé le$/,()=>'Appointment confirmed on'],[/^à$/,()=>'at'],[/^avec$/,()=>'with'],
- [/^Vous recevrez un rappel\.$/,()=>'You will receive a reminder.'],[/^référence$/,()=>'reference'],
- [/^intervention prévue le (.+)$/,(m,x)=>'operation planned for '+x],[/^secteur (\S+)$/,(m,x)=>'sector '+x],
- [/^Payer (.+)$/,(m,x)=>'Pay '+x],[/^le (\d.+)$/,(m,x)=>'on '+x],[/^Ce questionnaire est réservé/,m=>m],
- [/^Votre message évoque (.+)\. N’attendez pas la réponse de l’équipe : appelez le 15 \(ou le 112\) maintenant\.$/,(m,x)=>'Your message mentions '+({'une douleur dans la poitrine':'chest pain','une gêne pour respirer':'difficulty breathing','un saignement important':'heavy bleeding','un malaise':'feeling faint','un signe neurologique (paralysie, trouble de la parole)':'a neurological sign (weakness, speech problem)','une détresse':'distress'}[x]||x)+'. Do not wait for your care team: call 15 (or 112) now.']
+ [/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) (\d{1,2}) (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)$/i,(P,m,j,d,mo)=>P.date(P.jours[JOURS_FR.indexOf(j.toLowerCase())],d,P.mois[MOIS_FR.indexOf(mo.toLowerCase())])],
+ [/^(\d{1,2}) (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) (\d{4})$/i,(P,m,d,mo,y)=>P.dateAn(d,P.mois[MOIS_FR.indexOf(mo.toLowerCase())],y)],
+ [/^Rendez-vous confirmé le$/,P=>P.t.rdv],[/^à$/,P=>P.t.a],[/^avec$/,P=>P.t.avec],
+ [/^Vous recevrez un rappel\.$/,P=>P.t.rappel],[/^référence$/,P=>P.t.reference],
+ [/^intervention prévue le (.+)$/,(P,m,x)=>remp(P.t.interv,{x:trP(P,x)??x})],[/^secteur (\S+)$/,(P,m,x)=>remp(P.t.secteur,{x})],
+ [/^Payer (.+)$/,(P,m,x)=>remp(P.t.payer,{x})],[/^le (\d.+)$/,(P,m,x)=>remp(P.t.le,{x:trP(P,x)??x})],[/^Ce questionnaire est réservé/,(P,m)=>m],
+ [/^Votre message évoque (.+)\. N’attendez pas la réponse de l’équipe : appelez le 15 \(ou le 112\) maintenant\.$/,(P,m,x)=>remp(P.t.urgence,{x:P.urg[x]||x})],
+ // Écran en chambre (lot C).
+ [/^Prévue (.+?) vers (\d{1,2}) h (\d{2})$/,(P,m,x,h,mi)=>remp(P.t.prevueVers,{x:trP(P,x)??x,h:h.padStart(2,'0')+':'+mi})],
+ [/^Prévue (.+)$/,(P,m,x)=>remp(P.t.prevue,{x:trP(P,x)??x})],
+ [/^Bonjour (.+)$/,(P,m,x)=>remp(P.t.bonjour,{x})],
+ [/^Retour : (.+?)( · accompagnant prévu)?$/,(P,m,x,acc)=>remp(P.t.retour,{x:trP(P,x)??x})+(acc?' · '+P.t.accompagnant:'')],
+ [/^(.+) · chambre (\S+)$/,(P,m,x,n)=>remp(P.t.chambre,{x,n})],
+ [/^(.+?) · (envoyée)$/,(P,m,x,e)=>{const t=trP(P,x);return t===null?null:t+' · '+(trP(P,e)??e)}],
+ [/^(.+?) \((\d{1,2})\/10\)$/,(P,m,x,n)=>{const t=trP(P,x);return t===null?null:t+' ('+n+'/10)'}]
 ];
 const KEY='iaselo-langue';
+const connue=c=>LANGUES.some(l=>l[0]===c);
 let lang='fr';try{lang=localStorage.getItem(KEY)||''}catch{}
-if(!lang)lang=/^en\b/i.test(navigator.language||'')?'en':'fr';
+if(!connue(lang)){const nav=String(navigator.language||'').slice(0,2).toLowerCase();lang=connue(nav)?nav:'fr'}
+const base=(document.currentScript?.src||location.href).replace(/[^/]*$/,'');
 const orig=new WeakMap(),attrOrig=new WeakMap(),ATTRS=['placeholder','title','aria-label','alt'];
 const norm=s=>s.replace(/\s+/g,' ').trim();
-function tr(s){const k=norm(s);if(!k)return null;if(EN[k])return EN[k];
- const sans=k.replace(/[\s:·]+$/,''),fin=k.slice(sans.length);if(sans!==k&&EN[sans])return EN[sans]+fin;
- for(const [re,f]of MOTIFS){const m=k.match(re);if(m)return f(...m)}return null}
+function trP(P,s){const k=norm(s);if(!k)return null;const D=P.phrases;if(D[k])return D[k];
+ const sans=k.replace(/[\s:·]+$/,''),fin=k.slice(sans.length);if(sans&&sans!==k){const r=trP(P,sans);if(r!==null)return r+fin}
+ for(const [re,f]of MOTIFS){const m=k.match(re);if(m){const r=f(P,...m);if(r!==null&&r!==undefined)return r}}return null}
+const actif=()=>lang!=='fr'&&PAQ[lang]?PAQ[lang]:null;
+const tr=s=>{const P=actif();return P?trP(P,s):null};
 function texte(n){
- if(lang==='en'){const src=orig.has(n)?orig.get(n):n.nodeValue;const t=tr(src);if(t!==null){if(!orig.has(n))orig.set(n,n.nodeValue);const lead=src.match(/^\s*/)[0],trail=src.match(/\s*$/)[0];const v=lead+t+trail;if(n.nodeValue!==v)n.nodeValue=v}}
+ if(actif()){const src=orig.has(n)?orig.get(n):n.nodeValue;const t=tr(src);if(t!==null){if(!orig.has(n))orig.set(n,n.nodeValue);const lead=src.match(/^\s*/)[0],trail=src.match(/\s*$/)[0];const v=lead+t+trail;if(n.nodeValue!==v)n.nodeValue=v}else if(orig.has(n)){if(n.nodeValue!==orig.get(n))n.nodeValue=orig.get(n);orig.delete(n)}}
  else if(orig.has(n)){if(n.nodeValue!==orig.get(n))n.nodeValue=orig.get(n);orig.delete(n)}
 }
 function attrs(el){
  let o=attrOrig.get(el);
  for(const a of ATTRS){if(!el.hasAttribute(a))continue;const cur=el.getAttribute(a);
-  if(lang==='en'){const src=o?.[a]??cur,t=tr(src);if(t!==null){if(!o){o={};attrOrig.set(el,o)}o[a]??=cur;if(cur!==t)el.setAttribute(a,t)}}
+  if(actif()){const src=o?.[a]??cur,t=tr(src);if(t!==null){if(!o){o={};attrOrig.set(el,o)}o[a]??=cur;if(cur!==t)el.setAttribute(a,t)}else if(o?.[a]!==undefined&&cur!==o[a])el.setAttribute(a,o[a])}
   else if(o?.[a]!==undefined){if(cur!==o[a])el.setAttribute(a,o[a])}}
 }
 function parcourir(root){
@@ -369,19 +437,34 @@ function parcourir(root){
  let n;while((n=w.nextNode()))n.nodeType===3?texte(n):attrs(n);
 }
 let titreFr=null;
-function tout(){if(titreFr===null)titreFr=document.title;document.title=lang==='en'?(tr(titreFr)||titreFr):titreFr;document.documentElement.lang=lang;parcourir(document.body);avis();boutons()}
-function avis(){let a=document.querySelector('.lang-avis');if(lang==='en'&&!a){a=document.createElement('p');a.className='lang-avis sessionnote no-print';a.textContent='English translation for your information. Documents you sign are recorded in French, and the French version prevails.';const ws=document.querySelector('#workspace');ws?ws.before(a):document.body.prepend(a)}else if(lang!=='en'&&a)a.remove()}
-function boutons(){document.querySelectorAll('.lang-switch button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lang===lang)))}
+function tout(){if(titreFr===null){titreFr=document.title;document.documentElement.dataset.titreFr=titreFr}const P=actif();document.title=P?(tr(titreFr)||titreFr):titreFr;document.documentElement.lang=P?lang:'fr';document.documentElement.dir=P?.dir==='rtl'?'rtl':'ltr';parcourir(document.body);avis();choix()}
+function avis(){const P=actif();let a=document.querySelector('.lang-avis');
+ if(P){if(!a){a=document.createElement('p');a.className='lang-avis sessionnote no-print';const ws=document.querySelector('#workspace');ws?ws.before(a):document.body.prepend(a)}a.textContent=P.avis;a.lang=lang;a.dir=P.dir}
+ else if(a)a.remove()}
+function choix(){const s=document.querySelector('.lang-switch select');if(s&&s.value!==lang)s.value=lang}
+// Chargement à la demande d'un paquet (script local, même origine : aucun service extérieur).
+function charger(code){
+ if(code==='fr'||PAQ[code])return Promise.resolve(true);
+ return new Promise(res=>{const sc=document.createElement('script');sc.src=base+'langues/'+code+'.js?v=1';sc.onload=()=>res(!!PAQ[code]);sc.onerror=()=>res(false);document.head.append(sc)});
+}
+async function changer(code){
+ if(!connue(code))code='fr';
+ const ok=await charger(code);if(!ok)code='fr';
+ lang=code;try{localStorage.setItem(KEY,lang)}catch{}
+ obs.disconnect();tout();obs.observe(document.body,OPTS);
+}
 function poser(){
- const s=document.createElement('div');s.className='lang-switch no-print';s.setAttribute('role','group');s.setAttribute('aria-label','Langue / Language');
- s.innerHTML='<button type="button" data-lang="fr" lang="fr">FR</button><button type="button" data-lang="en" lang="en">EN</button>';
- s.onclick=e=>{const b=e.target.closest('button');if(!b)return;lang=b.dataset.lang;try{localStorage.setItem(KEY,lang)}catch{}obs.disconnect();tout();obs.observe(document.body,OPTS)};
+ const s=document.createElement('div');s.className='lang-switch no-print';
+ s.innerHTML='<label><span aria-hidden="true" class="lang-ico">🌐</span><select aria-label="Langue / Language">'+LANGUES.map(([c,n])=>'<option value="'+c+'" lang="'+c+'"'+(c==='ar'?' dir="rtl"':'')+'>'+n+'</option>').join('')+'</select></label>';
+ s.querySelector('select').onchange=e=>changer(e.target.value);
  document.body.append(s);
- if(!document.querySelector('link[href^="liens-patient.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href='liens-patient.css?v=1';document.head.append(l)}
+ if(!document.querySelector('link[href^="liens-patient.css"]')){const l=document.createElement('link');l.rel='stylesheet';l.href=base+'liens-patient.css?v=2';document.head.append(l)}
 }
 const OPTS={childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:ATTRS};
 const obs=new MutationObserver(ms=>{obs.disconnect();for(const m of ms){if(m.type==='childList')m.addedNodes.forEach(parcourir);else if(m.type==='characterData'){orig.delete(m.target);texte(m.target)}else if(m.type==='attributes'){const o=attrOrig.get(m.target);if(o)delete o[m.attributeName];attrs(m.target)}}obs.observe(document.body,OPTS)});
-function demarrer(){poser();tout();obs.observe(document.body,OPTS)}
-window.IaseloLangue={langue:()=>lang,traduire:s=>lang==='en'?(tr(s)??s):s,_EN:EN};
+function demarrer(){poser();const voulu=lang;lang='fr';tout();obs.observe(document.body,OPTS);if(voulu!=='fr')changer(voulu)}
+window.IaseloLangue={langue:()=>lang,langues:LANGUES,traduire:s=>tr(s)??s,changer,
+ // Un paquet de langue s'enregistre ici (dist/langues/<code>.js).
+ enregistrer(p){if(p&&connue(p.code)&&p.code!=='fr'&&p.phrases)PAQ[p.code]=p},_EN:EN,_paquet:c=>PAQ[c]};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',demarrer);else demarrer();
 })();

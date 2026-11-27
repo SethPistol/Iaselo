@@ -10,7 +10,9 @@
 .lp-check{display:flex;gap:8px;align-items:flex-start;margin:8px 0}.lp-check input{width:auto}
 .lp-montant{font-size:2rem;font-weight:800;margin:6px 0 12px}
 .v-actions{display:flex;gap:10px;flex-wrap:wrap}
-.lang-switch{position:fixed;top:10px;right:10px;z-index:20;display:flex;gap:2px;border:1px solid var(--border);border-radius:999px;padding:2px;background:var(--bg)}
-.lang-switch button{border:0;background:none;padding:4px 10px;border-radius:999px;cursor:pointer;font-weight:700;color:inherit}
-.lang-switch button[aria-pressed=true]{background:var(--blue);color:#fff}
+.lang-switch{position:fixed;top:10px;right:10px;z-index:20;border:1px solid var(--border);border-radius:999px;padding:2px 4px 2px 10px;background:var(--bg)}
+.lang-switch label{display:flex;align-items:center;gap:4px;margin:0}
+.lang-switch select{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:4px 6px;min-height:32px;cursor:pointer;width:auto}
+[dir=rtl] .lang-switch{right:auto;left:10px}
+[dir=rtl] body{text-align:right}
 @media print{.lang-switch{display:none}}

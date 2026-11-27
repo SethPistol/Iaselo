@@ -16,7 +16,7 @@ test('le portail patient n’appelle que l’API du questionnaire',()=>{
 test('la traduction des pages patient est locale et chargée partout',()=>{
  const js=fs.readFileSync(new URL('../dist/traduction-patient.js',import.meta.url),'utf8');
  assert.doesNotMatch(js,/fetch\(|XMLHttpRequest|https?:\/\//);
- for(const page of ['patient','espace-patient','suivi-j1','lettre-liaison','ordonnance','rendez-vous','devis','paiement'])assert.match(fs.readFileSync(new URL('../dist/'+page+'.html',import.meta.url),'utf8'),/traduction-patient\.js/,page);
- const EN=JSON.parse(js.match(/const EN=(\{[\s\S]*?\});\nconst JOURS/)[1]);
+ for(const page of ['patient','espace-patient','suivi-j1','lettre-liaison','ordonnance','rendez-vous','devis','paiement','chambre','messagerie','preadmission'])assert.match(fs.readFileSync(new URL('../dist/'+page+'.html',import.meta.url),'utf8'),/traduction-patient\.js/,page);
+ const EN=JSON.parse(js.match(/const EN=(\{[\s\S]*?\});\n/)[1]);
  assert.equal(EN['Date de naissance'],'Date of birth');assert.ok(Object.keys(EN).length>250);
 });
