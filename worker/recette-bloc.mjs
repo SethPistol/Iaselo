@@ -115,6 +115,34 @@ const ANNONCES=[
 function identite(i,age,today){const y=Number(today.slice(0,4))-age,m=String(1+(i*5)%12).padStart(2,'0'),d=String(1+(i*7)%27).padStart(2,'0');return {lastName:'FICTIF-'+NOMS[i%NOMS.length],firstName:PRENOMS[i%PRENOMS.length],birthDate:y+'-'+m+'-'+d}}
 function consultation(c,ok){return {asa:c.asa,history:c.trt?c.trt:'Patient fictif de recette (programme du bloc).',allergies:c.all,treatments:c.trt||'Aucun traitement au long cours',plan:c.mode==='Ambulatoire'?'Anesthésie générale, prise en charge ambulatoire.':'Anesthésie générale, hospitalisation post-opératoire.',checks:[],validated:!!ok}}
 
+// Actes habituels par plage et biais de durée propre à chaque chirurgien (réel / prévu), pour un historique réaliste.
+const ACTES_HIST={lebrun:[['Prothèse totale de hanche',120],['Prothèse totale de genou',150],['Arthroscopie du genou (méniscectomie)',45],['Libération du canal carpien',30]],
+ test:[['Cure de hernie ombilicale',60],['Cure de hernie inguinale',60],['Exérèse de lipome',40]],ferrand:[['Cholécystectomie sous cœlioscopie',90],['Cure de hernie inguinale',60],['Sigmoïdectomie sous cœlioscopie',180]],
+ menard:[['Résection transurétrale de prostate',120],['Urétéroscopie souple (laser)',90]],okafor:[['Amygdalectomie',45],['Septoplastie',60],['Thyroïdectomie totale',90]],
+ vasseur:[['Cataracte (phacoémulsification)',30]],aubry:[['Coloscopie totale',30],['Fibroscopie œso-gastro-duodénale',20]]};
+const BIAIS={lebrun:1.18,test:1.05,ferrand:1.1,menard:.95,okafor:1.02,vasseur:.9,aubry:1.15};
+export function historiqueFictif(today,jours=30){
+ const out={vacations:[],bookings:[],stays:{}};let n=0,graine=7;
+ for(let i=1;i<=12;i++){const id=PREFIXE+'H-'+String(i).padStart(2,'0');out.stays[id]={core:{id,specialty:'Historique',mode:'Ambulatoire',stage:'Sortie',task:'Historique fictif du bloc',sector:'',identity:{lastName:'FICTIF-HISTORIQUE',firstName:'Patient '+i,birthDate:'1960-01-'+String(i).padStart(2,'0')},done:true,careTeamId:'demo-clinique'}}}const hasard=()=>{graine=(graine*1103515245+12345)%2147483648;return graine/2147483648};
+ const cle=Object.fromEntries(Object.entries(CHIRURGIENS).map(([k,v])=>[k,k]));
+ for(let d=ajouter(today,-1),k=0;k<jours;d=ajouter(d,-1)){const j=P.jourDe(d);if(j<1||j>5)continue;k++;
+  for(const [chir,js,salle,start,duree] of PLAGES){if(!js.includes(j)||!cle[chir])continue;
+   const vs=d+'T'+start,ve=C.addMinutes(vs,duree),v={id:'VAC-demo-h-'+salle+'-'+d+'-'+start.slice(0,2),resource:salle,label:'Historique fictif',start:vs,end:ve,staffIds:[...EQUIPES[salle]],surgeon:CHIRURGIENS[chir],state:'Ouverte'};
+   // Une vacation sur huit est restée peu remplie ; sinon 2 à 4 interventions.
+   const nb=hasard()<.125?1:2+Math.floor(hasard()*3);let cur=C.addMinutes(vs,Math.round(hasard()*hasard()*35));
+   for(let i=0;i<nb;i++){const [acte,prevu]=ACTES_HIST[chir][Math.floor(hasard()*ACTES_HIST[chir].length)];
+    const reel=Math.max(10,Math.round(prevu*BIAIS[chir]*(0.88+hasard()*.26)));const sortie=C.addMinutes(cur,reel);if(sortie>C.addMinutes(ve,40))break;
+    const id=PREFIXE+'H-'+String(++n%12+1).padStart(2,'0'),sspi=salle==='demo-endo-1'&&prevu<45?0:Math.round(40+hasard()*45);
+    out.bookings.push({id:PREFIXE+'RES-H-'+String(n).padStart(3,'0'),patient:id,resource:salle,vacationId:v.id,procedure:acte,start:cur,end:C.addMinutes(cur,prevu+15),duration:prevu,turnover:15,staffIds:[...v.staffIds],equipmentIds:[],note:'Historique fictif de recette',state:'Terminée',surgeon:v.surgeon,ccam:ccamDe(acte),
+     actualStart:cur,actualEnd:sortie,etapes:{arrivee:C.addMinutes(cur,-30),entree:cur,sortie,sortieBloc:C.addMinutes(sortie,sspi||10)},...(sspi?{recovery:{resource:'demo-sspi-1',start:sortie,end:C.addMinutes(sortie,sspi)}}:{})});
+    cur=C.addMinutes(sortie,12+Math.round(hasard()*20));
+   }
+   if(hasard()<.1)cur=v.end;out.vacations.push(v);
+  }
+ }
+ return out;
+}
+
 /* Construit tous les documents. current = documents actuels {key:data} (management/* seulement nécessaires).
    Retourne {documents:{key:data}, resume}. Déterministe pour une date et une heure données. */
 export function programmeFictif({today,now,current={}}){
@@ -181,6 +209,9 @@ export function programmeFictif({today,now,current={}}){
   stays[id].surgicalAnnouncement={published:{fields:{procedure:a.acte,surgeon:chir,urgency:a.urgent?'Urgente':'Programmée',mode:a.mode,laterality:a.lat||'Non applicable',date:d,time:a.time||'',duration:String(a.d),notes:a.notes||''},state:'Transmise',revision:1,sentAt:ajouter(today,-1)+'T'+String(8+i).padStart(2,'0')+':00:00.000Z',at:'Programme fictif de recette',author:{name:chir,label:'chirurgien'}}};
   resume.annonces++;
  }
+ // Historique fictif (27/11/2026, bloc prédictif) : 30 jours ouvrés passés de passages terminés, pour que les durées
+ // estimées, la prévision SSPI et l'analyse du bloc aient une référence. 12 dossiers fictifs « historique », sortis.
+ const hist=historiqueFictif(today);vacations.push(...hist.vacations);bookings.push(...hist.bookings);Object.assign(stays,hist.stays);resume.historique=hist.bookings.length;
  const documents={'management/planningResources':resources,'management/plages':plages,'management/vacations':vacations,'management/reservations':[...autresRes,...bookings]};
  for(const [id,s]of Object.entries(stays))for(const [module,data]of Object.entries(s))documents['stay/'+id+'/'+module]=data;
  resume.jours=jours.slice(0,3);resume.salles=SALLES.length;resume.plages=plagesDemoListe.length;

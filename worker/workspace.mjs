@@ -9,6 +9,7 @@ import {staffOuvertureSallesApi} from './ouverture-salles.mjs';
 import {staffMarcheApi} from './marche.mjs';
 import {staffProtocolesApi} from './protocoles.mjs';
 import {staffPlanningsInfirmiersApi} from './plannings-infirmiers.mjs';
+import {staffBlocOptimisationApi} from './bloc-optimisation.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
@@ -73,6 +74,7 @@ export async function workspaceApi(request,env){
   const ouvertureResponse=await staffOuvertureSallesApi(request,env,acl);if(ouvertureResponse)return ouvertureResponse;
   const marcheResponse=await staffMarcheApi(request,env,acl);if(marcheResponse)return marcheResponse;
   const protocolesResponse=await staffProtocolesApi(request,env,acl);if(protocolesResponse)return protocolesResponse;
+  const blocOptResponse=await staffBlocOptimisationApi(request,env,acl);if(blocOptResponse)return blocOptResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;

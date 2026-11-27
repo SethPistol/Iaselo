@@ -1,0 +1,15 @@
+/* Bloc prédictif et analyse du bloc (dist/bloc-previsions.js). */
+.bp-root h3{margin:26px 0 8px}.bp-root h3:first-child{margin-top:6px}.bp-root h4{margin:16px 0 6px;font-size:.95rem}
+.bp-muted{color:var(--muted,#5b6b7a);font-size:.86rem}
+.bp-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.78rem;font-weight:600;background:var(--wash,#eef4f8);border:1px solid var(--line,#d5e0e8);white-space:nowrap}
+.bp-badge.ok{background:#e6f4ea;border-color:#9fd3ad;color:#1d6b35}.bp-badge.warn{background:#fff4e0;border-color:#f3c47a;color:#8a5300}.bp-badge.crit{background:#fde8e8;border-color:#f0a1a1;color:#a11d1d}
+.bp-vacs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:10px 0}
+.bp-vac{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid var(--line,#d5e0e8);border-radius:10px;background:var(--paper,#fff);font-size:.88rem}
+.bp-vac.crit{border-color:#e07a7a;background:#fff5f5}
+.bp-heatmap td,.bp-heatmap th{text-align:center;min-width:42px}.bp-heatmap td.warn{background:#fff4e0}.bp-heatmap td.crit{background:#fbd5d5;font-weight:700}.bp-heatmap small{color:var(--muted,#5b6b7a)}
+.bp-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:12px 0 6px}
+.bp-kpi{display:flex;flex-direction:column;gap:4px;padding:14px!important}.bp-kpi strong{font-size:1.5rem}.bp-kpi small{color:var(--muted,#5b6b7a)}
+.bp-table td{vertical-align:top}.bp-table button{margin:2px 0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .bp-vac{background:transparent}:root:not([data-theme="light"]) .bp-vac.crit{background:rgba(224,122,122,.12)}:root:not([data-theme="light"]) .bp-heatmap td.warn{background:rgba(243,196,122,.18)}:root:not([data-theme="light"]) .bp-heatmap td.crit{background:rgba(224,122,122,.3)}}
+:root[data-theme="dark"] .bp-vac{background:transparent}:root[data-theme="dark"] .bp-heatmap td.warn{background:rgba(243,196,122,.18)}:root[data-theme="dark"] .bp-heatmap td.crit{background:rgba(224,122,122,.3)}
+@media print{.bp-root button,#bp-imprimer{display:none}}
