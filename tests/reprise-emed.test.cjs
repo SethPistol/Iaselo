@@ -46,3 +46,27 @@ test('rapprochement et versement dans une consultation non commencée seulement'
  const deja=R.versConsultation({allergies:'Iode',cpa:{}},p);assert.deepEqual(deja.faits,[]);assert.match(deja.note,/déjà commencée/);
  assert.equal(R.versConsultation({allergies:'Iode'},p).consult.allergies,'Iode');
 });
+const CDA=`<?xml version="1.0" encoding="UTF-8"?><ClinicalDocument xmlns="urn:hl7-org:v3"><title>Volet de synthèse médicale</title>
+<recordTarget><patientRole><id root="1.2.250.1.213.1.4.10" extension="260058815400233"/><id root="1.2.250.1.71.4.2.1" extension="E-1001"/>
+<patient><name><given>Alice</given><family qualifier="BR">FICTIF</family><family qualifier="SP">Martin</family></name><administrativeGenderCode code="F"/><birthTime value="19600512"/></patient></patientRole></recordTarget>
+<component><structuredBody>
+<component><section><code code="48765-2" codeSystem="2.16.840.1.113883.6.1"/><title>Allergies</title><text><list><item>Iode &amp; produits de contraste</item></list></text></section></component>
+<component><section><code code="11450-4"/><title>Problèmes</title><text><table><tbody><tr><td>Hypertension essentielle</td><td>2015</td></tr></tbody></table></text></section></component>
+<component><section><code code="10160-0"/><title>Traitements</title><text><list><item>Amlodipine 5 mg le soir</item></list></text></section></component>
+<component><section><code code="8716-3"/><title>Signes vitaux</title><text><table><tbody><tr><td>Poids</td><td>70 kg</td></tr></tbody></table></text></section></component>
+<component><section><code code="29762-2"/><title>Mode de vie</title><text>Non-fumeur</text></section></component>
+</structuredBody></component></ClinicalDocument>`;
+test('CDA R2 (DMP) : identité INS, sections allergies, antécédents, traitements, signes vitaux',()=>{
+ const r=R.lire(CDA,'vsm.xml');assert.equal(r.format,'CDA R2');const p=r.patients[0];
+ assert.equal(p.identite.ins,'260058815400233');assert.equal(p.identite.ipp,'E-1001');assert.equal(p.identite.nom,'FICTIF');assert.equal(p.identite.nomUsage,'MARTIN');assert.equal(p.identite.naissance,'1960-05-12');assert.equal(p.identite.sexe,'Féminin');
+ assert.deepEqual(p.allergies,['Iode & produits de contraste']);assert.deepEqual(p.antecedents,['Hypertension essentielle · 2015']);assert.deepEqual(p.traitements,['Amlodipine 5 mg le soir']);assert.equal(p.mesures.poids,70);
+ assert.ok(r.avertissements.some(a=>/Mode de vie/.test(a)));
+});
+test('plusieurs fichiers d’un même export : patients fusionnés, erreurs par fichier',()=>{
+ const r=R.lirePlusieurs([{nom:'adt.hl7',texte:HL7},{nom:'vsm.xml',texte:CDA},{nom:'vide.txt',texte:'bonjour'}]);
+ assert.equal(r.patients.length,2);assert.match(r.format,/HL7 v2 \+ CDA R2/);
+ const a=r.patients.find(p=>p.identite.ipp==='E-1001');
+ assert.ok(a.allergies.includes('Latex')&&a.allergies.includes('Iode & produits de contraste'));assert.equal(a.identite.ins,'260058815400233');
+ assert.ok(a.traitements.some(x=>/Amlodipine/.test(x))&&a.traitements.some(x=>/Bisoprolol/.test(x)));
+ assert.ok(r.avertissements.some(x=>/^vide\.txt : /.test(x)));
+});

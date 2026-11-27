@@ -24,9 +24,9 @@ root.createRepriseEmed=function(ctx){
  const sejours=()=>ctx.patients.filter(s=>s&&s.id&&s.identity);
  const nomS=s=>[String(s.identity?.lastName||'').toUpperCase(),s.identity?.firstName].filter(Boolean).join(' ')+' · '+(s.identity?.birthDate||'')+' · '+s.id;
  const frDate=d=>d?d.split('-').reverse().join('/'):'—';
- function analyser(texte,nom){
+ function analyser(texte,nom,fichiers){
   erreur='';bilan=null;choix={};
-  try{lu=R().lire(texte,nom);source=nom;
+  try{lu=fichiers?R().lirePlusieurs(fichiers):R().lire(texte,nom);source=fichiers?fichiers.map(f=>f.nom).join(', '):nom;
    lu.patients.forEach((p,i)=>{p.rapp=R().rapprocher(p,sejours());choix[i]=p.manque.length?'ignorer':p.rapp.auto||(p.rapp.candidats.length?'ignorer':'nouveau')})}
   catch(e){lu=null;erreur=e.message}
   draw();
@@ -52,8 +52,8 @@ root.createRepriseEmed=function(ctx){
   const teams=ctx.teams?.()||[];
   c.innerHTML=`<section class="re-card" aria-labelledby="re-h1"><h2 id="re-h1">Importer un export d’E-med</h2>
    <p class="re-mut">IASELO lit les formats d’échange publics. Rien n’est enregistré avant votre validation ; les données reprises sont marquées « à relire » et la consultation déjà commencée n’est jamais modifiée.</p>
-   <div class="re-formats"><span>HL7 v2 (ADT, ORU)</span><span>HPRIM Santé</span><span>FHIR R4 (JSON)</span><span>CSV (tableur)</span></div>
-   <p><label class="secondary" style="display:inline-block;cursor:pointer;padding:8px 14px;border-radius:8px">Choisir un fichier…<input type="file" id="re-file" accept=".hl7,.hpr,.hprim,.txt,.json,.csv,.tsv" hidden></label>
+   <div class="re-formats"><span>HL7 v2 (ADT, ORU)</span><span>HPRIM Santé</span><span>FHIR R4 (JSON)</span><span>CDA R2 (XML, documents du DMP)</span><span>CSV (tableur)</span></div>
+   <p><label class="secondary" style="display:inline-block;cursor:pointer;padding:8px 14px;border-radius:8px">Choisir un ou plusieurs fichiers…<input type="file" id="re-file" multiple accept=".hl7,.hpr,.hprim,.txt,.json,.xml,.csv,.tsv" hidden></label>
    <button type="button" class="secondary" id="re-modele">Télécharger le modèle CSV</button></p>
    ${erreur?`<p class="re-warn" role="alert">${esc(erreur)}</p>`:''}
    ${bilan?`<p class="re-ok" role="status">${bilan.crees} dossier(s) créé(s), ${bilan.completes} complété(s). Chaque dossier porte la mention « repris d’E-med, à relire » dans son historique.${bilan.notes.length?' Consultation déjà commencée, données à reporter depuis l’historique du dossier : '+esc(bilan.notes.join(' ; '))+'.':''}</p>`:''}
@@ -72,7 +72,9 @@ root.createRepriseEmed=function(ctx){
    </tbody></table></div>
    <p style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">${teams.length>1?`<label style="margin:0">Équipe des nouveaux dossiers <select id="re-team">${teams.map(t=>`<option value="${esc(t.id)}">${esc(t.name||t.id)}</option>`).join('')}</select></label>`:''}
    <button type="button" class="primary" id="re-go">Reprendre ${Object.values(choix).filter(v=>v!=='ignorer').length} dossier(s)</button></p></section>`:''}`;
-  c.querySelector('#re-file').onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>5e6){toast('Fichier trop volumineux (5 Mo au plus)');return}const buf=await f.arrayBuffer();let txt=new TextDecoder('utf-8').decode(buf);if(txt.includes('�'))txt=new TextDecoder('windows-1252').decode(buf);analyser(txt,f.name)};
+  c.querySelector('#re-file').onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;if(fs.length>200||fs.some(f=>f.size>5e6)){toast('200 fichiers de 5 Mo au plus');return}
+   const lus=await Promise.all(fs.map(async f=>{const buf=await f.arrayBuffer();let txt=new TextDecoder('utf-8').decode(buf);if(txt.includes('\uFFFD'))txt=new TextDecoder('windows-1252').decode(buf);return {nom:f.name,texte:txt}}));
+   lus.length===1?analyser(lus[0].texte,lus[0].nom):analyser('','',lus)};
   c.querySelector('#re-modele').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+R().MODELE_CSV],{type:'text/csv'}));a.download='modele-reprise-emed.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
   c.querySelectorAll('[data-choix]').forEach(s=>s.onchange=()=>{choix[s.dataset.choix]=s.value;const b=c.querySelector('#re-go');if(b)b.textContent='Reprendre '+Object.values(choix).filter(v=>v!=='ignorer').length+' dossier(s)'});
   const go=c.querySelector('#re-go');if(go)go.onclick=()=>{if(!Object.values(choix).some(v=>v!=='ignorer')){toast('Aucun dossier choisi.');return}appliquer()};
@@ -84,7 +86,7 @@ root.createRepriseEmed=function(ctx){
   draw();
  }
  // Exposé pour les tests de bout en bout (analyse d'un texte sans passer par le sélecteur de fichier).
- root.IaseloRepriseEmedUI={analyser:(txt,nom)=>analyser(txt,nom)};
+ root.IaseloRepriseEmedUI={analyser:(txt,nom)=>analyser(txt,nom),plusieurs:fichiers=>analyser('','',fichiers)};
  return {render};
 };
 })(typeof self!=='undefined'?self:this);

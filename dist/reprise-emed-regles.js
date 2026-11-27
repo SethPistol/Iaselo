@@ -98,14 +98,41 @@ function depuisCsv(texte){
  return {patients,avertissements:avert};
 }
 
+
+/* ---------- CDA R2 (documents du DMP, VSM, lettres structurées) ---------- */
+// Lecture sans DOM (serveur et navigateur) : en-tête recordTarget et sections codées LOINC.
+const ent=x=>t(String(x||'').replace(/<[^>]+>/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,(m,n)=>String.fromCharCode(+n)).replace(/&amp;/g,'&'));
+const attr=(xml,balise,nom)=>{const m=new RegExp('<(?:\\w+:)?'+balise+'\\b[^>]*\\b'+nom+'="([^"]*)"','i').exec(xml);return m?ent(m[1]):''};
+const bloc=(xml,balise)=>{const m=new RegExp('<(?:\\w+:)?'+balise+'\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?'+balise+'>','i').exec(xml);return m?m[1]:''};
+const SECTIONS_CDA={'48765-2':'allergies','11450-4':'antecedents','11348-0':'antecedents','47519-4':'antecedents','10160-0':'traitements','10183-2':'traitements','8716-3':'mesures'};
+function depuisCda(xml){
+ const x=String(xml),rt=bloc(x,'recordTarget');if(!rt)throw Error('Document CDA sans patient (recordTarget).');
+ const p=vide(),ids=[...rt.matchAll(/<(?:\w+:)?id\b([^>]*)\/?>/gi)].map(m=>({root:(/root="([^"]*)"/.exec(m[1])||[])[1]||'',ext:(/extension="([^"]*)"/.exec(m[1])||[])[1]||''}));
+ const ins=ids.find(i=>/^1\.2\.250\.1\.213\.1\.4\.(8|9|10|11)$/.test(i.root)),ipp=ids.find(i=>i!==ins&&i.ext);
+ const noms=[...rt.matchAll(/<(?:\w+:)?name\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?name>/gi)].map(m=>({use:(/use="([^"]*)"/.exec(m[1])||[])[1]||'',family:[...m[2].matchAll(/<(?:\w+:)?family\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?family>/gi)].map(f=>({q:(/qualifier="([^"]*)"/.exec(f[1])||[])[1]||'',v:ent(f[2])})),given:[...m[2].matchAll(/<(?:\w+:)?given\b[^>]*>([\s\S]*?)<\/(?:\w+:)?given>/gi)].map(g=>ent(g[1]))}));
+ const n=noms[0]||{family:[],given:[]},naiss=n.family.find(f=>f.q==='BR')||n.family[0],usage=n.family.find(f=>f.q==='SP'||f.q==='CL');
+ const bt=attr(rt,'birthTime','value'),g=attr(rt,'administrativeGenderCode','code');
+ p.identite={nom:t(naiss?.v).toUpperCase(),prenom:n.given.join(' '),nomUsage:usage&&usage!==naiss?t(usage.v).toUpperCase():'',naissance:bt.length>=8?bt.slice(0,4)+'-'+bt.slice(4,6)+'-'+bt.slice(6,8):'',sexe:SEXE[g]||'',ipp:ipp?.ext||'',ins:ins?.ext||''};
+ const avert=[],titre=ent(bloc(x,'title'));
+ for(const m of x.matchAll(/<(?:\w+:)?section\b[^>]*>([\s\S]*?)<\/(?:\w+:)?section>/gi)){
+  const sec=m[1],code=attr(sec,'code','code'),cible=SECTIONS_CDA[code];
+  const lignes=[...(bloc(sec,'text').matchAll(/<(?:\w+:)?(?:item|tr|paragraph)\b[^>]*>([\s\S]*?)<\/(?:\w+:)?(?:item|tr|paragraph)>/gi))].map(l=>ent(l[1].replace(/<\/(?:\w+:)?td>/gi,' — ').replace(/ — \s*$/,''))).filter(l=>l&&!/^(allerg|antécédent|traitement|médicament|libellé|substance)\b.*—/i.test(l));
+  if(!cible){avert.push('Section non reprise : '+(ent(bloc(sec,'title'))||code||'sans code'));continue}
+  if(cible==='mesures'){for(const l of lignes){const mm=/^(.*?)\s*—\s*([\d.,]+)\s*([a-zA-Z%]*)/.exec(l);if(mm)mesure(p,mm[1],'',mm[2],mm[3])}continue}
+  p[cible].push(...lignes.map(l=>l.replace(/\s*—\s*/g,' · ')));
+ }
+ if(titre)avert.unshift('Document : '+titre);
+ return {patients:[p],avertissements:avert};
+}
 const AUCUNE=/^(aucune?|nkda|pas d.?allergie|neant|r\.?a\.?s\.?|non)$/i;
 function lire(texte,nomFichier=''){
  const s=String(texte||'').replace(/^﻿/,'').trimStart();let format,r;
  if(s.startsWith('MSH|')){format='HL7 v2';r=depuisHl7(s)}
  else if(/^H\|/.test(s)){format='HPRIM Santé';r=depuisHprim(s)}
+ else if(/^(<\?xml[\s\S]*?)?<(\w+:)?ClinicalDocument\b/.test(s)||/<(\w+:)?ClinicalDocument\b/.test(s.slice(0,2000))){format='CDA R2';r=depuisCda(s)}
  else if(s.startsWith('{')){format='FHIR R4';try{r=depuisFhir(s)}catch(e){throw Error('JSON illisible ou non FHIR : '+e.message)}}
  else if(/\.(csv|txt|tsv)$/i.test(nomFichier)||/[;,\t]/.test(s.split(/\r?\n/)[0]||'')){format='CSV';r=depuisCsv(s)}
- else throw Error('Format non reconnu : HL7 v2 (MSH|…), HPRIM Santé (H|…), FHIR R4 (JSON) ou CSV attendu.');
+ else throw Error('Format non reconnu : HL7 v2 (MSH|…), HPRIM Santé (H|…), FHIR R4 (JSON) CDA R2 (XML) ou CSV attendu.');
  for(const p of r.patients){
   const sansAllergie=p.allergies.length&&p.allergies.every(a=>AUCUNE.test(t(a)));
   p.allergies=sansAllergie?[]:uniques(p.allergies.filter(a=>!AUCUNE.test(t(a))));p.aucuneAllergie=!!sansAllergie;
@@ -133,5 +160,19 @@ function versConsultation(consult,p,source){
  return {consult:c,faits,note:''};
 }
 const MODELE_CSV='Nom;Prénom;Date de naissance;Sexe;IPP;Allergies;Antécédents;Traitements;Poids;Taille;Groupe sanguin\nFICTIF;Alice;12/05/1960;F;E-1001;Pénicilline (urticaire);HTA | Diabète de type 2;Bisoprolol 5 mg 1 le matin | Metformine 1000 mg matin et soir;72;165;A+\n';
-return {lire,depuisHl7,depuisHprim,depuisFhir,depuisCsv,rapprocher,versConsultation,MODELE_CSV,COLONNES};
+// Plusieurs fichiers d'un même export : patients fusionnés par INS, IPP ou identité.
+function lirePlusieurs(fichiers){
+ const parCle=new Map(),formats=new Set(),avert=[];
+ for(const f of fichiers){let r;try{r=lire(f.texte,f.nom)}catch(e){avert.push(f.nom+' : '+e.message);continue}formats.add(r.format);avert.push(...r.avertissements.map(a=>f.nom+' : '+a));
+  for(const p of r.patients){const i=p.identite,triple=x=>[plie(x.nom),plie(x.prenom).split(' ')[0],x.naissance].join('|');
+   const d=[...parCle.values()].find(q=>i.ins&&q.identite.ins===i.ins||i.ipp&&q.identite.ipp===i.ipp||i.naissance&&triple(q.identite)===triple(i));
+   if(!d){parCle.set(parCle.size,p);continue}
+   for(const [k,v] of Object.entries(i))if(v&&!d.identite[k])d.identite[k]=v;
+   d.allergies=uniques([...d.allergies,...p.allergies]);d.aucuneAllergie=!d.allergies.length&&(d.aucuneAllergie||p.aucuneAllergie);d.antecedents=uniques([...d.antecedents,...p.antecedents]);d.traitements=uniques([...d.traitements,...p.traitements]);
+   d.mesures={...p.mesures,...d.mesures};d.biologie.push(...p.biologie);d.venue=d.venue||p.venue;d.manque=[!d.identite.nom&&'nom',!d.identite.naissance&&'date de naissance'].filter(Boolean)}}
+ if(!parCle.size)throw Error(avert[0]||'Aucun patient trouvé.');
+ for(const p of parCle.values())imc(p);
+ return {format:[...formats].join(' + '),patients:[...parCle.values()],avertissements:avert.slice(0,80)};
+}
+return {lire,lirePlusieurs,depuisCda,depuisHl7,depuisHprim,depuisFhir,depuisCsv,rapprocher,versConsultation,MODELE_CSV,COLONNES};
 });
