@@ -1467,7 +1467,7 @@ function consultAncienneTrame(){
 
 
 /* Consultation d'anesthésie : modèle « Consultation pré-anesthésique simplifiée » (consultation-modele.js). */
-let consultModele=null;
+let consultModele=null,ordonnanceLecture=null;
 function consult(){
  if(!consultModele)return consultAncienneTrame();
  const x=p(),c=x.consult,read=role!=='Anesthésiste'||c.validated;
@@ -1477,6 +1477,9 @@ function consult(){
  ${consultModele.bandeau(x)}
  <div id="cpa-zone" class="cpa-zone"></div>${consultModele.ancienneHTML(c)}`;
  consultModele.monter($('#cpa-zone'),x,read);
+ // Lecture d'ordonnance (dist/ordonnance-lecture.js, 27/11/2026) : photo, image, PDF ou texte → traitement habituel après validation.
+ ordonnanceLecture??=window.createOrdonnanceLecture?.({esc,toast,event,medecin:()=>professionalWorkspace?.getAccess?.()?.profile?.display_name||'',deriver:st=>consultModele.deriver(st),rerender:()=>{tab='consult';detail()}})||null;
+ ordonnanceLecture?.bouton(document.querySelector('.cpa-head .actions'),x,read);
  if(nurseProfile()||sharedWorkspace)$('#openscience').hidden=true;else $('#openscience').onclick=()=>{captureConsult();tab='science';detail()};
  const majGaps=()=>{if(c.validated)return;const g=consultGaps(),el=$('#cpa-gaps');if(!el)return;el.textContent=g.length?g.length+' champ'+(g.length>1?'s':'')+' à compléter':'Complète';el.className='pill '+(g.length?'warn':'good')};
  consultChangeHook=majGaps;
