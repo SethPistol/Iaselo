@@ -26,7 +26,7 @@ const MENUS={
 // « Bloc & lits » : l'administrateur y gère les plages opératoires des chirurgiens (26/11/2026).
 // Plannings infirmiers : l'administrateur les consulte (lecture seule, la validation revient au cadre).
 // API FHIR & partenaires (27/11/2026) : logiciels autorisés à lire le dossier.
-const ADMIN=['indicateurs','telephonie','professionalAccess','pilotage','droits','fhir','etablissement','protocoles','commandesPharmacie','regulation','planningsInfirmiers','activity','billing'];
+const ADMIN=['indicateurs','telephonie','professionalAccess','pilotage','droits','fhir','etablissement','repriseEmed','protocoles','commandesPharmacie','regulation','planningsInfirmiers','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
 function menuPourProfil(profession,isAdmin,poste){

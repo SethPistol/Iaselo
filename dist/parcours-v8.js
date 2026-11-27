@@ -2355,6 +2355,9 @@ if(etabEcran){const renderBeforeEtab=render;render=function(){if(view==='etablis
 // Accueil téléphonique par IA (dist/accueil-telephonique.js) : appels reçus ou simulés, rappels par service.
 const telEcran=window.createAccueilTelephonique?.({esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(telEcran){const renderBeforeTel=render;render=function(){if(view==='telephonie'){closeCroDictation();telEcran.render();return}renderBeforeTel()}}
+// Reprise des dossiers d'E-med (dist/reprise-emed.js) : HL7 v2, HPRIM Santé, FHIR R4, CSV, après relecture.
+const repriseEcran=window.createRepriseEmed?.({esc,toast,patients,teams:()=>careTeams,role:()=>role,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(repriseEcran){const renderBeforeReprise=render;render=function(){if(view==='repriseEmed'){closeCroDictation();repriseEcran.render();return}renderBeforeReprise()}}
 // Plannings infirmiers (dist/plannings-infirmiers.js) : préparés et validés par le cadre, consultés en lecture seule par les infirmier(ère)s.
 const planningsInfirmiers=window.createPlanningsInfirmiers?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(planningsInfirmiers){const renderBeforePlannings=render;render=function(){if(view==='planningsInfirmiers'){closeCroDictation();planningsInfirmiers.render();return}renderBeforePlannings()}}
