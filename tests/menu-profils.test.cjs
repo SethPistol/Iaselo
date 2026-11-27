@@ -14,7 +14,7 @@ test('menu : écrans hors métier masqués',()=>{
  for(const v of ['pmsi','billing','activity','pilotage','professionalAccess'])assert.ok(!inf.includes(v),'infirmier voit '+v);
  for(const v of ['pmsi','billing','pharmacy','releve'])assert.ok(!sec.includes(v),'secrétariat voit '+v);
  assert.ok(sec.includes('priorities')&&inf.includes('priorities')&&sec.includes('patients')&&sec.includes('regulation')&&sec.includes('questionnaireSend'));
- assert.deepEqual(M.menuPourProfil('administration',false),['indicateurs','professionalAccess','droits']);
+ assert.deepEqual(M.menuPourProfil('administration',false),['indicateurs','telephonie','professionalAccess','droits']);
  assert.deepEqual(M.menuPourProfil('inconnu',false),['professionalAccess']);
 });
 test('menu : l’administrateur des habilitations garde la gestion de la clinique',()=>{

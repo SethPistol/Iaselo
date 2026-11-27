@@ -15,6 +15,7 @@ import {staffFhirApi,notifierFhir} from './fhir.mjs';
 import {staffRedactionApi} from './redaction-ia.mjs';
 import {patientMessagerieApi,staffMessagerieApi} from './messagerie.mjs';
 import {staffContinuiteApi} from './continuite.mjs';
+import {staffTelephonieApi} from './telephonie.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
@@ -87,6 +88,7 @@ export async function workspaceApi(request,env){
   const redactionResponse=await staffRedactionApi(request,env,acl);if(redactionResponse)return redactionResponse;
   const messagerieResponse=await staffMessagerieApi(request,env,acl);if(messagerieResponse)return messagerieResponse;
   const continuiteResponse=await staffContinuiteApi(request,env,acl);if(continuiteResponse)return continuiteResponse;
+  const telephonieResponse=await staffTelephonieApi(request,env,acl);if(telephonieResponse)return telephonieResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;

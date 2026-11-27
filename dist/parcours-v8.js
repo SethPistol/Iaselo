@@ -2352,6 +2352,9 @@ if(fhirEcran){const renderBeforeFhir=render;render=function(){if(view==='fhir'){
 // Établissement (dist/etablissement-admin.js) : identité de l'établissement de cette installation (administrateur).
 const etabEcran=window.createEtablissementAdmin?.({esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(etabEcran){const renderBeforeEtab=render;render=function(){if(view==='etablissement'){closeCroDictation();etabEcran.render();return}renderBeforeEtab()}}
+// Accueil téléphonique par IA (dist/accueil-telephonique.js) : appels reçus ou simulés, rappels par service.
+const telEcran=window.createAccueilTelephonique?.({esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(telEcran){const renderBeforeTel=render;render=function(){if(view==='telephonie'){closeCroDictation();telEcran.render();return}renderBeforeTel()}}
 // Plannings infirmiers (dist/plannings-infirmiers.js) : préparés et validés par le cadre, consultés en lecture seule par les infirmier(ère)s.
 const planningsInfirmiers=window.createPlanningsInfirmiers?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(planningsInfirmiers){const renderBeforePlannings=render;render=function(){if(view==='planningsInfirmiers'){closeCroDictation();planningsInfirmiers.render();return}renderBeforePlannings()}}

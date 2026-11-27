@@ -13,7 +13,7 @@ test('état de l’installation : jeton exigé, aucune donnée de santé, lu par
   const get=(h={})=>app(new Request(origin+'/api/instance/etat',{headers:h}));
   assert.equal((await get()).status,401);assert.equal((await get({Authorization:'Bearer mauvais'})).status,401);
   const r=await get({Authorization:'Bearer '+JETON});assert.equal(r.status,200);const e=await r.json();
-  assert.equal(e.base,'ok');assert.equal(e.stockage,'ok');assert.match(e.derniereMigration,/026_etablissement/);assert.equal(e.etablissement.nom,'Clinique du Trocadéro');
+  assert.equal(e.base,'ok');assert.equal(e.stockage,'ok');assert.match(e.derniereMigration,/^\d{3}_[a-z_]+\.sql$/);assert.equal(e.etablissement.nom,'Clinique du Trocadéro');
   assert.deepEqual(Object.keys(e).sort(),['base','baseUrl','commit','demarrage','derniereMigration','etablissement','migrations','recette','stockage','version']);
   const fetcher=(u,o)=>app(new Request(String(u),o));
   const res=await etat([{nom:'Trocadéro',url:origin,jetonVariable:'J1'},{nom:'Lilas',url:origin,jetonVariable:'J2'}],{fetcher,env:{J1:JETON}});
