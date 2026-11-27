@@ -11,6 +11,7 @@ import {staffProtocolesApi} from './protocoles.mjs';
 import {staffPlanningsInfirmiersApi} from './plannings-infirmiers.mjs';
 import {staffBlocOptimisationApi} from './bloc-optimisation.mjs';
 import {patientParcoursApi,staffParcoursApi} from './parcours-suivi.mjs';
+import {staffFhirApi,notifierFhir} from './fhir.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
@@ -78,6 +79,7 @@ export async function workspaceApi(request,env){
   const protocolesResponse=await staffProtocolesApi(request,env,acl);if(protocolesResponse)return protocolesResponse;
   const blocOptResponse=await staffBlocOptimisationApi(request,env,acl);if(blocOptResponse)return blocOptResponse;
   const parcoursResponse=await staffParcoursApi(request,env,acl);if(parcoursResponse)return parcoursResponse;
+  const fhirResponse=await staffFhirApi(request,env,acl);if(fhirResponse)return fhirResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;
@@ -122,7 +124,7 @@ export async function workspaceApi(request,env){
    const updates=docs.map(d=>d.revision===0?env.DB.prepare('INSERT INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES(?,?,1,?,?,?,?)').bind(d.key,JSON.stringify(d.data),user,at,d.operation,d.reason):env.DB.prepare('UPDATE workspace_documents SET data=?,revision=revision+1,actor=?,updated_at=?,operation=?,reason=? WHERE key=? AND revision=?').bind(JSON.stringify(d.data),user,at,d.operation,d.reason,d.key,d.revision));
    const cleanup=docs.map(d=>env.DB.prepare('DELETE FROM workspace_write_checks WHERE operation=?').bind(d.operation));
    try{await env.DB.batch([acl.policyGuard(),...checks,...updates,...plan.statements,...authorized.grants,...cleanup,env.DB.prepare("DELETE FROM workspace_write_checks WHERE operation LIKE 'policy-%'")]);}catch(error){const replay=await replays();if(replay)return json({documents:replay.map(rowValue),replayed:true});const conflicts=[];for(const d of docs){const current=await env.DB.prepare('SELECT * FROM workspace_documents WHERE key=?').bind(d.key).first();if((current?.revision||0)!==d.revision)conflicts.push({key:d.key,current:rowValue(current)});}if(conflicts.length)return json({error:'Conflit : aucune modification du lot n’a été enregistrée.',conflicts},409);throw error;}
-   const versions=await Promise.all(docs.map(async d=>resolveRow(await env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first())));for(const d of docs)await acl.log('write',d.key,'allowed',d.reason,'Révision '+(d.revision+1));await declencher(env,acl,docs,liaisonAvant,url.origin);await consentDeclencher(env,acl,docs,consentAvantEcriture,url.origin);return json({documents:versions.map(rowValue)});
+   const versions=await Promise.all(docs.map(async d=>resolveRow(await env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first())));for(const d of docs)await acl.log('write',d.key,'allowed',d.reason,'Révision '+(d.revision+1));await declencher(env,acl,docs,liaisonAvant,url.origin);await notifierFhir(env,docs).catch(e=>console.error('fhir',e?.message||e));await consentDeclencher(env,acl,docs,consentAvantEcriture,url.origin);return json({documents:versions.map(rowValue)});
   }
   if(path==='/api/workspace/document'&&method==='PUT'){
    let d=await body(request);
@@ -134,7 +136,7 @@ export async function workspaceApi(request,env){
    const statement=d.revision===0?env.DB.prepare('INSERT OR IGNORE INTO workspace_documents(key,data,revision,actor,updated_at,operation,reason) VALUES(?,?,1,?,?,?,?)').bind(d.key,payload,user,at,d.operation,d.reason):env.DB.prepare('UPDATE workspace_documents SET data=?,revision=revision+1,actor=?,updated_at=?,operation=?,reason=? WHERE key=? AND revision=?').bind(payload,user,at,d.operation,d.reason,d.key,d.revision);
    const results=await env.DB.batch([acl.policyGuard(),statement,...plan.statements,...authorized.grants,env.DB.prepare("DELETE FROM workspace_write_checks WHERE operation LIKE 'policy-%'")]);const result=results[1];
    if(!result.meta.changes){const current=await env.DB.prepare('SELECT * FROM workspace_documents WHERE key=?').bind(d.key).first();return json({error:'Cette rubrique a changé sur un autre poste. Comparez les versions.',current:rowValue(current)},409)}
-   const ownVersion=await resolveRow(await env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first());await acl.log('write',d.key,'allowed',d.reason,'Révision '+ownVersion.revision);await declencher(env,acl,[d],liaisonAvant,url.origin);await consentDeclencher(env,acl,[d],consentAvantEcriture,url.origin);return json({document:rowValue(ownVersion)});
+   const ownVersion=await resolveRow(await env.DB.prepare('SELECT * FROM workspace_versions WHERE operation=?').bind(d.operation).first());await acl.log('write',d.key,'allowed',d.reason,'Révision '+ownVersion.revision);await notifierFhir(env,[d]).catch(e=>console.error('fhir',e?.message||e));await declencher(env,acl,[d],liaisonAvant,url.origin);await consentDeclencher(env,acl,[d],consentAvantEcriture,url.origin);return json({document:rowValue(ownVersion)});
   }
   if(path==='/api/workspace/history'&&method==='GET'){
    const key=url.searchParams.get('key');if(!validKey(key))return json({error:'Rubrique invalide.'},400);

@@ -1,5 +1,5 @@
 import http from 'node:http';import fs from 'node:fs/promises';import {createReadStream,existsSync} from 'node:fs';import {Readable} from 'node:stream';import path from 'node:path';import {fileURLToPath} from 'node:url';
-import {workspaceApi} from '../worker/workspace.mjs';import {interopEntrantApi,patientMarcheApi} from '../worker/marche.mjs';import {config} from './config.mjs';import {createPool,migrate,postgresBinding} from './database.mjs';import {cellarBinding} from './storage.mjs';import {bootstrap,createAuth,loginPage} from './auth.mjs';import {brevoMessaging} from './brevo.mjs';import {createPsc} from './interop/psc.mjs';import {createConnectors} from './interop/index.mjs';import {tourneeRappels} from '../worker/rappels-auto.mjs';import {rechargerCcamIndex} from '../worker/ccam-ref.mjs';
+import {workspaceApi} from '../worker/workspace.mjs';import {fhirApi} from '../worker/fhir.mjs';import {interopEntrantApi,patientMarcheApi} from '../worker/marche.mjs';import {config} from './config.mjs';import {createPool,migrate,postgresBinding} from './database.mjs';import {cellarBinding} from './storage.mjs';import {bootstrap,createAuth,loginPage} from './auth.mjs';import {brevoMessaging} from './brevo.mjs';import {createPsc} from './interop/psc.mjs';import {createConnectors} from './interop/index.mjs';import {tourneeRappels} from '../worker/rappels-auto.mjs';import {rechargerCcamIndex} from '../worker/ccam-ref.mjs';
 const root=path.resolve(fileURLToPath(new URL('../dist/',import.meta.url)));
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.svg':'image/svg+xml','.wasm':'application/wasm','.gz':'application/gzip','.mjs':'application/javascript; charset=utf-8','.onnx':'application/octet-stream','.txt':'text/plain; charset=utf-8'};
 // Module de transcription vocale du compte rendu opératoire (Whisper small, ONNX), voir scripts/modele-whisper.mjs,
@@ -38,6 +38,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(pathname.startsWith('/api/espace-patient/'))return workspaceApi(request,{DB,BUCKET:bucket,ESTABLISHMENT:messaging?.establishment||''});
   // Questionnaire du lendemain (lien du SMS J+1) : réponses du patient, aucun envoi possible.
   if(pathname.startsWith('/api/suivi-j1/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
+  // API FHIR R4 des logiciels partenaires : jeton OAuth 2.0 (client credentials), lecture seule, journal d'accès.
+  if(pathname.startsWith('/fhir/'))return fhirApi(request,{DB},cfg.baseUrl);
   // Parcours de soins à distance (lien personnel) : fiche d'éducation ou questionnaire, aucun envoi possible.
   if(pathname.startsWith('/api/parcours/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   // Flux entrants des logiciels de la clinique (biologie, mouvements, moniteurs, courriers) : jeton propre à chaque émetteur.

@@ -2346,6 +2346,9 @@ if(preadmissionsEcran){const renderBeforePreadmissions=render;render=function(){
 // Télésuivi des patients (dist/parcours-suivi.js) : parcours RAAC / ambulatoire / endoscopie de J-7 à J+30, PROMs, PREMs, e-Satis.
 const telesuiviEcran=window.createParcoursSuivi?.({esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(telesuiviEcran){const renderBeforeTelesuivi=render;render=function(){if(view==='telesuivi'){closeCroDictation();telesuiviEcran.render();return}renderBeforeTelesuivi()}}
+// API FHIR & partenaires (dist/fhir-admin.js) : logiciels autorisés à lire le dossier en FHIR R4 (administrateur).
+const fhirEcran=window.createFhirAdmin?.({esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(fhirEcran){const renderBeforeFhir=render;render=function(){if(view==='fhir'){closeCroDictation();fhirEcran.render();return}renderBeforeFhir()}}
 // Plannings infirmiers (dist/plannings-infirmiers.js) : préparés et validés par le cadre, consultés en lecture seule par les infirmier(ère)s.
 const planningsInfirmiers=window.createPlanningsInfirmiers?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(planningsInfirmiers){const renderBeforePlannings=render;render=function(){if(view==='planningsInfirmiers'){closeCroDictation();planningsInfirmiers.render();return}renderBeforePlannings()}}
