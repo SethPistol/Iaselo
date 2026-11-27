@@ -13,6 +13,7 @@ import {creerLienJ1} from './suivi-j1.mjs';
 import {tourneeConvocations} from './convocations.mjs';
 import P from '../dist/preadmission-regles.js';
 import {contexte,envoyerLien,updatePre} from './preadmission.mjs';
+import {tourneeParcours} from './parcours-suivi.mjs';
 export const ACTEUR='iaselo-automatique',NOM='Envoi automatique IASELO',HEURE_DEBUT=10,HEURE_FIN=20;
 export const LIBELLES={'convocation':'Convocation','consentement-j-2':'Rappel du consentement à J-2','consentement-j-1':'Rappel du consentement à J-1','suivi-j+1':'SMS de suivi à J+1','preadmission-j-7':'Rappel de préadmission à J-7','preadmission-j-3':'Rappel de préadmission à J-3','preadmission-j-1':'Rappel de préadmission à J-1'};
 const mask=v=>{v=String(v||'');return v.length>4?v.slice(0,3)+'*'.repeat(v.length-5)+v.slice(-2):'***'};
@@ -123,5 +124,7 @@ async function tournee(env,{now=new Date(),origin=''}={}){
    if(avant)resultats.push(await rappelPreadmission(env,acl,stay,date,'preadmission-j-'+avant,origin));
   }catch(e){console.error('rappels_auto',stay,e?.message||e)}
  }
+ // Parcours de soins à distance (RAAC, ambulatoire, endoscopie) : étapes du jour, de J-7 à J+30.
+ resultats.push(...await tourneeParcours(env,acl,{now,origin}).catch(e=>{console.error('parcours',e?.message||e);return []}));
  return {jour,resultats};
 }

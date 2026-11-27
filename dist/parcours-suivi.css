@@ -1,0 +1,44 @@
+/* Télésuivi des patients (dist/parcours-suivi.js) et page patient du parcours (dist/parcours-page.js). */
+.ps-wrap{display:flex;flex-direction:column;gap:14px}
+.ps-head p{margin:0;color:var(--i-mut,#5b6b73);max-width:760px}
+.ps-kpis{display:flex;flex-wrap:wrap;gap:8px}
+.ps-kpi{display:flex;flex-direction:column;gap:2px;padding:10px 14px;min-width:130px;border-radius:12px;border:1px solid var(--border,#e0e4e9);background:var(--i-s1,#fff)}
+.ps-kpi b{font-size:1.5rem;line-height:1.1;color:var(--i-act,#0F4D5C)}.ps-kpi span{font-size:12px;color:var(--i-mut,#5b6b73)}
+.ps-kpi.crit{border-color:#e7a6a0;background:#fdf1f0}.ps-kpi.crit b{color:#B21F2A}
+.ps-card{border:1px solid var(--border,#e0e4e9);border-radius:14px;padding:14px 16px;background:var(--i-s1,#fff);min-width:0}
+.ps-card h3{margin:0 0 10px;font-size:.95rem;text-transform:uppercase;letter-spacing:.04em}
+.ps-cardhead{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin:0 0 6px}.ps-cardhead h3{margin:0}
+.ps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.ps-grid .ps-wide{grid-column:span 2}
+@media (max-width:760px){.ps-grid .ps-wide{grid-column:auto}}
+.ps-table{width:100%;border-collapse:collapse}.ps-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--i-mut,#5b6b73);text-align:left;padding:8px;border-bottom:1px solid var(--border,#e0e4e9)}
+.ps-table td{padding:9px 8px;border-bottom:1px solid var(--border,#e0e4e9);vertical-align:top}
+.ps-chip{display:inline-flex;align-items:center;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#eef2f3;color:#2f4650;white-space:nowrap}
+.ps-chip.ok{background:#dff3e6;color:#0F6E55}.ps-chip.warn{background:#fdf0d5;color:#8F4500}.ps-chip.crit{background:#fbe3e1;color:#B21F2A}.ps-chip.info{background:#e3ecfb;color:#163a72}
+.ps-frise{display:flex;gap:4px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.ps-step{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:30px}.ps-step i{font-style:normal;font-weight:800;font-size:11px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1.5px solid #b9c6cd;color:#7b8b93;background:#fff}
+.ps-step small{font-size:10px;color:var(--i-mut,#5b6b73)}
+.ps-step.repondu i,.ps-step.lue i{background:#0F6E55;border-color:#0F6E55;color:#fff}.ps-step.envoyee i,.ps-step.en-attente i{background:#163a72;border-color:#163a72;color:#fff}
+.ps-step.a-envoyer i{border-color:#C77700;color:#8F4500;background:#fdf0d5}.ps-step.echec i{background:#B21F2A;border-color:#B21F2A;color:#fff}.ps-step.manquee i{border-style:dashed}
+.ps-alertes{border-color:#e7a6a0}.ps-alerte{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#e0e4e9)}.ps-alerte:last-child{border-bottom:0}.ps-alerte p{margin:4px 0 0}
+.ps-q{font-style:italic;color:#2f4650}
+.ps-treat,.ps-inline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}.ps-treat input,.ps-inline input,.ps-inline select{min-height:38px;width:auto!important;max-width:100%}.ps-treat input{min-width:240px}
+.ps-link{background:none;border:0;padding:0;color:var(--i-act,#0F4D5C);font-weight:700;cursor:pointer;text-align:left}
+.ps-filtres{display:flex;flex-wrap:wrap;gap:4px}.ps-filtres button{border:1px solid var(--border,#e0e4e9);background:#fff;border-radius:999px;padding:4px 12px;cursor:pointer;font-weight:600}.ps-filtres button.on{background:#0F4D5C;color:#fff;border-color:#0F4D5C}
+.ps-small{padding:4px 10px!important;min-height:32px!important;font-size:13px}
+.ps-mut{color:var(--i-mut,#5b6b73)}.ps-err{color:#B21F2A}.ps-ok{color:#0F6E55;font-weight:600}
+.ps-back{background:none;border:0;color:var(--i-act,#0F4D5C);font-weight:700;padding:4px 0;cursor:pointer;align-self:flex-start}
+.ps-band{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;border-radius:14px;background:linear-gradient(120deg,#0F4D5C,#163a72);color:#fff}
+.ps-band h2{color:#fff!important;margin:0;font-size:1.35rem}.ps-band p{margin:2px 0 0;opacity:.9}
+.ps-check{display:flex;gap:8px;align-items:center;margin-top:10px}
+.ps-rep{border:1px solid var(--border,#e0e4e9);border-radius:12px;padding:10px 12px;margin:0 0 10px}.ps-rep.is-crit{border-color:#e7a6a0;background:#fdf6f5}.ps-rep.is-warn{border-color:#f0d39a}
+.ps-rep header{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.ps-rep p{margin:6px 0}
+.ps-ans{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 16px;margin:6px 0}.ps-ans dt{font-size:12px;color:var(--i-mut,#5b6b73)}.ps-ans dd{margin:0;font-weight:700}
+.ps-hist{list-style:none;margin:0;padding:0}.ps-hist li{padding:3px 0}.ps-hist span{color:var(--i-mut,#5b6b73);font-size:12px;margin-right:6px}
+/* Page patient */
+.ps-fiche{margin:14px 0}.ps-fiche h3{margin:0 0 6px;font-size:1.05rem}.ps-fiche ul{margin:0;padding-left:20px}.ps-fiche li{margin:4px 0;line-height:1.45}
+.ps-note{font-size:14px;color:var(--i-mut,#5b6b73)}
+.ps-scale{display:flex;flex-wrap:wrap;gap:4px}.ps-scale label{position:relative}.ps-scale input{position:absolute;opacity:0;inset:0}
+.ps-scale span{display:grid;place-items:center;min-width:40px;min-height:44px;border:1px solid var(--i-line-strong,#b9c6cd);border-radius:10px;font-weight:700;cursor:pointer}
+.ps-scale input:checked+span{background:var(--i-acc,#0F4D5C);color:var(--i-on-acc,#fff);border-color:transparent}.ps-scale input:focus-visible+span{outline:3px solid #8fb7c6;outline-offset:2px}
+.sj-q textarea{width:100%;min-height:80px}
+@media print{.ps-band{background:none;color:#000}.no-print{display:none!important}}

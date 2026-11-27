@@ -38,6 +38,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(pathname.startsWith('/api/espace-patient/'))return workspaceApi(request,{DB,BUCKET:bucket,ESTABLISHMENT:messaging?.establishment||''});
   // Questionnaire du lendemain (lien du SMS J+1) : réponses du patient, aucun envoi possible.
   if(pathname.startsWith('/api/suivi-j1/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
+  // Parcours de soins à distance (lien personnel) : fiche d'éducation ou questionnaire, aucun envoi possible.
+  if(pathname.startsWith('/api/parcours/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   // Flux entrants des logiciels de la clinique (biologie, mouvements, moniteurs, courriers) : jeton propre à chaque émetteur.
   if(pathname.startsWith('/api/interop/entrant/'))return interopEntrantApi(request,{DB,BUCKET:bucket,INTEROP_ENV:interopEnv});
   // Liens personnels du patient : prise de rendez-vous, devis d'honoraires, paiement (date de naissance demandée) ; webhook du paiement.

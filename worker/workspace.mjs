@@ -10,6 +10,7 @@ import {staffMarcheApi} from './marche.mjs';
 import {staffProtocolesApi} from './protocoles.mjs';
 import {staffPlanningsInfirmiersApi} from './plannings-infirmiers.mjs';
 import {staffBlocOptimisationApi} from './bloc-optimisation.mjs';
+import {patientParcoursApi,staffParcoursApi} from './parcours-suivi.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
@@ -26,6 +27,7 @@ export async function workspaceApi(request,env){
  if(path.startsWith('/api/prescriptions/'))return env.DB?patientPrescriptionsApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/lettre-liaison/'))return env.DB?patientLettreLiaisonApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/suivi-j1/'))return env.DB?patientSuiviJ1Api(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
+ if(path.startsWith('/api/parcours/'))return env.DB?patientParcoursApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/preadmission/'))return env.DB?patientPreadmissionApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/espace-patient/'))return env.DB?patientEspacePatientApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(!path.startsWith('/api/workspace'))return null;
@@ -75,6 +77,7 @@ export async function workspaceApi(request,env){
   const marcheResponse=await staffMarcheApi(request,env,acl);if(marcheResponse)return marcheResponse;
   const protocolesResponse=await staffProtocolesApi(request,env,acl);if(protocolesResponse)return protocolesResponse;
   const blocOptResponse=await staffBlocOptimisationApi(request,env,acl);if(blocOptResponse)return blocOptResponse;
+  const parcoursResponse=await staffParcoursApi(request,env,acl);if(parcoursResponse)return parcoursResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;

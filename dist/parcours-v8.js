@@ -2343,6 +2343,9 @@ const ouvertureSalles=window.createOuvertureSalles?.({$,esc,toast,go:v=>{if(view
 // Préadmissions des patients (admissions, anesthésistes, chirurgiens) : écran dist/preadmissions.js.
 const preadmissionsEcran=window.createPreadmissions?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(preadmissionsEcran){const renderBeforePreadmissions=render;render=function(){if(view==='preadmissions'){closeCroDictation();preadmissionsEcran.render();return}renderBeforePreadmissions()}}
+// Télésuivi des patients (dist/parcours-suivi.js) : parcours RAAC / ambulatoire / endoscopie de J-7 à J+30, PROMs, PREMs, e-Satis.
+const telesuiviEcran=window.createParcoursSuivi?.({esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(telesuiviEcran){const renderBeforeTelesuivi=render;render=function(){if(view==='telesuivi'){closeCroDictation();telesuiviEcran.render();return}renderBeforeTelesuivi()}}
 // Plannings infirmiers (dist/plannings-infirmiers.js) : préparés et validés par le cadre, consultés en lecture seule par les infirmier(ère)s.
 const planningsInfirmiers=window.createPlanningsInfirmiers?.({$,esc,toast,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(planningsInfirmiers){const renderBeforePlannings=render;render=function(){if(view==='planningsInfirmiers'){closeCroDictation();planningsInfirmiers.render();return}renderBeforePlannings()}}
