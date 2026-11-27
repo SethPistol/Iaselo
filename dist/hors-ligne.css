@@ -1,0 +1,16 @@
+#hl-bandeau{margin:0 0 12px;padding:12px 16px;border-radius:12px;background:#fbe3e1;color:#7a1219;border:1px solid #f0b8b3;font-size:15px}
+#hl-fiche{width:min(1200px,calc(100vw - 32px));max-height:calc(100vh - 32px);border:1px solid var(--border,#d6dde2);border-radius:14px;padding:20px;color:inherit;background:var(--bg,#fff)}
+#hl-fiche::backdrop{background:rgba(10,20,25,.45)}
+.hl-tete{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.hl-tete h2{margin:0 0 4px;font-size:22px}.hl-tete p{margin:0;font-size:14px}
+.hl-boutons{display:flex;gap:8px}.hl-conf{margin:12px 0;padding:8px 12px;border-radius:10px;background:#fff6e6;color:#6b3a00;font-size:14px}
+.hl-table{width:100%;border-collapse:collapse;font-size:13px}.hl-table th,.hl-table td{border:1px solid #c9d2d8;padding:6px 8px;text-align:left;vertical-align:top}
+.hl-table th{background:#eef2f4}.hl-table ul{margin:0;padding-left:16px}.hl-table small{color:#5a6a72}.hl-allergie{color:#b21f2a}.hl-vide{color:#9aa7ae}
+@media (max-width:700px){.hl-table{display:block;overflow-x:auto}}
+@media print{
+ html.hl-impression body>*:not(#hl-fiche){display:none!important}
+ html.hl-impression #hl-fiche{position:static;display:block;width:auto;max-height:none;border:0;padding:0;margin:0;background:#fff;color:#000}
+ html.hl-impression #hl-fiche::backdrop{display:none}
+ html.hl-impression .hl-boutons{display:none}
+ html.hl-impression .hl-table{font-size:10.5px}html.hl-impression tr{break-inside:avoid}
+ @page{size:A4 landscape;margin:10mm}
+}
