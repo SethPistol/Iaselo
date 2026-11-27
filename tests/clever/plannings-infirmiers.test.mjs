@@ -30,11 +30,12 @@ test('plannings infirmiers : le cadre valide, les infirmières lisent sans modif
   // Plannings fictifs de recette : mois en cours validé, mois suivant en brouillon, bloc et étage.
   const mois=new Date().toISOString().slice(0,7),suivant=(await import('../../dist/plannings-infirmiers-regles.js')).default.moisVoisin(mois,1);
   let r=await api(cadre,'GET','?service=bloc&mois='+mois);assert.equal(r.status,200);assert.equal(r.data.peutGerer,true);assert.equal(r.data.planning.statut,'valide');
+  assert.ok(r.data.programme&&r.data.programme.reglages.parSalle===2&&Object.keys(r.data.programme.besoins).length>=28,'besoins du programme calculés pour le bloc');
   assert.ok(r.data.planning.personnes.some(p=>p.nom==='Cadre de bloc (recette)'),'compte cadre de test au planning');assert.ok(r.data.planning.personnes.some(p=>/Fictif/.test(p.nom)));
   assert.ok(r.data.comptes.some(x=>x.userId===c.bloc.id),'comptes infirmiers proposés au cadre');
   assert.equal((await api(cadre,'GET','?service=bloc&mois='+suivant)).data.planning.statut,'brouillon');
   // L'infirmière de bloc ne voit que le bloc, jamais le brouillon ; l'étage lui est refusé.
-  r=await api(ibloc,'GET','?service=bloc&mois='+mois);assert.equal(r.status,200);assert.equal(r.data.peutGerer,false);assert.deepEqual(r.data.services,['bloc']);assert.equal(r.data.comptes,undefined);
+  r=await api(ibloc,'GET','?service=bloc&mois='+mois);assert.equal(r.status,200);assert.equal(r.data.peutGerer,false);assert.deepEqual(r.data.services,['bloc']);assert.equal(r.data.comptes,undefined);assert.equal(r.data.programme,undefined);
   assert.equal((await api(ibloc,'GET','?service=bloc&mois='+suivant)).data.planning,null,'brouillon jamais montré');
   assert.equal((await api(ibloc,'GET','?service=etage&mois='+mois)).status,403);
   assert.equal((await api(ietage,'GET','?service=bloc&mois='+mois)).status,403);

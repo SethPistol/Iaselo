@@ -48,3 +48,12 @@ button.pi-tag{cursor:pointer}button.pi-tag.active{border-color:var(--i-acc,#1f6b
 .pi-form{display:flex;flex-direction:column;gap:12px}.pi-form h3{margin:0}.pi-form label{display:flex;flex-direction:column;gap:4px;font-size:13px}.pi-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:640px){.pi-grid .pi-nom{min-width:120px;max-width:140px}.pi-moi-liste li{grid-template-columns:1fr;gap:4px}.pi-mois strong{min-width:0}}
 @media print{aside,header,.no-print,.pi-outils,.pi-ajout,.pi-actions,.pi-hist{display:none!important}.pi-scroll{overflow:visible;border:0}.pi-grid{font-size:9px}.pi-grid th,.pi-grid td{min-width:0;height:22px}.pi-nom{position:static!important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* Besoin du programme du bloc (27/11/2026) */
+.pi-besoin th small{display:block;font-weight:400;font-size:11px;color:var(--muted,#51626b)}
+.pi-besoin td{font-weight:700;text-align:center}.pi-besoin td.pi-b-crit{background:#fbe3e1;color:#9b1c25}.pi-besoin td.pi-b-warn{background:#fff3df;color:#7a4a00}
+.pi-programme ul{margin:6px 0;padding-left:18px}.pi-programme li{margin:2px 0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pi-besoin td.pi-b-crit{background:#3a1f22;color:#ffb3b3}:root:not([data-theme="light"]) .pi-besoin td.pi-b-warn{background:#3a2f1c;color:#ffd590}}
+:root[data-theme="dark"] .pi-besoin td.pi-b-crit{background:#3a1f22;color:#ffb3b3}:root[data-theme="dark"] .pi-besoin td.pi-b-warn{background:#3a2f1c;color:#ffd590}
+.pi-programme{display:block!important}.pi-programme>strong{display:block;margin-bottom:6px}
+.pi-prog-jours{list-style:none;display:flex;flex-wrap:wrap;gap:6px;padding:0!important}.pi-prog-jours li{padding:3px 10px;border-radius:999px;background:#fff;border:1px solid var(--border,#d6dde2);font-size:13px}
+.pi-prog-jours li.pi-b-crit{border-color:#e7a7a2;color:#9b1c25}.pi-prog-jours li em{font-style:normal;font-weight:700}

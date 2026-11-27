@@ -15,6 +15,7 @@
 // deux postes) ; un planning déjà validé ne se modifie qu'avec un motif ; une validation malgré des alertes exige un motif.
 // Minimisation : le motif d'une absence de santé n'est montré qu'à la personne concernée et au cadre (vueCollegue).
 import P from '../dist/plannings-infirmiers-regles.js';
+import E from '../dist/effectifs-regles.js';
 import {createHash} from 'node:crypto';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 async function body(request){const bytes=await request.arrayBuffer();if(bytes.byteLength>400000)throw Error('size');return JSON.parse(new TextDecoder().decode(bytes))}
@@ -46,7 +47,12 @@ export async function staffPlanningsInfirmiersApi(request,env,acl){
   if(gestion||admin){
    const comptes=gestion?(await DB.prepare("SELECT user_id,display_name,poste FROM professional_profiles WHERE profession='infirmier' AND active=1 ORDER BY display_name").all()).results.map(r=>({userId:r.user_id,nom:r.display_name,poste:['cadre','cadre-etage','bloc'].includes(r.poste)?r.poste:'etage'})):[];
    await acl.log('read',cible,'allowed',gestion?'Planning (cadre)':'Planning (lecture administrateur)');
-   return json({...base,comptes,planning:row?{statut:row.statut,statutLibelle:STATUTS[row.statut],version:Number(row.version),hash:row.hash,miseAJour:row.updated_at,par:row.updated_by_name,valideLe:row.validated_at,validePar:row.validated_by_name,versionValidee:row.validated_version==null?null:Number(row.validated_version),...JSON.parse(row.data)}:null});
+   // Bloc : besoins calculés à partir du programme (vacations ouvertes, interventions), comparés au planning.
+   let programme=null;
+   if(service==='bloc'){const lire=async k=>{try{return JSON.parse((await DB.prepare('SELECT data FROM workspace_documents WHERE key=?').bind(k).first())?.data||'[]')}catch{return []}};
+    const [vac,res]=await Promise.all([lire('management/vacations'),lire('management/reservations')]);
+    programme={reglages:E.REGLAGES,besoins:E.besoins(Array.isArray(vac)?vac:[],Array.isArray(res)?res:[],P.joursDuMois(mois))}}
+   return json({...base,comptes,programme,planning:row?{statut:row.statut,statutLibelle:STATUTS[row.statut],version:Number(row.version),hash:row.hash,miseAJour:row.updated_at,par:row.updated_by_name,valideLe:row.validated_at,validePar:row.validated_by_name,versionValidee:row.validated_version==null?null:Number(row.validated_version),...JSON.parse(row.data)}:null});
   }
   // Infirmier(ère) : dernière version validée seulement, jamais le brouillon en cours.
   const v=await DB.prepare("SELECT version,data,actor_name,at FROM nurse_schedule_versions WHERE service=? AND mois=? AND action='validation' ORDER BY version DESC LIMIT 1").bind(service,mois).first();

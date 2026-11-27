@@ -75,3 +75,17 @@ test('SMS de suivi : aucune information médicale ni identité',async()=>{
  for(const text of Object.values(suiviMessages('Clinique du Trocadéro'))){assert.ok(text.length<=320);assert.doesNotMatch(text,/MARTIN|anesth|opér|chirurg|hanche/i)}
  assert.ok(interopStatus({}).every(c=>c.mode==='simulation'));
 });
+
+test('risque global : ARISCAT, Caprini et profil avec mesures sourcées',()=>{
+ const stay={identity:{birthDate:'1948-03-01'},consult:{ext:{sex:'Homme',weight:'95',height:'175',spo2:'94',hb:'9.5',operation:'Colectomie gauche',duration:'200'}},questionnaire:{answers:{diseases:['Phlébite ou embolie pulmonaire','Infarctus ou stent'],stairs:'1 étage'}}};
+ const sc=R.scores(stay).list,ar=sc.find(s=>s.id==='ariscat'),ca=sc.find(s=>s.id==='caprini');
+ assert.equal(ar.value,3+8+11+15+23);assert.equal(ar.level,'crit');assert.match(ar.text,/42,1 %/);
+ assert.equal(R.scores(stay,{respInfection:true}).list.find(s=>s.id==='ariscat').value,ar.value+17);
+ assert.equal(ca.value,3+1+2+3);assert.equal(ca.level,'crit');
+ assert.equal(R.incision('Lobectomie supérieure droite'),'thorax');assert.equal(R.incision('Prothèse totale de genou'),'peripherique');
+ const ptg={identity:{birthDate:'1956-01-01'},consult:{ext:{operation:'Prothèse totale de genou droite',duration:'90'}}};
+ assert.equal(R.scores(ptg).list.find(s=>s.id==='caprini').criteria.find(c=>/Arthroplastie/.test(c.label)).value,true);
+ const p=R.profilRisque(stay);assert.equal(p.niveau,'crit');assert.deepEqual(p.eleves,['Poumon','Thrombose']);
+ assert.ok(p.mesures.some(m=>m.domaine==='Cœur'&&/ESC 2022/.test(m.ref)));assert.ok(p.mesures.every(m=>m.ref));
+ const vide=R.profilRisque({});assert.ok(vide.manquants>0);assert.match(vide.avertissement,/jugement clinique/);
+});

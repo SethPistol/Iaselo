@@ -50,7 +50,7 @@ function stopBang(ctx,saisie={}){
 
 function lee(ctx,saisie={}){
  const op=norm(ctx.operation);
- const highRisk=saisie.highRiskSurgery??(/(colorectal|digestive|bariatrique|hysterectomie|thorac|aort|vascul)/.test(op)?true:op?false:null);
+ const highRisk=saisie.highRiskSurgery??(/(colorectal|colect|gastrect|hepat|pancrea|splenect|laparotom|digestive|bariatrique|sleeve|bypass|hysterectomie|thorac|aort|vascul)/.test(op)?true:op?false:null);
  const creat=num(ctx.ext.creatinine);
  const cr=[
   critere('Chirurgie à haut risque (intrapéritonéale, intrathoracique, vasculaire sus-inguinale)',highRisk,saisie.highRiskSurgery!=null?'médecin':'intervention'),
@@ -100,10 +100,78 @@ function hemstop(ctx){
 
 function scores(stay,saisie={}){
  const ctx=contexte(stay);
- return {ctx,bmi:ctx.bmi?Math.round(ctx.bmi*10)/10:null,list:[stopBang(ctx,saisie),lee(ctx,saisie),apfel(ctx,saisie),voiesAeriennes(ctx),hemstop(ctx)]};
+ return {ctx,bmi:ctx.bmi?Math.round(ctx.bmi*10)/10:null,list:[stopBang(ctx,saisie),lee(ctx,saisie),apfel(ctx,saisie),voiesAeriennes(ctx),hemstop(ctx),ariscat(ctx,saisie),caprini(ctx,saisie)]};
 }
 // Texte reporté dans les champs de la consultation (CPA préremplie).
 function resumeScore(s){const pos=s.criteria.filter(c=>c.value===true).map(c=>c.label.toLowerCase());return `${s.label} ${s.value??'—'}/${s.max} · ${s.text}${pos.length?' · critères : '+pos.join(', '):''}${s.missing?' · '+s.missing+' critère(s) non renseigné(s)':''} (calcul IASELO, validé par le médecin)`}
+
+
+/* ---------- Risque global (27/11/2026, manque n°13 de la 3e veille) ----------
+   ARISCAT (complications pulmonaires) et Caprini (thrombose veineuse) complètent STOP-Bang, Lee, Apfel, voies aériennes
+   et HEMSTOP. profilRisque() réunit les domaines et propose des mesures tirées des recommandations citées.
+   Aide à la décision : ne remplace pas le jugement clinique. Avant tout usage clinique réel, ce calcul relève du
+   marquage CE comme dispositif médical (règlement 2017/745, règle 11). */
+const pts=(label,points,value,source,key)=>({label:label+' (+'+points+')',points,value:value===undefined?null:value,source,...(key?{key}:{})});
+const somme=cr=>cr.reduce((n,c)=>n+(c.value===true?c.points:0),0);
+function incision(op){op=norm(op);if(!op)return null;if(/(thorac|poumon|pulmon|lobectom|pneumonectom|oesophag|cardiaque|pontage coronar|valv|mediastin)/.test(op))return 'thorax';if(/(gastr|colect|colon|cholecyst|hepat|foie|pancrea|splen|rate|bariatr|sleeve|bypass|hiatal|duoden|grele|laparotom|eventration|surrenal|nephrect|rein)/.test(op))return 'abdo';return 'peripherique'}
+function ariscat(ctx,saisie={}){
+ const age=ctx.age,sp=num(ctx.ext.spo2),hb=num(ctx.ext.hb),dur=num(ctx.surgery.duration)??num(ctx.ext.duration),inc=saisie.incision||incision(ctx.operation);
+ const urg=saisie.emergency??(ctx.surgery.urgency?/urgen/i.test(ctx.surgery.urgency)&&!/programm|non/i.test(ctx.surgery.urgency):null);
+ const cr=[
+  pts('Âge 51 à 80 ans',3,age==null?null:age>50&&age<=80,'calcul'),pts('Âge > 80 ans',16,age==null?null:age>80,'calcul'),
+  pts('SpO₂ préopératoire 91 à 95 %',8,sp==null?null:sp>90&&sp<96,'consultation'),pts('SpO₂ préopératoire ≤ 90 %',24,sp==null?null:sp<=90,'consultation'),
+  pts('Infection respiratoire dans le mois',17,saisie.respInfection??null,saisie.respInfection==null?'à demander':'médecin','respInfection'),
+  pts('Anémie préopératoire (Hb ≤ 10 g/dL)',11,hb==null?null:hb<=10,'bilan'),
+  pts('Incision abdominale haute',15,inc==null?null:inc==='abdo','intervention'),pts('Incision intrathoracique',24,inc==null?null:inc==='thorax','intervention'),
+  pts('Durée 2 à 3 h',16,dur==null?null:dur>=120&&dur<=180,'annonce'),pts('Durée > 3 h',23,dur==null?null:dur>180,'annonce'),
+  pts('Chirurgie en urgence',8,urg,saisie.emergency!=null?'médecin':'annonce','emergency')
+ ];
+ const v=somme(cr),missing=[age==null,sp==null,saisie.respInfection==null,hb==null,inc==null,dur==null,urg==null].filter(Boolean).length;
+ const level=v>=45?'crit':v>=26?'warn':'ok';
+ return {id:'ariscat',label:'ARISCAT (poumon)',value:v,max:123,level,text:(v>=45?'Risque élevé':v>=26?'Risque intermédiaire':'Risque faible')+' de complication pulmonaire postopératoire ≈ '+(v>=45?'42,1':v>=26?'13,3':'1,6')+' %',missing,criteria:cr,ref:'Canet J. et al., Anesthesiology 2010 ; validation Mazo V., Anesthesiology 2014'};
+}
+function caprini(ctx,saisie={}){
+ const age=ctx.age,op=norm(ctx.operation),dur=num(ctx.surgery.duration)??num(ctx.ext.duration);
+ const arthro=/(prothese totale|arthroplast|pth|ptg)/.test(op)&&/(hanche|genou)/.test(op);
+ const majeure=op?(dur!=null?dur>45:null):null;
+ const cr=[
+  pts('Âge 41 à 60 ans',1,age==null?null:age>40&&age<=60,'calcul'),pts('Âge 61 à 74 ans',2,age==null?null:age>60&&age<75,'calcul'),pts('Âge ≥ 75 ans',3,age==null?null:age>=75,'calcul'),
+  pts('IMC > 25 kg/m²',1,ctx.bmi==null?null:ctx.bmi>25,'calcul'),
+  pts('Chirurgie mineure',1,majeure==null||arthro?(arthro?false:null):!majeure,'annonce'),pts('Chirurgie majeure > 45 min',2,arthro?false:majeure,'annonce'),
+  pts('Arthroplastie de hanche ou de genou',5,op?arthro:null,'intervention'),
+  pts('Antécédent personnel de thrombose ou d’embolie',3,has(ctx,'Phlébite ou embolie pulmonaire')||/(phlebite|thrombose veineuse|embolie pulmonaire|\btvp\b)/.test(ctx.history)?true:ctx.q.diseases?false:null,'dossier'),
+  pts('Antécédent familial de thrombose',3,saisie.familyVte??null,saisie.familyVte==null?'à demander':'médecin','familyVte'),
+  pts('Cancer actif ou récent',2,/(cancer|neoplas|tumeur maligne|chimiotherap|metasta|lymphome)/.test(ctx.history)?true:saisie.cancer??null,saisie.cancer!=null?'médecin':'dossier','cancer'),
+  pts('Contraception œstroprogestative ou traitement hormonal',1,/(pilule|oestro|estro|ethinyl|contracept|traitement hormonal substitutif|\bths\b)/.test(ctx.text)?true:ctx.sex==='M'?false:null,'traitements'),
+  pts('BPCO',1,has(ctx,'Bronchite chronique')||/\bbpco\b/.test(ctx.history)?true:ctx.q.diseases?false:null,'dossier'),
+  pts('Insuffisance cardiaque',1,has(ctx,'Insuffisance cardiaque')?true:ctx.q.diseases?false:null,'dossier')
+ ];
+ const v=somme(cr),level=v>=5?'crit':v>=3?'warn':'ok';
+ return {id:'caprini',label:'Caprini (thrombose)',value:v,max:30,level,text:(v>=5?'Risque élevé':v>=3?'Risque modéré':v>=1?'Risque faible':'Risque très faible')+' de thrombose veineuse ≈ '+(v>=5?'6':v>=3?'3':v>=1?'1,5':'< 0,5')+' % sans prophylaxie',missing:manquants(cr),criteria:cr,ref:'Caprini JA, Dis Mon 2005 ; Gould MK, Chest 2012 (ACCP)'};
+}
+function profilRisque(stay,saisie={}){
+ const {ctx,list}=scores(stay,saisie),g=id=>list.find(s=>s.id===id),mesures=[];
+ const lee=g('lee'),ar=g('ariscat'),sb=g('stopbang'),aw=g('airway'),ca=g('caprini'),ap=g('apfel'),hs=g('hemstop');
+ const add=(domaine,texte,ref)=>mesures.push({domaine,texte,ref});
+ const met4=['Aucun','1 étage'].includes(ctx.q.stairs);
+ if(lee.value>=1&&(ctx.age>=65||lee.value>=2))add('Cœur','ECG, BNP ou NT-proBNP et troponine préopératoires à discuter ; troponine à J1 et J2 si haut risque.','ESC 2022');
+ if(lee.value>=1&&met4)add('Cœur','Capacité fonctionnelle < 4 MET : avis cardiologique ou épreuve fonctionnelle à discuter avant une chirurgie à risque.','ESC 2022');
+ if(ar.value>=26)add('Poumon','Kinésithérapie et spirométrie incitative, ventilation protectrice, analgésie épargnant les morphiniques, mobilisation précoce.','Canet 2010 ; Miskovic, Br J Anaesth 2017');
+ if(sb.value>=5)add('SAOS','SpO₂ continue en postopératoire, morphiniques limités, PPC si le patient est appareillé.','SFAR 2010 ; ASA 2014');
+ else if(sb.value>=3)add('SAOS','SAOS possible : surveillance SpO₂ renforcée si morphiniques.','ASA 2014');
+ if(aw.value>=3)add('Voies aériennes','Intubation difficile prévisible : chariot dédié, vidéolaryngoscope, stratégie écrite.','SFAR 2017');
+ if(ca.value>=5)add('Thrombose','Prophylaxie pharmacologique et mécanique à discuter, durée selon la chirurgie.','ACCP 2012 ; SFAR 2011');
+ else if(ca.value>=3)add('Thrombose','Prophylaxie pharmacologique ou mécanique à discuter.','ACCP 2012');
+ if(ap.value>=3)add('NVPO','Prophylaxie multimodale (au moins 2 molécules) et réduction des facteurs de risque (TIVA, morphiniques limités).','Gan 2020');
+ else if(ap.value>=2)add('NVPO','Prophylaxie à 2 molécules.','Gan 2020');
+ if(hs.value>=1)add('Hémorragie','Bilan d’hémostase orienté et avis spécialisé si réponses multiples.','Bonhomme, Eur J Anaesthesiol 2016');
+ const domaines=[['Cœur',lee],['Poumon',ar],['SAOS',sb],['Voies aériennes',aw],['Thrombose',ca],['NVPO',ap],['Hémorragie',hs]].map(([d,s])=>({domaine:d,id:s.id,label:s.label,level:s.level,value:s.value,max:s.max,text:s.text,missing:s.missing}));
+ const ordre={crit:3,warn:2,ok:1,na:0},niveau=domaines.reduce((m,d)=>ordre[d.level]>ordre[m]?d.level:m,'ok');
+ const eleves=domaines.filter(d=>d.level==='crit').map(d=>d.domaine);
+ return {niveau,eleves,domaines,mesures,manquants:domaines.reduce((n,d)=>n+(d.missing||0),0),
+  synthese:niveau==='crit'?'Risque périopératoire élevé : '+eleves.join(', ').toLowerCase()+'.':niveau==='warn'?'Risque périopératoire intermédiaire : points de vigilance à anticiper.':'Pas de risque élevé repéré avec les données disponibles.',
+  avertissement:'Aide à la décision calculée à partir du dossier : ne remplace pas le jugement clinique. Les mesures sont des propositions à adapter au patient.'};
+}
 
 /* ---------- Orientation après le questionnaire (tri) ---------- */
 function orientation(stay,saisie={}){
@@ -281,5 +349,5 @@ function envoiLiaisonPossible(stay,identityStatus=''){
  return {ok:!reasons.length,reasons};
 }
 
-return {contexte,scores,resumeScore,orientation,consignes,REGLES,completude,STATUTS,statutSuivant,CHECKLIST_HAS,etatChecklist,SEUILS_J1,QUESTIONS_J1,QUESTIONS_J1_PATIENT,validerJ1,alertesJ1,envoiLiaisonPossible};
+return {contexte,scores,resumeScore,profilRisque,incision,orientation,consignes,REGLES,completude,STATUTS,statutSuivant,CHECKLIST_HAS,etatChecklist,SEUILS_J1,QUESTIONS_J1,QUESTIONS_J1_PATIENT,validerJ1,alertesJ1,envoiLiaisonPossible};
 });
