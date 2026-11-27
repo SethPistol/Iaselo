@@ -19,6 +19,7 @@ import {staffTelephonieApi} from './telephonie.mjs';
 import {patientChambreApi,staffChambreApi,staffProchesApi} from './proches-chambre.mjs';
 import {staffAppelJ1Api} from './appel-j1.mjs';
 import {staffCoutSejourApi} from './cout-sejour.mjs';
+import {staffObjetsApi} from './objets-connectes.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
@@ -97,6 +98,7 @@ export async function workspaceApi(request,env){
   const chambreResponse=await staffChambreApi(request,env,acl);if(chambreResponse)return chambreResponse;
   const appelJ1Response=await staffAppelJ1Api(request,env,acl);if(appelJ1Response)return appelJ1Response;
   const coutResponse=await staffCoutSejourApi(request,env,acl);if(coutResponse)return coutResponse;
+  const objetsResponse=await staffObjetsApi(request,env,acl);if(objetsResponse)return objetsResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;
