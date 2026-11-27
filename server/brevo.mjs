@@ -57,7 +57,16 @@ export function brevoMessaging(env=process.env,fetchImpl=globalThis.fetch){
  const recette=env.IASELO_RECETTE==='true';
  const channels={email:!!key,sms:!!key&&smsSender.length>=3};
  let senderEmail=clean(env.BREVO_SENDER_EMAIL),statusCache=null;
- function refusal(){return ''}
+ // Audit du 27/11 : plafonds d'envoi, contre l'envoi en masse depuis un compte volé (harcèlement d'un numéro,
+ // crédits SMS épuisés). Par destinataire : MESSAGING_MAX_PAR_DESTINATAIRE par heure (10 par défaut). Pour tout le
+ // serveur : MESSAGING_MAX_PAR_HEURE (400 par défaut, 100 en recette). Les envois normaux restent très en dessous.
+ const parDest=Math.max(1,Number(env.MESSAGING_MAX_PAR_DESTINATAIRE)||10),parHeure=Math.max(1,Number(env.MESSAGING_MAX_PAR_HEURE)||(recette?100:400)),envois=[];
+ function refusal(to){
+  const now=Date.now(),dest=normalizeRecipient(to);while(envois.length&&now-envois[0].at>3600000)envois.shift();
+  if(envois.length>=parHeure)return 'Plafond d’envois atteint pour cette heure ('+parHeure+'). Réessayez plus tard ou prévenez l’administrateur.';
+  if(dest&&envois.filter(e=>e.dest===dest).length>=parDest)return 'Trop de messages envoyés à ce destinataire dans l’heure. Réessayez plus tard.';
+  envois.push({at:now,dest});return '';
+ }
  // Un nouvel essai si Brevo est saturé ou momentanément injoignable (jamais après un délai
  // dépassé : le message a pu partir, on évite le doublon).
  async function call(method,path,payload,attempt=1){

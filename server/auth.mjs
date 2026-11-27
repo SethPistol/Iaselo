@@ -52,20 +52,35 @@ export async function bootstrap(pool,env=process.env){if((await pool.query('SELE
 // Formulaires HTML : avec Referrer-Policy: no-referrer, les navigateurs envoient « Origin: null » pour un POST
 // de formulaire, même vers la même origine. Sec-Fetch-Site, fixé par le navigateur et non modifiable par une page,
 // confirme alors que la requête vient bien de cette origine. Toute autre origine reste refusée.
+// Adresse du client vue par le répartiteur de Clever Cloud : dernière valeur de X-Forwarded-For (celle qu'il ajoute lui-même ;
+// les valeurs précédentes peuvent être fournies par le client). Absente en local : pas de compte par adresse.
+export function clientIp(request){const v=String(request.headers.get('x-forwarded-for')||'').split(',').map(x=>x.trim()).filter(Boolean);return (v.at(-1)||request.headers.get('x-real-ip')||'').slice(0,64)}
 export function sameOrigin(request,cfg){const origin=request.headers.get('Origin');if(origin===cfg.baseUrl)return true;return origin==='null'&&request.headers.get('Sec-Fetch-Site')==='same-origin'}
 export async function createAuth(pool,cfg,{psc=null}={}){
  const fingerprint=v=>createHmac('sha256',cfg.sessionSecret).update(v).digest('hex'),cookieName=cfg.secure?'__Host-parcours_session':'parcours_session',dummy=await hashPassword(randomBytes(32).toString('hex'));
- const sessionCookie=(token,age)=>cookieName+'='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+age+(cfg.secure?'; Secure':'');
+ // Cookie de session du navigateur (sans durée) : fermer le navigateur ferme la session ; la durée maximale reste fixée par le serveur.
+ const sessionCookie=(token,age)=>cookieName+'='+token+'; Path=/; HttpOnly; SameSite=Lax'+(age>0?'':'; Max-Age=0')+(cfg.secure?'; Secure':'');
  function getToken(request){const value=(request.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(cookieName+'='))?.slice(cookieName.length+1);return /^[a-f0-9]{64}$/.test(value||'')?value:null}
- async function user(request){const token=getToken(request);if(!token)return null;return (await pool.query('SELECT u.id,u.email,u.display_name FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND s.mfa_ok=1 AND u.enabled=1 AND p.active=1 AND u.must_change_password=0',[fingerprint(token),new Date().toISOString()])).rows[0]||null}
+ async function user(request){const token=getToken(request);if(!token)return null;const now=Date.now(),row=(await pool.query('SELECT u.id,u.email,u.display_name,s.token_hash,s.last_seen_at FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id JOIN professional_profiles p ON p.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>$2 AND s.locked_at IS NULL AND s.mfa_ok=1 AND u.enabled=1 AND p.active=1 AND u.must_change_password=0',[fingerprint(token),new Date(now).toISOString()])).rows[0];if(!row)return null;
+  // Audit du 27/11 : inactivité contrôlée par le serveur. Sans aucune requête depuis SESSION_IDLE_MINUTES (60 min par
+  // défaut), la session est close : un navigateur laissé ouvert ou rouvert sur un poste partagé redemande la connexion.
+  const last=Date.parse(row.last_seen_at||'');if(Number.isFinite(last)&&now-last>cfg.idleMinutes*60000){await pool.query('UPDATE auth_sessions SET expires_at=$1 WHERE token_hash=$2',[new Date(now).toISOString(),row.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[new Date(now).toISOString(),row.id,'session-idle-expired']);return null}
+  if(!Number.isFinite(last)||now-last>60000)await pool.query('UPDATE auth_sessions SET last_seen_at=$1 WHERE token_hash=$2',[new Date(now).toISOString(),row.token_hash]);
+  return {id:row.id,email:row.email,display_name:row.display_name}}
  async function login(request){
   if(!sameOrigin(request,cfg))return new Response('Origine refusée',{status:403});
   const bytes=await request.arrayBuffer();if(bytes.byteLength>8192)return new Response('Requête trop volumineuse',{status:413});let d;try{const raw=new TextDecoder().decode(bytes);d=request.headers.get('Content-Type')?.includes('application/json')?JSON.parse(raw):Object.fromEntries(new URLSearchParams(raw))}catch{return new Response('Requête invalide',{status:400})}
   const email=String(d.email||'').trim().toLowerCase().slice(0,240),identity=fingerprint(email),at=new Date().toISOString(),since=new Date(Date.now()-15*60000).toISOString();
   if(Number((await pool.query('SELECT COUNT(*) AS n FROM auth_attempts WHERE identity_hash=$1 AND at>$2 AND success=0',[identity,since])).rows[0].n)>=10)return new Response('Trop de tentatives. Réessayez dans 15 minutes.',{status:429});
+  // Audit du 27/11 : « pulvérisation » de mots de passe (un même mot de passe essayé sur de nombreux comptes depuis une
+  // même adresse). Au-delà de 20 comptes différents en échec en 15 minutes depuis une adresse, elle est bloquée 15 minutes.
+  // Seuil choisi pour ne jamais gêner une clinique dont tous les postes sortent par la même adresse.
+  const ip=clientIp(request),ipKey=ip?'ip:'+fingerprint('ip:'+ip).slice(0,32)+':':'';
+  if(ipKey&&Number((await pool.query('SELECT COUNT(DISTINCT identity_hash) AS n FROM auth_attempts WHERE identity_hash LIKE $1 AND at>$2 AND success=0',[ipKey+'%',since])).rows[0].n)>=20)return new Response('Trop de tentatives depuis ce réseau. Réessayez dans 15 minutes.',{status:429});
   const account=(await pool.query('SELECT u.*,p.active FROM auth_users u JOIN professional_profiles p ON p.user_id=u.id WHERE u.email=$1',[email])).rows[0];
   const passwordOK=await verifyPassword(d.password,account?.password_hash||dummy),ok=passwordOK&&account?.enabled===1&&account?.active===1;
   await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,ok?1:0]);
+  if(!ok&&ipKey)await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,0)',[ipKey+identity.slice(0,32),at]);
   if(!ok)return new Response(loginPage('Identifiants invalides ou compte désactivé.'),{status:401,headers:{'Content-Type':'text/html; charset=utf-8'}});
   const mfa=mfaRequired(account.email);return openSession(account.id,'password',null,account.must_change_password?'/mot-de-passe':mfa?'/double-authentification':'/',mfa);
  }
@@ -101,7 +116,7 @@ export async function createAuth(pool,cfg,{psc=null}={}){
   const ok=await verifyPassword(String(d.password||''),s.password_hash||dummy);
   await pool.query('INSERT INTO auth_attempts(identity_hash,at,success) VALUES($1,$2,$3)',[identity,at,ok?1:0]);
   if(!ok){const lastOk=(await pool.query('SELECT MAX(at) AS at FROM auth_attempts WHERE identity_hash=$1 AND success=1',[identity])).rows[0]?.at,from=lastOk&&lastOk>since?lastOk:since;const n=Number((await pool.query('SELECT COUNT(*) AS n FROM auth_attempts WHERE identity_hash=$1 AND at>$2 AND success=0',[identity,from])).rows[0].n);if(n>=5){await pool.query('DELETE FROM auth_sessions WHERE token_hash=$1',[s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'unlock-refused-logout']);return Response.json({error:'Trop d’essais : la session est fermée. Reconnectez-vous.',logout:true},{status:401,headers:{'Set-Cookie':sessionCookie('',0)}})}return Response.json({error:'Mot de passe incorrect ('+(5-n)+' essai'+(5-n>1?'s':'')+' restant'+(5-n>1?'s':'')+').'},{status:401})}
-  await pool.query('UPDATE auth_sessions SET locked_at=NULL WHERE token_hash=$1',[s.token_hash]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'unlock']);
+  await pool.query('UPDATE auth_sessions SET locked_at=NULL,last_seen_at=$2 WHERE token_hash=$1',[s.token_hash,new Date().toISOString()]);await pool.query('INSERT INTO auth_audit(at,user_id,action) VALUES($1,$2,$3)',[at,s.user_id,'unlock']);
   return Response.json({unlocked:true});
  }
  // Changement de mot de passe (obligatoire à la première connexion d'un compte créé par l'administrateur).

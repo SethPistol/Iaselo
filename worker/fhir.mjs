@@ -216,7 +216,12 @@ async function livrer(env,{now=new Date(),fetcher=env.FETCH||globalThis.fetch}={
 }
 
 /* ---------------- Administration ---------------- */
-function urlWebhook(v,recette){const s=t(v);if(!s)return '';let u;try{u=new URL(s)}catch{return null}if(u.username||u.password)return null;if(u.protocol==='https:')return u.toString();if(recette&&u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))return u.toString();return null}
+// Audit du 27/11 : un webhook ne peut pas viser le réseau interne de l'hébergeur (adresse locale, privée ou de
+// métadonnées) : le serveur IASELO s'en servirait sinon pour atteindre des services non exposés.
+export function interne(h){h=String(h||'').toLowerCase().replace(/^\[|\]$/g,'');if(h==='localhost'||h.endsWith('.localhost')||h.endsWith('.internal')||h.endsWith('.local'))return true;
+ const m=/^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(h);if(m){const a=+m[1],b=+m[2];return a===0||a===10||a===127||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&b===168||a===100&&b>=64&&b<=127||a>=224}
+ return h.includes(':')&&(h==='::1'||h.startsWith('fc')||h.startsWith('fd')||h.startsWith('fe80')||h.startsWith('::ffff:'))}
+function urlWebhook(v,recette){const s=t(v);if(!s)return '';let u;try{u=new URL(s)}catch{return null}if(u.username||u.password)return null;if(u.protocol==='https:')return interne(u.hostname)&&!recette?null:u.toString();if(recette&&u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))return u.toString();return null}
 export async function staffFhirApi(request,env,acl){
  const url=new URL(request.url);if(url.pathname!=='/api/workspace/fhir')return null;
  if(!acl.isAdmin)return json({error:'Réservé à l’administrateur.'},403);
