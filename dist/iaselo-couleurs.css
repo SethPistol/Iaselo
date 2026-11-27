@@ -65,7 +65,7 @@ label{color:#1c6679}
 .pill.good{background:#e7ebf0;color:#1a7050}
 .pill.warn{background:#e1f2f6;color:#1a5e6f}
 .detailhead{background:linear-gradient(105deg,#f6f8fa,#ffffff);border-bottom-color:#dfe3e7}
-.identity{background:#ffffff;border:1px solid #dadfe5;color:#25859d}
+.identity{background:#ffffff;border:1px solid #dadfe5;color:#1d6f83}
 .timeline{background:#ffffff}
 .timeline button{background:#fafafb}
 .timeline button.current{background:#e2f3f7;color:#1e6e82;border-color:#97d6e6}
@@ -297,7 +297,7 @@ dialog{border-color:#d2d8df;background:#f9fafb}
 .dossier-subnav{border-bottom:1px solid #dce0e5;background:#f8f9fa}
 .dossier-subnav label{color:#617285}
 .dossier-subnav select{background:#ffffff}
-.dossier-subnav>span{color:#64768b}
+.dossier-subnav>span{color:#536477}
 .postop-sections{border-bottom:1px solid #d8dde3}
 .postop-sections button{border:1px solid #cfd6dd;background:#f4f6f8;color:#1e6b7e}
 .postop-sections button.current{background:#e1e6ec;border-color:#5ed9ac;color:#165c42}

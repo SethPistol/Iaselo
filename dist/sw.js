@@ -4,8 +4,8 @@
    - Réseau d'abord : en ligne, IASELO se comporte comme avant (toujours la dernière version). Hors ligne, les fichiers
      déjà chargés servent depuis le cache et toute page demandée affiche hors-ligne.html (procédure dégradée). */
 'use strict';
-const VERSION='iaselo-statique-1',HORS_LIGNE='/hors-ligne.html';
-const PRECACHE=[HORS_LIGNE,'/manifest.webmanifest','/assets/app/icone-192.png','/assets/marque/iaselo.webp','/assets/marque/favicon.png'];
+const VERSION='iaselo-statique-2',HORS_LIGNE='/hors-ligne.html';
+const PRECACHE=[HORS_LIGNE,'/manifest.webmanifest','/assets/app/icone-192.png','/assets/marque/iaselo.webp','/assets/marque/favicon.png','/accessibilite.css?v=1','/accessibilite.js?v=1'];
 const STATIQUE=/\.(?:js|css|webp|png|jpg|svg|woff2?|ttf|webmanifest)$/;
 const JAMAIS=/^\/(?:api|fhir|__dev|auth|login|logout|modeles)\b/;
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(PRECACHE)).then(()=>self.skipWaiting()))});

@@ -1,0 +1,6 @@
+/* IASELO · accessibilité (RGAA 4.1, 27/11/2026) : lien d'évitement, titre caché, débordements à 320 px. Voir docs/accessibilite-rgaa.md. */
+.a11y-evitement{position:absolute;left:8px;top:-60px;z-index:1000;background:#0f3b47;color:#fff;padding:10px 16px;border-radius:6px;font-weight:700;text-decoration:none}
+.a11y-evitement:focus{top:8px;outline:3px solid #f2b705;outline-offset:2px}
+.a11y-masque{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important}
+#contenu:focus{outline:none}
+@media (max-width:480px){.patient-masthead{flex-wrap:wrap}.patient-masthead .clinic-logo{max-width:100%}.patient-space{white-space:normal}}

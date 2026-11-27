@@ -463,7 +463,7 @@ header.top .tag{margin-left:auto}
 #s-allergies .lab{font-weight:700;color:var(--ink);font-size:13.5px}
 #s-allergies .chip span{font-weight:700}
 #s-allergies textarea{font-weight:600}
-#conclRecap dd.empty{grid-column:1/-1;color:var(--muted);font-weight:400}
+#conclRecap dt.empty{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}#conclRecap dd.empty{grid-column:1/-1;color:var(--muted);font-weight:400}
 @media (max-width:560px){#conclRecap{grid-template-columns:minmax(0,1fr)}#conclRecap dt{border-bottom:0;padding-bottom:0}}
 .subt{grid-column:1/-1;margin:10px 0 -6px;padding-bottom:6px;border-bottom:2px solid var(--accent);font-family:var(--f-display);font-weight:600;font-size:15px;color:var(--accent);letter-spacing:.01em}
 .grid>.subt:first-child{margin-top:0}
@@ -1789,7 +1789,7 @@ function update(){
     ['SAOS — STOP-BANG',conclNormal('sb_score',v,c)?'':c.sb_score,true],['Cardiaque — Lee',conclNormal('lee_score',v,c)?'':c.lee_score,true],['NVPO — Apfel',conclNormal('apfel_score',v,c)?'':c.apfel_score,true],['Hémorragique — HEMSTOP',conclNormal('hemstop_score',v,c)?'':c.hemstop_score,true],
     ['Inhalation — estomac plein',conclNormal('ep_score',v,c)?'':c.ep_score,true],['Thrombotique',X.thrombo_concl,true],
     ['Lentilles / prothèse',X.retrait,true],['Traitements : consignes / arrêts',X.stop_rappel,/⚠|•/.test(X.stop_rappel)]].filter(x=>x[1]);
-   const rH=R.length?R.map(([k,x,a])=>`<dt${a==='strat'?' class="strat"':''}>${esc(k)}</dt><dd${a?` class="${a==='danger'?'danger':a==='strat'?'strat':'alert'}"`:''}>${esc(x).replace(/\n/g,'<br>')}</dd>`).join(''):'<dd class="empty">Rien à reprendre pour l\'instant.</dd>';
+   const rH=R.length?R.map(([k,x,a])=>`<dt${a==='strat'?' class="strat"':''}>${esc(k)}</dt><dd${a?` class="${a==='danger'?'danger':a==='strat'?'strat':'alert'}"`:''}>${esc(x).replace(/\n/g,'<br>')}</dd>`).join(''):'<dt class="empty">Récapitulatif</dt><dd class="empty">Rien à reprendre pour l\'instant.</dd>';
    const rEl=document.getElementById('conclRecap');if(rEl.innerHTML!==rH)rEl.innerHTML=rH}
   const scEl=document.getElementById('scores');if(scEl.innerHTML!==scH)scEl.innerHTML=scH;
   if(showMiss&&!miss.size){document.getElementById('missing').hidden=true}

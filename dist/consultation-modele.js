@@ -82,7 +82,7 @@ window.createConsultationModele=function({$,esc,toast,event,role,medecin,onChang
  function monter(zone,stay,read){
   preparer(stay);
   frame=document.createElement('iframe');frameStay=stay.id;frameRead=read;frameReady=false;const ce=frame;
-  frame.className='cpa-frame';frame.title='Consultation pré-anesthésique';frame.src='consultation-modele.html?v=3';
+  frame.className='cpa-frame';frame.title='Consultation pré-anesthésique';frame.src='consultation-modele.html?v=4';
   frame.addEventListener('load',()=>{
    const w=win();if(!w||frame!==ce||frameStay!==stay.id)return;stay=sejour?.(stay.id)||stay;const c=stay.consult;
    w.CPA.theme(document.documentElement.dataset.theme||null);

@@ -3,7 +3,7 @@ import {test} from 'node:test';import assert from 'node:assert/strict';import fs
 test('la page patient ne charge que le portail autonome',()=>{
  const html=fs.readFileSync(new URL('../dist/patient.html',import.meta.url),'utf8');
  const scripts=[...html.matchAll(/<script[^>]*src="([^"?]+)/g)].map(m=>m[1]);
- assert.deepEqual(scripts,['startup-v5.js','patient-portal.js','traduction-patient.js']);
+ assert.deepEqual(scripts,['startup-v5.js','patient-portal.js','traduction-patient.js','accessibilite.js']);
  assert.doesNotMatch(html,/<aside|<dialog|Nouveau séjour|acces-professionnels|parcours-v8\.js/);
 });
 test('le portail patient n’appelle que l’API du questionnaire',()=>{
