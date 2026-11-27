@@ -9,6 +9,8 @@ export function ccamIndex(){
  catch{cache=null}
  return cache;
 }
+/** À appeler quand dist/assets/ccam.json a été remplacé (nouvelle version chargée par le serveur). */
+export function rechargerCcamIndex(){cache=undefined}
 // Tests : index fourni directement ({code:{libelle,tarif,tarifs,modificateurs,activites}}, modificateurs).
 export function _testCcamIndex(actes,modificateurs={}){
  if(actes===null){cache=null;return}

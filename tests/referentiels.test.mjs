@@ -81,3 +81,43 @@ test('BDPM : spécialités et substances actives avec dosage, encodage Windows-1
  assert.throws(()=>construireBdpm(Buffer.from(spe.slice(0,10).join('\n')),Buffer.from('')),/incomplet/);
  assert.throws(()=>construireBdpm(Buffer.from([spe[0],spe[0]].join('\n')),Buffer.from('')),/double/);
 });
+
+test('CCAM : ameli en maintenance (520) → nouvelles tentatives puis copie du dépôt, la CCAM déjà chargée est gardée',async()=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path'),{gzipSync}=await import('node:zlib');
+ const {majCcam,rafraichirCcam,CCAM_CONNUE}=await import('../scripts/referentiels.mjs');
+ const dossier=fs.mkdtempSync(path.join(os.tmpdir(),'ccam-')),depot=path.join(dossier,'depot.json.gz');
+ const ref=await construireCcam(archives,{version:'08400',aujourdhui:'20261123'});fs.writeFileSync(depot,gzipSync(JSON.stringify(ref)));
+ const appels=[],fetchOrig=globalThis.fetch;
+ globalThis.fetch=async u=>{appels.push(String(u));return new Response('Maintenance',{status:520})};
+ try{
+  assert.deepEqual(CCAM_CONNUE.urls[1],['https://www.ameli.fr/fileadmin/user_upload/documents/CCAM08400_DBF_PART2.zip','https://www.ameli.fr/fileadmin/user_upload/documents/CCAM8400_DBF_PART2.zip']);
+  const journal=[];const r=await majCcam({dossier,depot,essais:2,journal:m=>journal.push(m)});
+  assert.equal(r.etat,'ok');assert.equal(r.copie,'dépôt');assert.equal(r.version,'08400');assert.match(r.erreurAmeli,/HTTP 520/);
+  assert.ok(appels.filter(u=>u.endsWith('CCAM08400_DBF_PART1.zip')).length===2,'deux essais par adresse');
+  assert.ok(appels.some(u=>u.endsWith('CCAM8400_DBF_PART1.zip')),'orthographe sans zéro essayée');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dossier,'ccam.json'),'utf8')).actes.length,2);
+  // Une CCAM aussi récente est déjà en place : on la garde (échec signalé, pas d'écrasement).
+  await assert.rejects(majCcam({dossier,depot,essais:1,journal:()=>{}}),/HTTP 520/);
+  // Sans copie du dépôt ni CCAM chargée : échec et « absent » dans l'état.
+  const vide=fs.mkdtempSync(path.join(os.tmpdir(),'ccam-'));
+  const e=await rafraichirCcam({dossier:vide,journal:()=>{},forcer:true,essais:1,depot:path.join(vide,'aucun.gz')});
+  assert.equal(e.change,false);const etat=JSON.parse(fs.readFileSync(path.join(vide,'referentiels.json'),'utf8'));assert.equal(etat.ccam.etat,'echec');assert.equal(etat.ccam.absent,true);
+ }finally{globalThis.fetch=fetchOrig}
+});
+
+test('CCAM : le serveur reprend la version officielle dès qu’ameli répond à nouveau',async()=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const {rafraichirCcam}=await import('../scripts/referentiels.mjs');
+ const dossier=fs.mkdtempSync(path.join(os.tmpdir(),'ccam-'));
+ fs.writeFileSync(path.join(dossier,'referentiels.json'),JSON.stringify({ccam:{etat:'ok',version:'08400',copie:'dépôt',actes:1}}));
+ const page='<a href="/fileadmin/user_upload/documents/CCAM08400_DBF_PART1.zip">1</a><a href="/fileadmin/user_upload/documents/CCAM08400_DBF_PART2.zip">2</a>';
+ const fetchOrig=globalThis.fetch;
+ globalThis.fetch=async u=>String(u).endsWith('.php')?new Response(page):new Response(String(u).includes('PART1')?archives[0]:archives[1]);
+ try{
+  const r=await rafraichirCcam({dossier,journal:()=>{}});
+  assert.equal(r.change,true);assert.equal(r.etat.copie,undefined);assert.equal(r.etat.actes,2);
+  // Version officielle déjà chargée et rien de plus récent publié : aucun téléchargement.
+  let telechargements=0;globalThis.fetch=async u=>{if(!String(u).endsWith('.php'))telechargements++;return new Response(page)};
+  assert.equal((await rafraichirCcam({dossier,journal:()=>{}})).change,false);assert.equal(telechargements,0);
+ }finally{globalThis.fetch=fetchOrig}
+});

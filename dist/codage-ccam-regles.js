@@ -103,6 +103,23 @@ function erreurValidation(codage,cle,ix){
  return '';
 }
 
+// Cohérence d'un codage avec la CCAM chargée (nouvelle version) : actes supprimés, activité ou modificateur retirés,
+// codage validé avec une autre version. Ne bloque rien : signale au praticien et au DIM ce qui est à revoir.
+function alertesVersion(codage,cle,ix){
+ if(!ix?.actes?.length)return [];
+ const p=panneau(codage,cle,ix),out=[],v=ix.version?'V'+ix.version:'chargée';
+ for(const x of p.lignes){
+  const a=ix.parCode?.get(x.code);
+  if(!a){out.push(x.code+' n’existe plus dans la CCAM '+v+' : remplacez l’acte.');continue}
+  if(!x.complement&&a.activites&&!a.activites.includes(x.activite))out.push(x.code+' n’a plus d’activité '+x.activite+' dans la CCAM '+v+'.');
+  const ok=autorises(ix,x.code,x.activite),retires=ok?x.modificateurs.split('').filter(m=>m&&!ok.includes(m)):[];
+  if(retires.length)out.push(x.code+' : modificateur'+(retires.length>1?'s ':' ')+retires.join(', ')+' plus autorisé'+(retires.length>1?'s':'')+' dans la CCAM '+v+'.');
+ }
+ const val=p.validation?.ccam;
+ if(p.validation&&val&&ix.version&&val!==ix.version)out.unshift('Codage validé avec la CCAM V'+val+' ; valeurs recalculées avec la V'+ix.version+'.');
+ return out;
+}
+
 // Part d'un praticien dans le codage : sert au serveur pour refuser qu'un praticien modifie la part de l'autre.
 function part(codage,cle){
  const c=normaliser(codage),act=PANNEAUX[cle].activite;
@@ -129,5 +146,5 @@ function ecritureAutorisee(job,avant,apres){
  return partInchangee(avant,apres,autre)&&decisionsAutorisees(avant,apres,moi);
 }
 
-return {DEPASSEMENT_MAX,euro,PANNEAUX,COMPLEMENTS,ASSOCIATIONS,TYPES_ANESTHESIE,normaliser,panneau,lignesFacturables,erreurValidation,part,partInchangee,decisionsAutorisees,ecritureAutorisee,prixUnitaire,autorises,mods,id};
+return {DEPASSEMENT_MAX,euro,PANNEAUX,COMPLEMENTS,ASSOCIATIONS,TYPES_ANESTHESIE,normaliser,panneau,lignesFacturables,erreurValidation,alertesVersion,part,partInchangee,decisionsAutorisees,ecritureAutorisee,prixUnitaire,autorises,mods,id};
 });

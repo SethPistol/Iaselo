@@ -61,3 +61,14 @@ test('codage CCAM : valeur de l’acte saisie si absente de la CCAM et dépassem
  const avant=codage(),apres=codage();apres.lignes[0].activites['1'].depassement=99;
  assert.equal(R.ecritureAutorisee('anesthesiste',avant,apres),false);assert.equal(R.ecritureAutorisee('chirurgien',avant,apres),true);
 });
+
+test('codage CCAM : nouvelle version de la CCAM, actes supprimés et modificateurs retirés signalés',()=>{
+ const c=codage();c.validations={'1':{par:'Dr A',at:'2026-11-26T10:00:00Z',ccam:'08300'}};
+ const v84={...ix,version:'08400',parCode:new Map([...ix.parCode].filter(([k])=>k!=='MEMA017').map(([k,a])=>[k,k==='MEMC003'?{...a,modificateurs:{'1':'J'}}:a]))};
+ const al=R.alertesVersion(c,'chirurgien',v84);
+ assert.match(al[0],/validé avec la CCAM V08300 ; valeurs recalculées avec la V08400/);
+ assert.ok(al.some(t=>/MEMA017 n’existe plus dans la CCAM V08400/.test(t)));
+ assert.ok(al.some(t=>/MEMC003 : modificateur K plus autorisé/.test(t)));
+ assert.deepEqual(R.alertesVersion(codage(),'chirurgien',ix),[],'codage cohérent : aucune alerte');
+ assert.deepEqual(R.alertesVersion(c,'chirurgien',null),[],'CCAM non chargée : rien à signaler');
+});
