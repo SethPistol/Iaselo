@@ -42,3 +42,15 @@
 .ps-scale input:checked+span{background:var(--i-acc,#0F4D5C);color:var(--i-on-acc,#fff);border-color:transparent}.ps-scale input:focus-visible+span{outline:3px solid #8fb7c6;outline-offset:2px}
 .sj-q textarea{width:100%;min-height:80px}
 @media print{.ps-band{background:none;color:#000}.no-print{display:none!important}}
+/* Messagerie patient ↔ équipe (dist/messagerie.js, dist/messagerie-page.js) */
+.ps-onglets{display:flex;gap:6px;flex-wrap:wrap}.ps-onglets button{border:1px solid var(--border,#e0e4e9);background:#fff;border-radius:999px;padding:6px 14px;font-weight:700;cursor:pointer}.ps-onglets button.on{background:#0F4D5C;color:#fff;border-color:#0F4D5C}
+.ps-onglets .n{display:inline-block;min-width:20px;margin-left:6px;padding:0 6px;border-radius:999px;background:#B21F2A;color:#fff;font-size:12px}
+.mg-cols{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:14px}@media (max-width:860px){.mg-cols{grid-template-columns:1fr}}
+.mg-liste{list-style:none;margin:0;padding:0}.mg-liste li button{all:unset;box-sizing:border-box;display:block;width:100%;padding:10px 12px;border-radius:10px;cursor:pointer}.mg-liste li button:hover,.mg-liste li button.on{background:#eef4f6}
+.mg-liste small{display:block;color:var(--i-mut,#5b6b73);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mg-fil{list-style:none;margin:12px 0;padding:0;display:flex;flex-direction:column;gap:10px;max-height:520px;overflow:auto}
+.mg-msg{display:flex;flex-direction:column;max-width:82%}.mg-msg small{color:var(--i-mut,#5b6b73);font-size:12px;margin-top:2px}
+.mg-msg.moi{align-self:flex-end;align-items:flex-end}.mg-msg.eux{align-self:flex-start}
+.mg-bulle{padding:10px 14px;border-radius:14px;line-height:1.45;background:#eef2f3}.mg-msg.moi .mg-bulle{background:#0F4D5C;color:#fff}.mg-msg.urgent .mg-bulle{border:2px solid #B21F2A}
+.mg-vide{color:var(--i-mut,#5b6b73)}.mg-aide{border:1px solid var(--border,#e0e4e9);border-radius:12px;padding:10px 14px;margin:10px 0;background:#f7fafb}.mg-aide summary{font-weight:700;cursor:pointer}
+.mg-modeles{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.mg-modeles button{font-size:13px}

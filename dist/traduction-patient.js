@@ -303,7 +303,35 @@ const EN={
 "Lien invalide.": "Invalid link.",
 "Créneau indisponible.": "Slot no longer available.",
 "Saisissez vos nom et prénom.": "Enter your surname and first name.",
-"Ce document a déjà reçu votre réponse.": "You have already answered this document."
+"Ce document a déjà reçu votre réponse.": "You have already answered this document.",
+"Mon suivi": "My follow-up",
+"Comment allez-vous ?": "How are you?",
+"Un mois après votre intervention": "One month after your operation",
+"Votre avis sur votre séjour": "Your opinion of your stay",
+"Un mois après : vos résultats et votre avis": "One month on: your results and your opinion",
+"Vos réponses sont transmises à votre équipe. Si l’une d’elles l’inquiète, l’équipe vous rappelle.": "Your answers are sent to your care team. If any of them is a concern, the team will call you back.",
+"Votre équipe est informée. Bon rétablissement.": "Your care team has been informed. We wish you a good recovery.",
+"Votre équipe est prévenue et va vous rappeler.": "Your care team has been alerted and will call you back.",
+"Ces conseils sont généraux. Les consignes écrites remises par votre équipe priment toujours. En cas de doute, appelez la clinique.": "This advice is general. The written instructions given by your care team always take priority. If in doubt, call the clinic.",
+"Votre douleur au repos, de 0 (aucune) à 10 (maximale)": "Your pain at rest, from 0 (none) to 10 (worst)",
+"Votre température, si vous l’avez prise (°C)": "Your temperature, if you have taken it (°C)",
+"Votre cicatrice est-elle rouge, chaude, gonflée, ou laisse-t-elle couler du liquide ?": "Is your scar red, warm, swollen, or leaking fluid?",
+"Saignez-vous, ou votre pansement est-il imbibé ?": "Are you bleeding, or is your dressing soaked?",
+"Êtes-vous essoufflé(e), ou avez-vous une douleur dans la poitrine ?": "Are you short of breath, or do you have chest pain?",
+"Avez-vous une douleur ou un gonflement d’un mollet ?": "Do you have pain or swelling in a calf?",
+"Vous levez-vous et marchez-vous plusieurs fois par jour ?": "Do you get up and walk several times a day?",
+"Souhaitez-vous que l’équipe vous rappelle ?": "Would you like the team to call you back?",
+"Une question pour l’équipe ? (facultatif)": "A question for the team? (optional)",
+"Messagerie avec votre équipe": "Messages with your care team",
+"Messagerie": "Messages",
+"Pour protéger vos échanges, indiquez votre date de naissance.": "To protect your messages, please enter your date of birth.",
+"Vos échanges avec l’équipe": "Your messages with the team",
+"Votre message": "Your message",
+"Actualiser": "Refresh",
+"Écrivez votre question ci-dessous. L’équipe vous répond aux heures ouvrables.": "Write your question below. The team replies during working hours.",
+"Votre message est transmis à votre équipe, qui vous répond aux heures ouvrables. Ce service n’est pas lu la nuit ni le week-end.": "Your message has been sent to your care team, who will reply during working hours. This service is not read at night or at weekends.",
+"En attendant, ces conseils peuvent vous aider :": "In the meantime, this advice may help:",
+"Messagerie indisponible": "Messages unavailable"
 };
 const JOURS={lundi:'Monday',mardi:'Tuesday',mercredi:'Wednesday',jeudi:'Thursday',vendredi:'Friday',samedi:'Saturday',dimanche:'Sunday'};
 const MOIS={janvier:'January',février:'February',mars:'March',avril:'April',mai:'May',juin:'June',juillet:'July',août:'August',septembre:'September',octobre:'October',novembre:'November',décembre:'December'};
@@ -313,7 +341,8 @@ const MOTIFS=[
  [/^Rendez-vous confirmé le$/,()=>'Appointment confirmed on'],[/^à$/,()=>'at'],[/^avec$/,()=>'with'],
  [/^Vous recevrez un rappel\.$/,()=>'You will receive a reminder.'],[/^référence$/,()=>'reference'],
  [/^intervention prévue le (.+)$/,(m,x)=>'operation planned for '+x],[/^secteur (\S+)$/,(m,x)=>'sector '+x],
- [/^Payer (.+)$/,(m,x)=>'Pay '+x],[/^le (\d.+)$/,(m,x)=>'on '+x],[/^Ce questionnaire est réservé/,m=>m]
+ [/^Payer (.+)$/,(m,x)=>'Pay '+x],[/^le (\d.+)$/,(m,x)=>'on '+x],[/^Ce questionnaire est réservé/,m=>m],
+ [/^Votre message évoque (.+)\. N’attendez pas la réponse de l’équipe : appelez le 15 \(ou le 112\) maintenant\.$/,(m,x)=>'Your message mentions '+({'une douleur dans la poitrine':'chest pain','une gêne pour respirer':'difficulty breathing','un saignement important':'heavy bleeding','un malaise':'feeling faint','un signe neurologique (paralysie, trouble de la parole)':'a neurological sign (weakness, speech problem)','une détresse':'distress'}[x]||x)+'. Do not wait for your care team: call 15 (or 112) now.']
 ];
 const KEY='iaselo-langue';
 let lang='fr';try{lang=localStorage.getItem(KEY)||''}catch{}

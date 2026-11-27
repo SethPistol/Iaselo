@@ -8,7 +8,9 @@
 'use strict';
 root.createParcoursSuivi=function(ctx){
  const {esc,toast}=ctx,P=root.IaseloParcoursSuivi;if(!P)return null;
- let data=null,erreur='',ouvert=null,dossier=null,filtre='tous',chargement=0,esatisRes=null;
+ let data=null,erreur='',ouvert=null,dossier=null,filtre='tous',chargement=0,esatisRes=null,mode='parcours',msgStay=null;
+ // Onglet « Messages des patients » (dist/messagerie.js).
+ const msg=root.createMessagerieEquipe?.({esc,toast})||null;
  const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>';
  const fmt=d=>d?new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}):'—';
  const fmtDT=iso=>iso?new Date(iso).toLocaleString('fr-FR',{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
@@ -52,6 +54,7 @@ root.createParcoursSuivi=function(ctx){
    <section class="ps-card"><h3>Parcours</h3>
     <form class="ps-inline" data-inscrire="${esc(d.stay)}"><select name="programme">${Object.entries(P.PROGRAMMES).map(([k,v])=>`<option value="${k}" ${(p.programme||d.propose)===k?'selected':''}>${esc(v.label)}</option>`).join('')}</select><button class="primary">${p.programme?'Changer de parcours':'Inscrire au parcours'}</button></form>
     ${p.programme?(p.arret?`<p class="ps-mut">Arrêté par ${esc(p.arret.par)} le ${esc(fmtDT(p.arret.at))} : ${esc(p.arret.motif)}</p><button class="secondary" data-reprendre="${esc(d.stay)}">Reprendre le parcours</button>`:`<form class="ps-inline" data-arreter="${esc(d.stay)}"><input name="motif" required minlength="3" maxlength="300" placeholder="Motif de l’arrêt (réhospitalisation, refus…)"><button class="secondary">Arrêter</button></form>`):`<p class="ps-mut">Parcours proposé : ${esc(P.PROGRAMMES[d.propose]?.label||'')}. Les messages partent automatiquement entre 10 h et 20 h.</p>`}
+    ${msg?`<p><button type="button" class="secondary" data-messagerie="${esc(d.stay)}">Messagerie avec le patient</button></p>`:''}
     <label class="ps-check"><input type="checkbox" data-opposition="${esc(d.stay)}" ${p.esatisOpposition?'checked':''} ${p.programme?'':'disabled'}> Le patient s’oppose à l’enquête nationale e-Satis</label>
    </section>
    <section class="ps-card ps-wide"><h3>Étapes</h3>${et.etapes?.length?`<table class="ps-table"><thead><tr><th>Date</th><th>Étape</th><th>État</th><th></th></tr></thead><tbody>${et.etapes.map(e=>{const st=P.ETATS[e.code];return `<tr><td>${esc(fmt(e.date))}</td><td>${esc(e.libelle)}${e.echec&&e.code==='echec'?`<br><small class="ps-err">${esc(e.echec.raison)}</small>`:''}${e.envoi?`<br><small class="ps-mut">${esc(e.envoi.detail||'')} · ${esc(fmtDT(e.envoi.at))}</small>`:''}</td><td>${chip(st[1],st[0])}</td><td>${!p.arret&&e.date<=jour&&e.code!=='repondu'?`<button class="secondary ps-small" data-envoyer="${esc(d.stay)}" data-etape="${esc(e.id)}">${e.envoi?'Renvoyer':'Envoyer'}</button>`:''}</td></tr>`}).join('')}</tbody></table>`:`<p class="ps-mut">${p.programme?'Date d’intervention inconnue : les étapes seront datées dès qu’elle sera renseignée.':'Inscrivez le patient pour voir le calendrier.'}</p>`}</section>
@@ -84,7 +87,11 @@ root.createParcoursSuivi=function(ctx){
  }
  function draw(){
   const c=host();if(!c)return;
-  c.innerHTML=`<section class="panel"><div class="content"><div class="ps-wrap">${ouvert?vueDossier():vueTableau()}</div></div></section>`;
+  const n=msg?.nonLus()||0,onglets=msg?`<div class="ps-onglets" role="tablist"><button type="button" role="tab" aria-selected="${mode==='parcours'}" class="${mode==='parcours'?'on':''}" data-mode="parcours">Parcours de soins</button><button type="button" role="tab" aria-selected="${mode==='messages'}" class="${mode==='messages'?'on':''}" data-mode="messages">Messages des patients${n?`<span class="n">${n}</span>`:''}</button></div>`:'';
+  c.innerHTML=`<section class="panel"><div class="content"><div class="ps-wrap">${onglets}${mode==='messages'?'<div id="mg-hote"></div>':ouvert?vueDossier():vueTableau()}</div></div></section>`;
+  c.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;msgStay=null;draw()});
+  if(mode==='messages'){const st=msgStay;msgStay=null;msg.monter(c.querySelector('#mg-hote'),{stay:st,change:()=>{const b=c.querySelector('[data-mode="messages"]');if(b)b.innerHTML='Messages des patients'+(msg.nonLus()?`<span class="n">${msg.nonLus()}</span>`:'')}});return}
+  c.querySelectorAll('[data-messagerie]').forEach(b=>b.onclick=()=>{mode='messages';msgStay=b.dataset.messagerie;draw()});
   c.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>ouvrir(b.dataset.open));
   c.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>{ouvert=null;dossier=null;draw()});
   c.querySelectorAll('[data-filtre]').forEach(b=>b.onclick=()=>{filtre=b.dataset.filtre;draw()});
@@ -97,6 +104,7 @@ root.createParcoursSuivi=function(ctx){
   c.querySelectorAll('[data-esatis]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();try{const r=await api('esatis?mois='+encodeURIComponent(f.mois.value));esatisRes=r;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.csv],{type:'text/csv;charset=utf-8'}));a.download='e-satis-'+r.mois+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);draw()}catch(err){toast(err.message)}});
  }
  function render(){
+  msg?.rafraichir();
   const t=document.querySelector('#title');if(t)t.textContent='Télésuivi des patients';
   document.body.classList.remove('j-home');const nw=document.querySelector('#new');if(nw)nw.hidden=true;const st=document.querySelector('#stats');if(st)st.hidden=true;
   document.querySelectorAll('aside .nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='telesuivi'));
