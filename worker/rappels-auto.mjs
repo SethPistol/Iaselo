@@ -15,6 +15,7 @@ import P from '../dist/preadmission-regles.js';
 import {contexte,envoyerLien,updatePre} from './preadmission.mjs';
 import {tourneeParcours} from './parcours-suivi.mjs';
 import {livrerWebhooks} from './fhir.mjs';
+import {tourneeProches} from './proches-chambre.mjs';
 export const ACTEUR='iaselo-automatique',NOM='Envoi automatique IASELO',HEURE_DEBUT=10,HEURE_FIN=20;
 export const LIBELLES={'convocation':'Convocation','consentement-j-2':'Rappel du consentement à J-2','consentement-j-1':'Rappel du consentement à J-1','suivi-j+1':'SMS de suivi à J+1','preadmission-j-7':'Rappel de préadmission à J-7','preadmission-j-3':'Rappel de préadmission à J-3','preadmission-j-1':'Rappel de préadmission à J-1'};
 const mask=v=>{v=String(v||'');return v.length>4?v.slice(0,3)+'*'.repeat(v.length-5)+v.slice(-2):'***'};
@@ -112,6 +113,8 @@ async function tournee(env,{now=new Date(),origin=''}={}){
  // Webhooks FHIR en attente (nouvelles tentatives), à toute heure.
  await livrerWebhooks(env,{now}).catch(e=>console.error('fhir webhooks',e?.message||e));
  const convocations=await tourneeConvocations(env,acl,{now,origin}).catch(e=>{console.error('convocations',e?.message||e);return []});
+ // Information des proches (accord du patient) : plage propre, 7 h – 21 h.
+ convocations.push(...await tourneeProches(env,acl,{now}).catch(e=>{console.error('proches',e?.message||e);return []}));
  if(heure<HEURE_DEBUT||heure>=HEURE_FIN)return {hors:true,jour,resultats:convocations};
  const rows=(await env.DB.prepare("SELECT key,data FROM workspace_documents WHERE key LIKE 'stay/%/consult' OR key LIKE 'stay/%/surgicalAnnouncement'").all()).results||[];
  const sejours=new Map();

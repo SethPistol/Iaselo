@@ -37,7 +37,7 @@ root.createSurveillanceCentrale=function(ctx){
   return `<article class="sc-pat p-${l.pire}" aria-labelledby="sc-${esc(l.stay)}"><div class="sc-tete"><h2 id="sc-${esc(l.stay)}">${esc(l.nom)}</h2><span class="sc-mut">${esc(l.stage)}${l.secteur?' · '+esc(l.secteur):''} · dernier relevé : ${l.dernier?esc(heure(l.dernier)):'aucun'}</span></div>
    ${liste.length?liste.map(a=>`<div class="sc-al ${a.vue?'vu':''}"><span class="sc-badge ${NIV[a.niveau][1]}">${NIV[a.niveau][0]}</span><div><strong>${esc(a.titre)}</strong><p>${esc(a.detail)}</p>${a.vue?`<p>Pris en charge par ${esc(a.vue.par)} ${esc(heure(a.vue.at))}${a.vue.note?' : '+esc(a.vue.note):''}</p>`:''}</div>${a.vue?'':`<button type="button" class="secondary ps-small" data-prendre="${esc(l.stay)}" data-cle="${esc(a.cle)}">Pris en charge</button>`}</div>`).join('')
     :`<p class="sc-mut">${l.alertes.length?'Alertes déjà prises en charge.':'Aucune alerte.'}</p>`}
-   <div class="sc-actions"><button type="button" class="secondary ps-small" data-ouvrir="${esc(l.stay)}">Ouvrir le dossier</button>${ctx.peutSaisir?.()?`<button type="button" class="secondary ps-small" data-dicter="${esc(l.stay)}">Dicter les constantes</button>`:''}</div></article>`;
+   <div class="sc-actions"><button type="button" class="secondary ps-small" data-ouvrir="${esc(l.stay)}">Ouvrir le dossier</button>${ctx.peutSaisir?.()?`<button type="button" class="secondary ps-small" data-dicter="${esc(l.stay)}">Dicter les constantes</button>`:''}${root.IaseloProchesUI?`<button type="button" class="secondary ps-small" data-proches="${esc(l.stay)}">Proches · écran en chambre</button>`:''}</div></article>`;
  }
  function draw(){
   const c=document.querySelector('#workspace');if(!c||ctx.view()!=='surveillance')return;
@@ -45,12 +45,14 @@ root.createSurveillanceCentrale=function(ctx){
   const lignes=t.lignes.filter(l=>filtre==='toutes'||l.ouvertes);
   c.innerHTML=`<div class="sc-bandeau"><span class="sc-badge ${t.critiques?'sc-crit':'sc-ok'}">${t.critiques} patient(s) en alerte critique</span><span class="sc-badge">${t.aVoir} alerte(s) à prendre en charge</span><span class="sc-badge">${t.lignes.length} patient(s) présents</span>
    <div class="sc-filtres" role="group" aria-label="Filtrer">${[['ouvertes','Alertes à voir'],['toutes','Tous les patients présents']].map(([k,l])=>`<button type="button" data-filtre="${k}" aria-pressed="${filtre===k}">${l}</button>`).join('')}</div></div>
-  <div class="sc-liste" aria-live="polite">${lignes.length?lignes.map(patientHtml).join(''):'<p class="sc-mut">Aucune alerte à prendre en charge parmi les patients présents.</p>'}</div>
+  <section id="sc-demandes" hidden></section><div class="sc-liste" aria-live="polite">${lignes.length?lignes.map(patientHtml).join(''):'<p class="sc-mut">Aucune alerte à prendre en charge parmi les patients présents.</p>'}</div>
   <p class="sc-mut">Seuils : NEWS2, qSOFA (Sepsis-3), Braden, Morse, IMC (HAS), surveillance SSPI 15 min et service 8 h. À faire valider par les médecins de l’établissement. Mis à jour chaque minute.</p>`;
   c.querySelectorAll('[data-filtre]').forEach(b=>b.onclick=()=>{filtre=b.dataset.filtre;draw()});
   c.querySelectorAll('[data-prendre]').forEach(b=>b.onclick=()=>{const note=prompteNote(b);if(note!==null)prendre(b.dataset.prendre,b.dataset.cle,note)});
   c.querySelectorAll('[data-ouvrir]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.ouvrir,'follow'));
   c.querySelectorAll('[data-dicter]').forEach(b=>b.onclick=()=>ouvrirDictee(b.dataset.dicter));
+  c.querySelectorAll('[data-proches]').forEach(b=>b.onclick=()=>root.IaseloProchesUI?.ouvrir(b.dataset.proches));
+  root.IaseloProchesUI?.demandes(c.querySelector('#sc-demandes'));
  }
  // Note courte facultative, sans boîte de dialogue bloquante : champ inséré sous l'alerte.
  function prompteNote(b){

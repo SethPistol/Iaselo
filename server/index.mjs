@@ -48,6 +48,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   if(pathname.startsWith('/api/parcours/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   // Messagerie du patient (lien personnel) : lecture et envoi de ses messages, aucun envoi SMS possible.
   if(pathname.startsWith('/api/messagerie/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
+  // Écran en chambre (tablette, lien activé par l'équipe) : vue du patient et demandes non urgentes, aucun envoi possible.
+  if(pathname.startsWith('/api/chambre/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   // Flux entrants des logiciels de la clinique (biologie, mouvements, moniteurs, courriers) : jeton propre à chaque émetteur.
   // Accueil téléphonique : agent vocal de l'opérateur (signature HMAC, TELEPHONIE_SECRET) ; absent = simulation.
   if(pathname==='/api/telephonie/appel')return operateurTelephonieApi(request,{DB,TELEPHONIE_SECRET:interopEnv.TELEPHONIE_SECRET,ESTABLISHMENT:messaging?.establishment||''});

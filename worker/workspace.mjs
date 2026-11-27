@@ -16,6 +16,7 @@ import {staffRedactionApi} from './redaction-ia.mjs';
 import {patientMessagerieApi,staffMessagerieApi} from './messagerie.mjs';
 import {staffContinuiteApi} from './continuite.mjs';
 import {staffTelephonieApi} from './telephonie.mjs';
+import {patientChambreApi,staffChambreApi,staffProchesApi} from './proches-chambre.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
@@ -34,6 +35,7 @@ export async function workspaceApi(request,env){
  if(path.startsWith('/api/suivi-j1/'))return env.DB?patientSuiviJ1Api(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/parcours/'))return env.DB?patientParcoursApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/messagerie/'))return env.DB?patientMessagerieApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
+ if(path.startsWith('/api/chambre/'))return env.DB?patientChambreApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/preadmission/'))return env.DB?patientPreadmissionApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/espace-patient/'))return env.DB?patientEspacePatientApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(!path.startsWith('/api/workspace'))return null;
@@ -89,6 +91,8 @@ export async function workspaceApi(request,env){
   const messagerieResponse=await staffMessagerieApi(request,env,acl);if(messagerieResponse)return messagerieResponse;
   const continuiteResponse=await staffContinuiteApi(request,env,acl);if(continuiteResponse)return continuiteResponse;
   const telephonieResponse=await staffTelephonieApi(request,env,acl);if(telephonieResponse)return telephonieResponse;
+  const prochesResponse=await staffProchesApi(request,env,acl);if(prochesResponse)return prochesResponse;
+  const chambreResponse=await staffChambreApi(request,env,acl);if(chambreResponse)return chambreResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;

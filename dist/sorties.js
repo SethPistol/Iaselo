@@ -57,7 +57,7 @@ root.createSorties=function(ctx){
   return `<article class="so-pat ${l.pret?'pret':l.jour==='retard'?'retard':''}" aria-labelledby="so-${esc(l.stay)}"><div class="sc-tete"><h2 id="so-${esc(l.stay)}">${esc(l.nom)}</h2><span class="sc-mut">${esc(l.mode||'')} · ${esc(l.stage)}${l.chambre?' · chambre '+esc(l.chambre):''}${l.heure?' · départ '+esc(l.heure):''}${l.jour==='retard'?' · prévue le '+esc(fdate(l.date)):''}</span></div>
    <ul class="so-etapes" aria-label="Étapes de la sortie">${l.etapes.map(e=>`<li><button type="button" class="so-et ${e.ok?'ok':''}" ${e.ok?'aria-disabled="true"':`data-etape="${e.id}" data-stay="${esc(l.stay)}"`}>${e.ok?'✓':'•'} ${esc(e.libelle)}<small>${esc(e.id==='date'&&e.ok?fdate(e.detail):e.detail)}</small></button></li>`).join('')}</ul>
    <p class="sc-mut">${l.pret?'Tout est prêt.':'Bloque : '+esc(l.bloquants.join(', '))}</p>
-   <div class="sc-actions"><button type="button" class="secondary ps-small" data-plier="${esc(l.stay)}" aria-expanded="${plein}">${plein?'Replier':'Organiser la sortie'}</button><button type="button" class="secondary ps-small" data-ouvrir="${esc(l.stay)}">Ouvrir le dossier</button></div>
+   <div class="sc-actions"><button type="button" class="secondary ps-small" data-plier="${esc(l.stay)}" aria-expanded="${plein}">${plein?'Replier':'Organiser la sortie'}</button><button type="button" class="secondary ps-small" data-ouvrir="${esc(l.stay)}">Ouvrir le dossier</button>${root.IaseloProchesUI?`<button type="button" class="secondary ps-small" data-proches="${esc(l.stay)}">Proches · écran en chambre</button>`:''}</div>
    ${plein&&s?cliniqueHtml(s,l)+transportHtml(s,l):''}</article>`;
  }
  function draw(){
@@ -70,6 +70,7 @@ root.createSorties=function(ctx){
   c.querySelectorAll('[data-jour]').forEach(b=>b.onclick=()=>{jour=b.dataset.jour;draw()});
   c.querySelectorAll('[data-plier]').forEach(b=>b.onclick=()=>{ouvert=ouvert===b.dataset.plier?null:b.dataset.plier;draw()});
   c.querySelectorAll('[data-ouvrir]').forEach(b=>b.onclick=()=>ctx.open(b.dataset.ouvrir));
+  c.querySelectorAll('[data-proches]').forEach(b=>b.onclick=()=>root.IaseloProchesUI?.ouvrir(b.dataset.proches));
   c.querySelectorAll('[data-etape]').forEach(b=>b.onclick=()=>{const tab=ONGLET[b.dataset.etape];if(tab)ctx.open(b.dataset.stay,tab);else{ouvert=b.dataset.stay;draw();c.querySelector('.so-bloc')?.scrollIntoView({block:'center'})}});
   c.querySelectorAll('form.so-presc').forEach(f=>f.onsubmit=e=>{e.preventDefault();const s=sejour(f.dataset.stay);if(!s)return;
    try{s.sortiePlus=R().prescrire(s.sortiePlus||{},{par:qui(),criteres:[...f.querySelectorAll('[name=c]:checked')].map(x=>x.value),note:f.note.value.trim()})}catch(x){toast(x.message);return}
