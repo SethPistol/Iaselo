@@ -37,6 +37,9 @@ window.createVeille=function(ctx){
  function viewHeader(title,id){$('#title').textContent=title;const nw=$('#new');if(nw)nw.hidden=true;const st=$('#stats');if(st)st.hidden=true;document.body.classList.remove('j-home');document.body.classList.add('v-controle-on');document.querySelectorAll('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id));}
  const plus=window.createVeillePlus?.(ctx,{who,can,trace,job,identity,goTab:k=>ctx.goTab(k),viewHeader,name:s=>name(s)})||null;
  if(plus)Object.assign(TABS,plus.TABS);
+ // Rédaction assistée (dist/redaction-ia.js) : brouillons relus puis acceptés ou rejetés, décision tracée.
+ const redac=window.createRedactionIa?.(ctx,{job,who})||null;
+ if(redac)Object.assign(TABS,redac.TABS);
  for(const [key,[group,label,pos]] of Object.entries(TABS)){const g=dossierStages.find(x=>x.id===group);if(g&&!g.items.some(([k])=>k===key))g.items.splice(Math.min(pos,g.items.length),0,[key,label]);}
 
  /* ================= Aide à la consultation ================= */
@@ -244,7 +247,7 @@ window.createVeille=function(ctx){
    if(!motif||motif.trim().length<5){e.stopImmediatePropagation();sel.value=stay.stage;toast('Étape non modifiée : dossier incomplet.');return}
    aide(stay).overrides=[...(aide(stay).overrides||[]),{at:new Date().toISOString(),by:who(),motif:motif.trim().slice(0,300),missing:c.blocking.map(i=>i.id)}];trace(stay,'Passage au bloc malgré dossier incomplet · motif : '+motif.trim(),'Bloc');},true);}
  }
- function panel(tab){(({aideCpa:panelAide,checklistHas:panelChecklist,suiviJ1:panelSuivi})[tab]||plus?.panels[tab])?.()}
+ function panel(tab){(({aideCpa:panelAide,checklistHas:panelChecklist,suiviJ1:panelSuivi})[tab]||plus?.panels[tab]||redac?.panels[tab])?.()}
 
  // Bouton de navigation « Tour de contrôle », juste après « Ma journée ».
  const home=document.querySelector('.nav[data-view="priorities"]');

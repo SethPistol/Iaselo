@@ -12,6 +12,7 @@ import {staffPlanningsInfirmiersApi} from './plannings-infirmiers.mjs';
 import {staffBlocOptimisationApi} from './bloc-optimisation.mjs';
 import {patientParcoursApi,staffParcoursApi} from './parcours-suivi.mjs';
 import {staffFhirApi,notifierFhir} from './fhir.mjs';
+import {staffRedactionApi} from './redaction-ia.mjs';
 import {staffCommandesPharmacieApi} from './commandes-pharmacie.mjs';
 import {recetteProgrammeApi} from './recette-bloc.mjs';
 import {patientSuiviJ1Api,staffSuiviJ1Api} from './suivi-j1.mjs';
@@ -80,6 +81,7 @@ export async function workspaceApi(request,env){
   const blocOptResponse=await staffBlocOptimisationApi(request,env,acl);if(blocOptResponse)return blocOptResponse;
   const parcoursResponse=await staffParcoursApi(request,env,acl);if(parcoursResponse)return parcoursResponse;
   const fhirResponse=await staffFhirApi(request,env,acl);if(fhirResponse)return fhirResponse;
+  const redactionResponse=await staffRedactionApi(request,env,acl);if(redactionResponse)return redactionResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;
   const pharmacieResponse=await staffCommandesPharmacieApi(request,env,acl);if(pharmacieResponse)return pharmacieResponse;
   const liaisonResponse=await staffLettreLiaisonApi(request,env,acl);if(liaisonResponse)return liaisonResponse;
