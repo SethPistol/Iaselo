@@ -23,7 +23,11 @@ test('appel J+1 : simulation, identité, réponses au questionnaire et alerte, r
   await put('stay/'+stay+'/consult',{ext:{surgeryDate:date}});
   await put('stay/'+stay+'/invitationContact',{contact:{firstName:'Lina',lastName:'FICTIF',birthDate:'1975-09-23',phone:'0612345678'},confirmed:true,verifiedBy:me,verifiedAt:new Date().toISOString(),source:'Test'});
   let r=await api('GET','/appel-j1');assert.equal(r.status,200);assert.equal(r.data.mode,'simulation');
-  let p=r.data.patients.find(x=>x.stay===stay);assert.ok(p.aAppeler);assert.equal(p.telephone,'061*****78');assert.equal(p.naissance,undefined);
+  // Par défaut : SMS seul, aucun appel proposé ni simulable.
+  let p=r.data.patients.find(x=>x.stay===stay);assert.equal(p.appelChoisi,false);assert.ok(!p.aAppeler);assert.ok(!p.rappelInfirmier);assert.equal(p.telephone,'061*****78');assert.equal(p.naissance,undefined);
+  r=await api('POST','/appel-j1',{action:'sans-reponse',stay,date});assert.equal(r.status,409);
+  r=await api('POST','/appel-j1',{action:'choisir',stay,actif:true});assert.equal(r.status,200);
+  p=(await api('GET','/appel-j1')).data.patients.find(x=>x.stay===stay);assert.equal(p.appelChoisi,true);assert.ok(p.aAppeler);
   r=await api('POST','/appel-j1',{action:'sans-reponse',stay,date});assert.equal(r.data.appel.statut,'sans-reponse');
   r=await api('POST','/appel-j1',{action:'simuler',stay,date,naissance:'12 mai 1980',reponses:{douleur:'sept'}});assert.equal(r.data.appel.identite,false);
   p=(await api('GET','/appel-j1')).data.patients.find(x=>x.stay===stay);assert.ok(!p.aAppeler);assert.ok(p.rappelInfirmier);assert.equal(p.appels.length,2);
@@ -39,9 +43,13 @@ test('appel J+1 : simulation, identité, réponses au questionnaire et alerte, r
   await put('stay/DÉMO-J1B/invitationContact',{contact:{firstName:'Paul',lastName:'FICTIF',birthDate:'1960-03-01',phone:'0700000000'},confirmed:true,verifiedBy:me,verifiedAt:new Date().toISOString(),source:'Test'});
   const signe=async corps=>{const ts=String(Math.floor(Date.now()/1000));return {'X-Iaselo-Horodatage':ts,'X-Iaselo-Signature':await signer(SECRET,ts,corps)}};
   assert.equal((await call('POST','/api/telephonie/j1/a-appeler','{}',{'X-Iaselo-Horodatage':'1','X-Iaselo-Signature':'x'})).status,401);
-  let x=await call('POST','/api/telephonie/j1/a-appeler','{}',await signe('{}'));const liste=(await x.json()).appels;
+  let x=await call('POST','/api/telephonie/j1/a-appeler','{}',await signe('{}'));assert.deepEqual((await x.json()).appels,[],'sans choix, aucun appel');
+  assert.equal((await api('POST','/appel-j1',{action:'choisir',stay:'DÉMO-J1B',actif:true})).status,200);
+  x=await call('POST','/api/telephonie/j1/a-appeler','{}',await signe('{}'));const liste=(await x.json()).appels;
   assert.deepEqual(liste.map(a=>a.stay),['DÉMO-J1B']);assert.equal(liste[0].numero,'0700000000');assert.match(liste[0].script.accueil,/de Paul/);
   const corps=JSON.stringify({stay:'DÉMO-J1B',date,naissance:'premier mars 1960',reponses:{douleur:'trois',nausees:'non',saignement:'non',temperature:'non',miction:'non',respiration:'oui',mollet:'non',moral:'oui'}});
   x=await call('POST','/api/telephonie/j1/resultat',corps,await signe(corps));const res=await x.json();assert.equal(x.status,200);assert.equal(res.urgence,true);
+  // Retirer l'appel : retour au SMS seul.
+  assert.equal((await api('POST','/appel-j1',{action:'choisir',stay:'DÉMO-J1B',actif:false})).data.appelChoisi,false);
  }finally{await pool.end()}
 });

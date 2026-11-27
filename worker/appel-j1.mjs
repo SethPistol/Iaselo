@@ -1,7 +1,10 @@
 // IASELO · appel du lendemain par agent vocal (27/11/2026, 4e veille, lot D). Règles : dist/appel-j1-regles.js.
+// PAR DÉFAUT, le lendemain = SMS automatique avec le questionnaire J+1 (rappels-auto). L'appel vocal est une OPTION, ajoutée
+// séjour par séjour par un soignant (table appels_j1_choix) ; sans ce choix, aucun appel n'est proposé à l'opérateur.
 //  Professionnels (soignants) :
 //   GET  /api/workspace/appel-j1?date=AAAA-MM-JJ   patients opérés ce jour-là (hier par défaut) : répondu ou à appeler, appels passés
-//   POST /api/workspace/appel-j1                   {action:'simuler', stay, date, naissance, reponses} | {action:'sans-reponse', stay, date}
+//   POST /api/workspace/appel-j1                   {action:'choisir', stay, actif} (ajouter ou retirer l'appel)
+//                                                  | {action:'simuler', stay, date, naissance, reponses} | {action:'sans-reponse', stay, date}
 //  Opérateur vocal (à brancher ; signature HMAC comme l'accueil téléphonique, TELEPHONIE_SECRET ; absent = 404, simulation) :
 //   POST /api/telephonie/j1/a-appeler   {date?} → appels à passer (numéro, prénom, script)
 //   POST /api/telephonie/j1/resultat    {stay, date, naissance, reponses, joint}
@@ -26,17 +29,20 @@ async function patients(env,date,peutLire=()=>true){
   if(R.datePrevueSejour(d)!==date||!peutLire('stay/'+stay+'/core'))continue;
   const [esp,contact,core]=await Promise.all([docData(env,'stay/'+stay+'/espacePatient'),docData(env,'stay/'+stay+'/invitationContact'),docData(env,'stay/'+stay+'/core')]);
   const reps=(esp?.suiviJ1?.reponses||[]).filter(x=>x.date===date),appels=((await env.DB.prepare('SELECT * FROM appels_j1 WHERE stay_id=? AND date_ref=? ORDER BY at').bind(stay,date).all()).results||[]);
+  const choix=await env.DB.prepare('SELECT actif,par,at FROM appels_j1_choix WHERE stay_id=?').bind(stay).first(),appelChoisi=!!choix?.actif;
   const joint=appels.some(a=>a.statut==='joint'),tentatives=appels.length,telephone=contact?.contact?.phone||'';
   const repondu=reps.some(x=>x.source!=='appel')?'questionnaire':joint?'appel':'';
   out.push({stay,prenom:t(core?.identity?.firstName),naissance:t(contact?.contact?.birthDate)||t(core?.identity?.birthDate),telephone,repondu,tentatives,
-   aAppeler:!repondu&&!!telephone&&tentatives<A.MAX_TENTATIVES&&!appels.some(a=>a.statut==='a-rappeler-ide'),
-   rappelInfirmier:!repondu&&(appels.some(a=>a.statut==='a-rappeler-ide')||tentatives>=A.MAX_TENTATIVES||!telephone),
+   appelChoisi,choixPar:choix?.actif?choix.par:'',
+   aAppeler:appelChoisi&&!repondu&&!!telephone&&tentatives<A.MAX_TENTATIVES&&!appels.some(a=>a.statut==='a-rappeler-ide'),
+   rappelInfirmier:appelChoisi&&!repondu&&(appels.some(a=>a.statut==='a-rappeler-ide')||tentatives>=A.MAX_TENTATIVES||!telephone),
    appels:appels.map(a=>({id:a.id,at:a.at,canal:a.canal,statut:a.statut,par:a.par,dit:JSON.parse(a.dit||'[]'),reponses:JSON.parse(a.reponses||'{}'),alertes:JSON.parse(a.alertes||'[]'),urgence:!!a.urgence}))});
  }
  return out;
 }
 export async function enregistrerAppel(env,acl,{stay,date,canal,naissance,reponses,joint=true}){
  const p=(await patients(env,date)).find(x=>x.stay===stay);if(!p)return {error:'Patient non opéré à cette date.',status:404};
+ if(!p.appelChoisi)return {error:'L’appel du lendemain n’a pas été ajouté pour ce patient (il reçoit le SMS).',status:409};
  const id=crypto.randomUUID(),at=new Date().toISOString(),par=acl.profile?.display_name||canal;
  let r={statut:'sans-reponse',dit:[],compris:{},alertes:[],urgence:false,identite:false};
  if(joint)r=A.analyser({naissance,reponses:reponses||{}},{naissanceAttendue:p.naissance,etab:env.MESSAGING?.establishment||env.ESTABLISHMENT,prenom:p.prenom});
@@ -62,6 +68,12 @@ export async function staffAppelJ1Api(request,env,acl){
  let d;try{d=await corps(request)}catch{return json({error:'Demande invalide.'},400)}
  const stay=t(d.stay),date=isDate(d.date)?d.date:hier();
  if(!/^[^/]{1,80}$/.test(stay)||!acl.canRead('stay/'+stay+'/core'))return json({error:'Séjour inaccessible.'},403);
+ if(d.action==='choisir'){
+  const actif=d.actif===true,at=new Date().toISOString(),par=acl.profile?.display_name||'soignant';
+  await env.DB.prepare('INSERT INTO appels_j1_choix(stay_id,actif,par,at) VALUES(?,?,?,?) ON CONFLICT(stay_id) DO UPDATE SET actif=excluded.actif,par=excluded.par,at=excluded.at').bind(stay,actif?1:0,par,at).run();
+  await acl.log('appel-j1','stay/'+stay+'/espacePatient','allowed',actif?'Appel du lendemain ajouté (en plus du SMS)':'Appel du lendemain retiré (SMS seul)');
+  return json({ok:true,appelChoisi:actif});
+ }
  if(!['simuler','sans-reponse'].includes(d.action))return json({error:'Action inconnue.'},400);
  const r=await enregistrerAppel(env,acl,{stay,date,canal:'simulation',naissance:t(d.naissance),reponses:d.reponses,joint:d.action==='simuler'});
  return json(r,r.error?r.status||400:200);

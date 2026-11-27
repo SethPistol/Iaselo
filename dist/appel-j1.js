@@ -1,4 +1,5 @@
 /* IASELO · appel du lendemain par agent vocal (4e veille, lot D), en tête du Télésuivi des patients.
+   Par défaut le patient reçoit seulement le SMS J+1 (questionnaire) ; l'appel est une option ajoutée patient par patient.
    Patients opérés la veille : questionnaire J+1 rempli, appel à passer, ou rappel infirmier. En SIMULATION, le soignant
    joue le rôle du patient (scénarios prêts) ; avec l'opérateur vocal branché, les appels partent seuls.
    Règles : appel-j1-regles.js ; serveur : worker/appel-j1.mjs. */
@@ -20,9 +21,11 @@ root.createAppelJ1=function(ctx){
  async function charger(){charge=true;try{etat=await api(date?'?date='+date:'');date=etat.date}catch(x){etat={erreur:x.message}}charge=false;dessiner()}
  function ligne(p){
   const der=p.appels.at(-1),al=p.appels.flatMap(a=>a.alertes);
+  if(!p.appelChoisi)return `<div class="aj-l"><div><strong>${esc(nom(p.stay))}</strong> <span class="sc-badge sc-ok">SMS</span><p>${p.repondu==='questionnaire'?'Questionnaire J+1 rempli par le patient':'SMS du lendemain avec le questionnaire J+1 (automatique)'} · pas d’appel</p></div>
+   <span class="sc-actions" style="margin:0">${p.repondu?'':`<button type="button" class="secondary ps-small" data-choix="${esc(p.stay)}" data-actif="1">Ajouter l’appel</button>`}${p.appels.length?`<button type="button" class="secondary ps-small" data-voir="${esc(p.stay)}">Transcription</button>`:''}</span></div>`;
   const etatTxt=p.repondu==='questionnaire'?'Questionnaire J+1 rempli par le patient':p.repondu==='appel'?'Joint par l’appel'+(al.length?' · '+al.map(a=>a.label).join(', '):' · sans alerte'):p.rappelInfirmier?(p.telephone?'À rappeler par une infirmière':'Pas de portable vérifié : à appeler par une infirmière'):'À appeler'+(p.tentatives?' (tentative '+(p.tentatives+1)+')':'');
-  return `<div class="aj-l"><div><strong>${esc(nom(p.stay))}</strong>${der?` <span class="sc-badge ${der.urgence?'sc-crit':der.statut==='joint'?'sc-ok':'sc-warn'}">${esc(STATUT[der.statut])} ${esc(fdt(der.at))}</span>`:''}<p>${esc(etatTxt)}${p.telephone?' · '+esc(p.telephone):''}</p></div>
-   <span class="sc-actions" style="margin:0">${p.repondu?'':`<button type="button" class="secondary ps-small" data-sim="${esc(p.stay)}">${etat.mode==='simulation'?'Simuler l’appel':'Voir'}</button>`}${p.appels.length?`<button type="button" class="secondary ps-small" data-voir="${esc(p.stay)}">Transcription</button>`:''}</span></div>`;
+  return `<div class="aj-l"><div><strong>${esc(nom(p.stay))}</strong>${der?` <span class="sc-badge ${der.urgence?'sc-crit':der.statut==='joint'?'sc-ok':'sc-warn'}">${esc(STATUT[der.statut])} ${esc(fdt(der.at))}</span>`:''}<p>SMS + appel${p.choixPar?' (ajouté par '+esc(p.choixPar)+')':''} · ${esc(etatTxt)}${p.telephone?' · '+esc(p.telephone):''}</p></div>
+   <span class="sc-actions" style="margin:0">${p.repondu?'':`<button type="button" class="secondary ps-small" data-sim="${esc(p.stay)}">${etat.mode==='simulation'?'Simuler l’appel':'Voir'}</button>`}${p.appels.length?`<button type="button" class="secondary ps-small" data-voir="${esc(p.stay)}">Transcription</button>`:''}${p.repondu||p.appels.length?'':`<button type="button" class="secondary ps-small" data-choix="${esc(p.stay)}" data-actif="0">Retirer l’appel</button>`}</span></div>`;
  }
  function dessiner(){
   if(ctx.view()!=='telesuivi')return;const c=document.querySelector('#workspace');if(!c)return;
@@ -30,11 +33,12 @@ root.createAppelJ1=function(ctx){
   if(!etat){el.innerHTML='<p>Chargement des appels du lendemain…</p>';if(!charge)charger();return}
   if(etat.erreur){el.innerHTML=`<p class="sc-mut">${esc(etat.erreur)}</p>`;return}
   const n=etat.patients.filter(p=>p.aAppeler).length,ide=etat.patients.filter(p=>p.rappelInfirmier).length;
-  el.innerHTML=`<div class="aj-tete"><h2 id="aj-t">Appels du lendemain (agent vocal)</h2><label class="sc-mut">Opérés le <input type="date" value="${esc(etat.date)}" data-date></label></div>
-   <p class="sc-mut">${etat.mode==='simulation'?'<b>Simulation</b> : aucun appel ne part tant que l’opérateur vocal n’est pas branché. ':''}Les patients qui n’ont pas rempli le questionnaire du lendemain sont appelés (2 tentatives). Les réponses arrivent dans le questionnaire J+1, avec les mêmes alertes au médecin. ${n} à appeler · ${ide} à rappeler par une infirmière.</p>
+  el.innerHTML=`<div class="aj-tete"><h2 id="aj-t">Lendemain de l’intervention : SMS et appel en option</h2><label class="sc-mut">Opérés le <input type="date" value="${esc(etat.date)}" data-date></label></div>
+   <p class="sc-mut">${etat.mode==='simulation'?'<b>Simulation</b> : aucun appel ne part tant que l’opérateur vocal n’est pas branché. ':''}Par défaut, chaque patient reçoit le <b>SMS du lendemain</b> avec le questionnaire J+1. L’<b>appel par l’agent vocal</b> est une option : ajoutez-le pour un patient (au besoin dès le jour de l’intervention, en choisissant la date) ; il n’est passé que si le questionnaire n’est pas rempli (2 tentatives), et les réponses arrivent dans le questionnaire J+1 avec les mêmes alertes au médecin. ${etat.patients.filter(p=>p.appelChoisi).length} appel(s) ajouté(s) · ${n} à appeler · ${ide} à rappeler par une infirmière.</p>
    ${etat.patients.length?etat.patients.map(ligne).join(''):'<p class="sc-mut">Aucun patient opéré ce jour-là.</p>'}`;
   el.querySelector('[data-date]').onchange=e=>{date=e.target.value;etat=null;dessiner()};
   el.querySelectorAll('[data-sim]').forEach(b=>b.onclick=()=>simuler(b.dataset.sim));
+  el.querySelectorAll('[data-choix]').forEach(b=>b.onclick=async()=>{const actif=b.dataset.actif==='1';try{await api('',{action:'choisir',stay:b.dataset.choix,actif});toast(actif?'Appel du lendemain ajouté, en plus du SMS.':'Appel retiré : le patient reçoit seulement le SMS.');etat=null;dessiner()}catch(x){toast(x.message)}});
   el.querySelectorAll('[data-voir]').forEach(b=>b.onclick=()=>voir(etat.patients.find(p=>p.stay===b.dataset.voir).appels.at(-1)));
  }
  let dlg=null;
