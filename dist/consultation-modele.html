@@ -813,6 +813,7 @@ const SCHEMA=[
  {id:'autonomie',l:'Dépendance et autonomie',ty:'radio',o:['Autonome','Aide partielle','Dépendant']}]},
 {id:'ttt',t:'Traitements et gestion périopératoire',f:[
  {id:'ttt_habituel',l:'Traitement habituel',ty:'area',req:1,none:'Pas de traitement',meds:1,h:'Une ligne par médicament. Entrée dans la posologie ajoute une ligne.'},
+ {id:'ttt_ordo',l:'Ordonnance',ty:'checks',o:['Ordonnance présentée'],h:'Cochez si le patient a présenté son ordonnance en cours.'},
  {id:'ttt_consignes',l:'Consignes',ty:'area',req:1,none:'Pas de consigne',
   pick:['Poursuite de l\'antiagrégant plaquettaire (AAP)','Arrêt de l\'AAP à J-3 (prévention primaire)','Prendre le traitement habituel le matin de l\'intervention','Prendre le traitement habituel le matin de l\'intervention, sauf : ','Arrêt de l\'anticoagulant oral direct (AOD) à J-3','Arrêt de l\'AVK à J-5, sans relais HBPM','Arrêt de l\'AVK à J-5, avec relais HBPM'],
   h:'Choisissez une consigne dans le menu : elle s\'ajoute au texte, que vous complétez ou modifiez librement.'}]},
