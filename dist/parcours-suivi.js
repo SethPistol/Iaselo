@@ -11,6 +11,8 @@ root.createParcoursSuivi=function(ctx){
  let data=null,erreur='',ouvert=null,dossier=null,filtre='tous',chargement=0,esatisRes=null,mode='parcours',msgStay=null;
  // Onglet « Messages des patients » (dist/messagerie.js).
  const msg=root.createMessagerieEquipe?.({esc,toast})||null;
+ // Onglet « Préhabilitation » (dist/prehabilitation-equipe.js, 5e veille lot 6).
+ const prehab=root.createPrehabEquipe?.({esc,toast})||null;
  const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>';
  const fmt=d=>d?new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}):'—';
  const fmtDT=iso=>iso?new Date(iso).toLocaleString('fr-FR',{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
@@ -87,9 +89,10 @@ root.createParcoursSuivi=function(ctx){
  }
  function draw(){
   const c=host();if(!c)return;
-  const n=msg?.nonLus()||0,onglets=msg?`<div class="ps-onglets" role="tablist"><button type="button" role="tab" aria-selected="${mode==='parcours'}" class="${mode==='parcours'?'on':''}" data-mode="parcours">Parcours de soins</button><button type="button" role="tab" aria-selected="${mode==='messages'}" class="${mode==='messages'?'on':''}" data-mode="messages">Messages des patients${n?`<span class="n">${n}</span>`:''}</button></div>`:'';
-  c.innerHTML=`<section class="panel"><div class="content"><div class="ps-wrap">${onglets}${mode==='messages'?'<div id="mg-hote"></div>':ouvert?vueDossier():vueTableau()}</div></div></section>`;
+  const n=msg?.nonLus()||0,onglets=msg||prehab?`<div class="ps-onglets" role="tablist"><button type="button" role="tab" aria-selected="${mode==='parcours'}" class="${mode==='parcours'?'on':''}" data-mode="parcours">Parcours de soins</button>${prehab?`<button type="button" role="tab" aria-selected="${mode==='prehab'}" class="${mode==='prehab'?'on':''}" data-mode="prehab">Préhabilitation</button>`:''}${msg?`<button type="button" role="tab" aria-selected="${mode==='messages'}" class="${mode==='messages'?'on':''}" data-mode="messages">Messages des patients${n?`<span class="n">${n}</span>`:''}</button>`:''}</div>`:'';
+  c.innerHTML=`<section class="panel"><div class="content"><div class="ps-wrap">${onglets}${mode==='messages'?'<div id="mg-hote"></div>':mode==='prehab'?'<div id="ph-hote" class="v-wrap"></div>':ouvert?vueDossier():vueTableau()}</div></div></section>`;
   c.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;msgStay=null;draw()});
+  if(mode==='prehab'){prehab.monter(c.querySelector('#ph-hote'));return}
   if(mode==='messages'){const st=msgStay;msgStay=null;msg.monter(c.querySelector('#mg-hote'),{stay:st,change:()=>{const b=c.querySelector('[data-mode="messages"]');if(b)b.innerHTML='Messages des patients'+(msg.nonLus()?`<span class="n">${msg.nonLus()}</span>`:'')}});return}
   c.querySelectorAll('[data-messagerie]').forEach(b=>b.onclick=()=>{mode='messages';msgStay=b.dataset.messagerie;draw()});
   c.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>ouvrir(b.dataset.open));

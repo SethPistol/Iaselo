@@ -387,7 +387,32 @@ const EN={
 "Indiquez votre nom et votre date de naissance.": "Please enter your surname and date of birth.",
 "Trop d’essais. Présentez-vous à l’accueil.": "Too many attempts. Please go to reception.",
 "Origine refusée.": "Request refused.",
-"Demande invalide.": "Invalid request."
+"Demande invalide.": "Invalid request.",
+"Ma préparation": "My preparation",
+"Ma préparation à l’intervention": "Preparing for my operation",
+"Chaque jour jusqu’à la veille de votre intervention, cochez vos activités. Une bonne préparation aide à mieux récupérer.": "Every day until the day before your operation, tick off your activities. Good preparation helps you recover better.",
+"Enregistrer ma journée": "Save my day",
+"Merci, votre journée est enregistrée.": "Thank you, your day has been saved.",
+"Aujourd’hui": "Today",
+"Hier": "Yesterday",
+"Avant-hier": "The day before yesterday",
+"Combien de minutes avez-vous marché aujourd’hui ?": "How many minutes did you walk today?",
+"Avez-vous fait vos exercices aujourd’hui ?": "Did you do your exercises today?",
+"Avez-vous mangé des protéines à chaque repas ?": "Did you eat protein at every meal?",
+"Avez-vous fumé aujourd’hui ?": "Did you smoke today?",
+"Marchez à un rythme qui vous essouffle un peu, en une ou plusieurs fois.": "Walk at a pace that makes you slightly out of breath, in one or several goes.",
+"Exercices de renforcement des jambes (se lever d’une chaise 10 fois, monter des marches) et de respiration profonde.": "Leg-strengthening exercises (standing up from a chair 10 times, climbing stairs) and deep-breathing exercises.",
+"Une source de protéines à chaque repas : viande, poisson, œufs, laitages ou légumineuses. Buvez régulièrement.": "A source of protein at every meal: meat, fish, eggs, dairy products or pulses. Drink regularly.",
+"Chaque jour sans tabac compte, même juste avant l’intervention. Votre médecin ou le 39 89 (Tabac info service) peuvent vous aider.": "Every day without tobacco counts, even just before the operation. Your doctor or 39 89 (Tabac info service) can help you.",
+"Ces conseils sont généraux. Les consignes de votre équipe priment toujours. Arrêtez un exercice qui provoque une douleur dans la poitrine, un essoufflement inhabituel ou un malaise, et appelez la clinique.": "This advice is general. Your care team’s instructions always take priority. Stop any exercise that causes chest pain, unusual breathlessness or feeling faint, and call the clinic.",
+"Le programme est terminé. Merci et à bientôt.": "The programme has ended. Thank you and see you soon.",
+"Votre programme est terminé. Merci !": "Your programme has ended. Thank you!",
+"Ce lien est incomplet. Utilisez le lien reçu par SMS ou le QR code remis par la clinique.": "This link is incomplete. Use the link received by text message or the QR code given by the clinic.",
+"Ce lien n’est plus valable. En cas de besoin, appelez la clinique.": "This link is no longer valid. If you need help, call the clinic.",
+"Ce jour ne peut plus être rempli.": "This day can no longer be filled in.",
+"Indiquez vos minutes de marche (0 à 600).": "Enter your walking minutes (0 to 600).",
+"Répondez à chaque question.": "Please answer every question.",
+"Jours remplis :": "Days filled in:"
 };
 // Paquet de langue : phrases + éléments des phrases composées (dates, rendez-vous, montants, écran en chambre).
 const PAQ_EN={code:'en',nom:'English',dir:'ltr',phrases:EN,
@@ -458,7 +483,7 @@ function choix(){const s=document.querySelector('.lang-switch select');if(s&&s.v
 // Chargement à la demande d'un paquet (script local, même origine : aucun service extérieur).
 function charger(code){
  if(code==='fr'||PAQ[code])return Promise.resolve(true);
- return new Promise(res=>{const sc=document.createElement('script');sc.src=base+'langues/'+code+'.js?v=2';sc.onload=()=>res(!!PAQ[code]);sc.onerror=()=>res(false);document.head.append(sc)});
+ return new Promise(res=>{const sc=document.createElement('script');sc.src=base+'langues/'+code+'.js?v=3';sc.onload=()=>res(!!PAQ[code]);sc.onerror=()=>res(false);document.head.append(sc)});
 }
 async function changer(code){
  if(!connue(code))code='fr';

@@ -20,6 +20,8 @@ import {staffTelephonieApi} from './telephonie.mjs';
 import {patientChambreApi,staffChambreApi,staffProchesApi} from './proches-chambre.mjs';
 import {patientArriveeApi,staffAccueilBlocApi} from './accueil-bloc.mjs';
 import {staffOrdonnanceNumeriqueApi} from './ordonnance-numerique.mjs';
+import {staffTableauPraticienApi} from './tableau-praticien.mjs';
+import {patientPrehabApi,staffPrehabApi} from './prehabilitation.mjs';
 import {staffAppelJ1Api} from './appel-j1.mjs';
 import {staffCoutSejourApi} from './cout-sejour.mjs';
 import {staffObjetsApi} from './objets-connectes.mjs';
@@ -42,6 +44,7 @@ export async function workspaceApi(request,env){
  if(path.startsWith('/api/parcours/'))return env.DB?patientParcoursApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/messagerie/'))return env.DB?patientMessagerieApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path==='/api/arrivee')return env.DB?patientArriveeApi(request,env):json({error:'Stockage serveur indisponible.'},503);
+ if(path.startsWith('/api/prehab/'))return env.DB?patientPrehabApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/chambre/'))return env.DB?patientChambreApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/preadmission/'))return env.DB?patientPreadmissionApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/espace-patient/'))return env.DB?patientEspacePatientApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
@@ -103,6 +106,8 @@ export async function workspaceApi(request,env){
   const appelJ1Response=await staffAppelJ1Api(request,env,acl);if(appelJ1Response)return appelJ1Response;
   const accueilBlocResponse=await staffAccueilBlocApi(request,env,acl);if(accueilBlocResponse)return accueilBlocResponse;
   const ordoNumResponse=await staffOrdonnanceNumeriqueApi(request,env,acl);if(ordoNumResponse)return ordoNumResponse;
+  const tableauPraticienResponse=await staffTableauPraticienApi(request,env,acl);if(tableauPraticienResponse)return tableauPraticienResponse;
+  const prehabResponse=await staffPrehabApi(request,env,acl);if(prehabResponse)return prehabResponse;
   const coutResponse=await staffCoutSejourApi(request,env,acl);if(coutResponse)return coutResponse;
   const objetsResponse=await staffObjetsApi(request,env,acl);if(objetsResponse)return objetsResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;

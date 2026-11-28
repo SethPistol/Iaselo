@@ -1,0 +1,11 @@
+.ph-page .ph-intro{font-size:18px}
+.ph-page form{display:grid;gap:16px;max-width:520px}
+.ph-page .ph-jour{font-size:15px;color:#4d5f68;margin:0}
+.ph-page .ph-conseil{font-size:14px;color:#4d5f68;margin:4px 0 0}
+.ph-page .ph-ok{font-size:18px;font-weight:600;color:#14532d;background:#e8f5ec;border-radius:12px;padding:12px 16px}
+.ph-page .ph-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;max-width:420px;margin:12px 0}
+.ph-page .ph-cal span{display:flex;align-items:center;justify-content:center;height:38px;border-radius:8px;background:#eef2f4;font-size:13px;color:#33474f}
+.ph-page .ph-cal span.ok{background:#2f7d4f;color:#fff}.ph-page .ph-cal span.part{background:#e0a422;color:#1b2b33}.ph-page .ph-cal span.ajd{outline:2px solid #134f5c}
+.ph-page .ph-jours{display:flex;gap:8px;flex-wrap:wrap}
+.ph-page .ph-stat{font-size:16px}
+.ph-page .sj-q>.v-seg{align-self:flex-start;display:inline-flex}

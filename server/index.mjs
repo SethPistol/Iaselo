@@ -54,6 +54,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   // Écran en chambre (tablette, lien activé par l'équipe) : vue du patient et demandes non urgentes, aucun envoi possible.
   // Accueil le jour J : le patient flashe le QR code de l'entrée (nom + date de naissance), arrivée notée, proches prévenus s'il l'a accepté.
   if(pathname==='/api/arrivee')return workspaceApi(request,{DB,MESSAGING:messaging});
+  // Préhabilitation (lien personnel) : programme de J-30 à J-1, saisies du patient, aucun envoi possible.
+  if(pathname.startsWith('/api/prehab/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   if(pathname.startsWith('/api/chambre/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   // Flux entrants des logiciels de la clinique (biologie, mouvements, moniteurs, courriers) : jeton propre à chaque émetteur.
   // Accueil téléphonique : agent vocal de l'opérateur (signature HMAC, TELEPHONIE_SECRET) ; absent = simulation.

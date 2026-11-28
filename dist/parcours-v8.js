@@ -2372,6 +2372,9 @@ const sortiesEcran=window.createSorties?.({esc,toast,patients,role:()=>role,job:
 if(sortiesEcran){const renderBeforeSorties=render;render=function(){if(view==='sorties'){closeCroDictation();sortiesEcran.render();return}renderBeforeSorties()}}
 const arriveesEcran=window.createArrivees?.({toast,job:jobNow,isAdmin:()=>{try{return !!professionalWorkspace?.getAccess?.()?.profile?.isAdmin}catch{return false}},view:()=>view,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(arriveesEcran){const renderBeforeArrivees=render;render=function(){if(view==='arrivees'){closeCroDictation();arriveesEcran.render();return}renderBeforeArrivees()}}
+// Tableau de bord personnel du praticien (5e veille, lot 6) : ouvert depuis « Ma journée ».
+const tableauPraticien=window.createTableauPraticien?.({esc,toast,job:jobNow,view:()=>view,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()},ouvrir:(stay,onglet)=>{selected=stay;view='patients';if(onglet)tab=onglet;render()}});
+if(tableauPraticien){const renderBeforeTableauPraticien=render;render=function(){if(view==='monTableau'){closeCroDictation();tableauPraticien.render();return}renderBeforeTableauPraticien();if(view==='priorities')tableauPraticien.lien()}}
 window.createAide?.({job:jobNow,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 window.createAppelJ1?.({esc,toast,patients,view:()=>view});
 window.createObjetsConnectes?.({esc,toast,patients,view:()=>view});
