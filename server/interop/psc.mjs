@@ -41,7 +41,7 @@ export function verifyJwt(token,jwks,{issuer,audience,nonce,now=Date.now(),leewa
  const t=Math.floor(now/1000);
  if(issuer&&claims.iss!==issuer)throw Error('Émetteur du jeton PSC inattendu.');
  if(audience&&!(Array.isArray(claims.aud)?claims.aud.includes(audience):claims.aud===audience))throw Error('Jeton PSC destiné à un autre service.');
- if(typeof claims.exp==='number'&&claims.exp+leeway<t)throw Error('Jeton PSC expiré.');
+ if(typeof claims.exp==='number'?claims.exp+leeway<t:nonce!==undefined)throw Error('Jeton PSC expiré ou sans date d’expiration.');
  if(typeof claims.nbf==='number'&&claims.nbf-leeway>t)throw Error('Jeton PSC pas encore valide.');
  if(nonce!==undefined&&claims.nonce!==nonce)throw Error('Nonce PSC invalide (rejeu possible).');
  return claims;

@@ -57,6 +57,9 @@ Configurer l’environnement de l’application dans Clever Cloud :
 | `BASE_URL` | Origine HTTPS publique exacte, par exemple `https://votre-domaine`, sans chemin |
 | `SESSION_SECRET` | Secret aléatoire généré ci-dessus |
 | `SESSION_HOURS` | `8` par défaut, de 1 à 24 |
+| `SESSION_IDLE_MINUTES` | `60` par défaut, de 5 à 480 : session close par le serveur après cette inactivité |
+| `MESSAGING_MAX_PAR_HEURE` | `400` par défaut (`100` en recette) : plafond d’e-mails et SMS par heure pour tout le serveur |
+| `MESSAGING_MAX_PAR_DESTINATAIRE` | `10` par défaut : plafond de messages par heure vers un même patient |
 | `BOOTSTRAP_ADMIN_EMAIL` | E-mail du premier administrateur |
 | `BOOTSTRAP_ADMIN_NAME` | Nom affiché du premier administrateur |
 | `BOOTSTRAP_ADMIN_PASSWORD_HASH` | Empreinte scrypt générée ci-dessus |

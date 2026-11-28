@@ -23,8 +23,12 @@ export function valider(d={}){
  return {valeurs:out,erreurs};
 }
 // Remplace les valeurs d'origine par celles de l'installation dans un texte servi (HTML, JS, SMS).
+// Audit du 27/11 : ces valeurs sont insérées telles quelles dans les scripts et pages servis. Une apostrophe droite
+// (« Clinique de l'Europe ») casserait les chaînes JavaScript et un guillemet permettrait d'injecter du code dans
+// toutes les pages : on remplace les caractères spéciaux par leur équivalent typographique, sans effet sur l'affichage.
+export const sur=v=>String(v||'').replace(/'/g,'’').replace(/"/g,'”').replace(/`/g,'’').replace(/[\\${}<>]/g,'').replace(/&/g,' et ').replace(/\s+/g,' ').trim();
 export function substituer(texte,e){
- if(!e||typeof texte!=='string')return texte;
+ if(!e||typeof texte!=='string')return texte;e=Object.fromEntries(Object.entries(e).map(([k,v])=>[k,typeof v==='string'?sur(v):v]));
  let s=texte;
  const paires=[
   [DEFAUT.adresse+', '+DEFAUT.cp+' '+DEFAUT.ville,[e.adresse,[e.cp,e.ville].filter(Boolean).join(' ')].filter(Boolean).join(', ')],

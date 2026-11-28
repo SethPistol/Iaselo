@@ -8,6 +8,9 @@ const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; ch
 const modeleOfficiel=fileURLToPath(new URL('../modeles/',import.meta.url));
 const modelesRoot=path.resolve(process.env.IASELO_MODELES_DIR||(existsSync(path.join(modeleOfficiel,'Xenova/whisper-small/onnx/encoder_model_quantized.onnx'))?modeleOfficiel:fileURLToPath(new URL('../node_modules/sts-whisper-small/models/',import.meta.url))));
 const modeleAutorise=/^\/modeles\/Xenova\/whisper-small\/(?:onnx\/(?:encoder_model_quantized|decoder_model_merged_quantized)\.onnx|[a-z_]+\.(?:json|txt))$/;
+// Sec-Fetch-Site est posé par le navigateur et ne peut pas être modifié par une page : « cross-site » ou « same-site »
+// signale une requête déclenchée depuis un autre site. Absent (outils, anciens navigateurs) : contrôle d'origine habituel.
+export const crossSite=request=>['cross-site','same-site'].includes(request.headers.get('Sec-Fetch-Site')||'');
 export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),interopEnv={},connectors=createConnectors(interopEnv),psc=createPsc({env:interopEnv,baseUrl:cfg.baseUrl,secret:cfg.sessionSecret})}){
  const auth=await createAuth(pool,cfg,{psc}),DB=postgresBinding(pool);
  // Identité de l'établissement de cette installation (nom, coordonnées, logos) : réglée par l'administrateur.
@@ -62,6 +65,9 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   const staff=await auth.user(request);
   if(pathname==='/api/admin/etablissement'){const r=await etab.api(request,staff,cfg.baseUrl);if(request.method==='POST'&&r.ok)await appliquerEtab();return r}
   if(pathname.startsWith('/api/workspace')){
+   // Audit du 27/11 : aucune requête vers le dossier ne peut venir d'un autre site, même une simple lecture
+   // (un lien piégé ouvert par un soignant connecté pourrait sinon déclencher une action, ex. messages marqués lus).
+   if(crossSite(request))return Response.json({error:'Requête d’un autre site refusée.'},{status:403});
    if(!staff)return Response.json({error:'Connexion professionnelle requise.'},{status:401});
    const headers=new Headers(request.headers);for(const k of [...headers.keys()])if(k.startsWith('oai-')||k==='cookie')headers.delete(k);
    headers.set('oai-authenticated-user-id',staff.id);headers.set('oai-authenticated-user-email',staff.email);headers.set('oai-authenticated-user-full-name',encodeURIComponent(staff.display_name));headers.set('oai-authenticated-user-full-name-encoding','percent-encoded-utf-8');
@@ -94,8 +100,10 @@ export function httpServer(handle,cfg){return http.createServer(async(req,res)=>
   const request=new Request(target,{method:req.method,headers,...(!['GET','HEAD'].includes(req.method)?{body:Buffer.concat(chunks)}:{})});const response=await handle(request);const output=new Headers(response.headers);
   output.set('X-Content-Type-Options','nosniff');
   // Polices publiques : lisibles par l’aide scientifique, cadre isolé d’origine « null ».
-  if(req.url.startsWith('/assets/fonts/'))output.set('Access-Control-Allow-Origin','*');output.set('Referrer-Policy','no-referrer');output.set('X-Frame-Options','DENY');if(!(req.url.startsWith('/modeles/')&&response.ok))output.set('Cache-Control','no-store');
-  output.set('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");if(cfg.secure)output.set('Strict-Transport-Security','max-age=31536000');
+  if(req.url.startsWith('/assets/fonts/'))output.set('Access-Control-Allow-Origin','*');output.set('Referrer-Policy','no-referrer');output.set('X-Frame-Options','DENY');output.set('Cross-Origin-Opener-Policy','same-origin');output.set('Permissions-Policy','camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()');if(!(req.url.startsWith('/modeles/')&&response.ok))output.set('Cache-Control','no-store');
+  output.set('Content-Security-Policy',"default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");if(cfg.secure)output.set('Strict-Transport-Security','max-age=31536000');
+  // Pièces jointes et documents téléchargés : la réponse impose une politique « sandbox » (aucun script, même ouvert dans un onglet).
+  if(/^sandbox\b/.test(response.headers.get('Content-Security-Policy')||''))output.set('Content-Security-Policy',response.headers.get('Content-Security-Policy'));
   // Les cadres scientifiques internes sont nécessaires au dossier ; eux seuls peuvent être embarqués.
   if(req.url.startsWith('/scientifique-')){output.set('X-Frame-Options','SAMEORIGIN');output.set('Content-Security-Policy',"default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'self'; object-src 'none'")}
   // Trame de consultation d’anesthésie : affichée dans le dossier (même origine) uniquement.

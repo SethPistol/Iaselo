@@ -1,3 +1,4 @@
+import {enTetesFichier,typeSur} from './fichiers-surs.mjs';
 import {patientQuestionnaireApi,staffQuestionnaireApi} from './questionnaire.mjs';
 import {professionalAccess,professionalRoutes} from './professional-access.mjs';import {openingRows,searchArchives,stayRows} from './archives.mjs';import {ITEM_MARKER,isItemKey,mergeItems,itemVersionStatements,documentAt,entries as itemEntries} from './items.mjs';
 import {veilleApi} from './veille.mjs';
@@ -181,7 +182,7 @@ export async function workspaceApi(request,env){
    }
    if(method==='GET'){
     const key=url.searchParams.get('key');if(!await allowFile(hash,key)){await acl.log('file-read',key||hash,'denied');return json({error:'Pièce jointe hors habilitation.'},403)}
-    const object=await env.BUCKET.get(hash);if(!object)return json({error:'Pièce jointe introuvable.'},404);await audit('file-read',hash);await acl.log('file-read',key||'backup','allowed','',hash);return new Response(object.body,{headers:{'Content-Type':object.httpMetadata?.contentType||'application/octet-stream','Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(object.customMetadata?.name||'document'),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+    const object=await env.BUCKET.get(hash);if(!object)return json({error:'Pièce jointe introuvable.'},404);await audit('file-read',hash);await acl.log('file-read',key||'backup','allowed','',hash);return new Response(object.body,{headers:{'Content-Type':typeSur(object.httpMetadata?.contentType),'Content-Disposition':"attachment; filename*=UTF-8''"+encodeURIComponent(object.customMetadata?.name||'document'),'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',...enTetesFichier(typeSur(object.httpMetadata?.contentType))}});
    }
   }
   return json({error:'Service inconnu.'},404);

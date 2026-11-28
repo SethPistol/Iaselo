@@ -8,7 +8,7 @@
 // Modules : biologie, courriers, interfaces, moniteurs, secours, transfusion, evenements, agenda, honoraires,
 // sterilisation, brancardage, planning, messagerie. Règles : dist/marche-regles.js et dist/interop-hl7.js.
 import {randomUUID,createHash,randomBytes} from 'node:crypto';
-import H from '../dist/interop-hl7.js';
+import H from '../dist/interop-hl7.js';import {enTetesFichier,typeSur} from './fichiers-surs.mjs';
 import M from '../dist/marche-regles.js';
 import planningCore from '../dist/planning-core.js';
 import {creerModuleAssurance} from './assurance-maladie.mjs';
@@ -179,7 +179,7 @@ const HANDLERS={
  courriers:{
   async get({env,acl,q,sous}){if(!LEC(acl,[...CLIN,'secretariat']))return json({error:'Courriers réservés aux soignants et au secrétariat.'},403);
    if(sous==='fichier'){const rec=await un(env,'courriers',q('id'));if(!rec||!rec.data.hash)return json({error:'Document introuvable.'},404);if(rec.stay?!voitSejour(acl,rec.stay):!est(acl,['anesthesiste','chirurgien','infirmier','secretariat']))return json({error:'Document hors habilitation.'},403);
-    const o=await env.BUCKET?.get(rec.data.hash);if(!o)return json({error:'Fichier introuvable.'},404);await acl.log('file-read','marche/courriers','allowed','Courrier reçu',rec.id);return new Response(o.body,{headers:{'Content-Type':rec.data.type,'Content-Disposition':'inline; filename="'+encodeURIComponent(rec.data.nom)+'"','Cache-Control':'no-store'}})}
+    const o=await env.BUCKET?.get(rec.data.hash);if(!o)return json({error:'Fichier introuvable.'},404);await acl.log('file-read','marche/courriers','allowed','Courrier reçu',rec.id);return new Response(o.body,{headers:{'Content-Type':typeSur(rec.data.type),'Content-Disposition':'inline; filename="'+encodeURIComponent(rec.data.nom)+'"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...enTetesFichier(typeSur(rec.data.type))}})}
    const stay=q('stay');if(stay){if(!voitSejour(acl,stay))return json({error:'Séjour hors habilitation.'},403);return json({courriers:await lire(env,'courriers',{stay})})}
    const tous=await lire(env,'courriers',{limit:400});await acl.log('read','marche/courriers','allowed','Courriers reçus');
    return json({courriers:visibles(acl,tous.filter(r=>r.stay),false),aRattacher:est(acl,['anesthesiste','chirurgien','infirmier','secretariat'])?tous.filter(r=>!r.stay):[]})},

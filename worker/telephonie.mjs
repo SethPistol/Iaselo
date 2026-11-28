@@ -44,9 +44,12 @@ export async function operateurTelephonieApi(request,env){
  return json({dire:r.reponse,transfert:r.transfert,orientation:r.orientation,id:r.id});
 }
 
+export const LECTEURS_APPELS=['secretariat','administration'];
 export async function staffTelephonieApi(request,env,acl){
  const url=new URL(request.url);if(url.pathname!=='/api/workspace/telephonie')return null;
- if(!acl.isAdmin&&acl.job==='unassigned')return json({error:'Accès réservé au personnel de la clinique.'},403);
+ // Audit du 27/11 : les appels (transcription, numéro complet) sont lus par le secrétariat, l'administration et
+ // l'administrateur seulement, comme le menu ; auparavant tout profil (pharmacie, DIM, facturation…) y avait accès.
+ if(!acl.isAdmin&&!LECTEURS_APPELS.includes(acl.job)){await acl.log('read','telephonie','denied','Accueil téléphonique hors habilitation');return json({error:'Accueil téléphonique réservé au secrétariat et à l’administration.'},403)}
  if(request.method==='GET'){
   const id=url.searchParams.get('appel');
   if(id){const r=await env.DB.prepare('SELECT * FROM telephonie_appels WHERE id=?').bind(id).first();if(!r)return json({error:'Appel introuvable.'},404);
