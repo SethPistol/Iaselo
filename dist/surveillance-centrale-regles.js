@@ -55,6 +55,14 @@ function alertes(s,now=new Date()){
  if(br&&num(br.value)<=SEUILS.braden)out.push({type:'braden',niveau:'warn',titre:'Risque d’escarre élevé (Braden '+br.value+')',detail:'Matelas adapté, changements de position, protection des talons.',depuis:br.at});
  if(mo&&num(mo.value)>=SEUILS.morse)out.push({type:'morse',niveau:'warn',titre:'Risque de chute élevé (Morse '+mo.value+')',detail:'Lit en position basse, sonnette à portée, aide au premier lever.',depuis:mo.at});
  if(s.stage==='Hospitalisation'&&(!br||!mo))out.push({type:'echelles',niveau:'info',titre:'Évaluer '+[!br&&'Braden',!mo&&'Morse'].filter(Boolean).join(' et '),detail:'Évaluation à l’entrée dans le service.',depuis:'entree'});
+ // Circuit du médicament (5e veille, lot 1) : doses prévues en retard ou à donner maintenant.
+ const ADM=typeof module==='object'&&module.exports?(()=>{try{return require('./administration-regles.js')}catch{return null}})():(typeof self!=='undefined'?self:globalThis).IaseloAdministration;
+ if(ADM&&Array.isArray(s.rx)&&s.rx.some(r=>r?.posologie&&r.validated)){
+  const loc=ADM.versLocal(now),p=ADM.plan(s.rx,loc,{avantH:24,apresH:0});
+  const retards=p.lignes.flatMap(l=>l.creneaux.filter(c=>c.etat==='retard').map(c=>({c,l})));
+  if(retards.length)out.push({type:'doses',niveau:'warn',titre:retards.length+' dose(s) en retard',detail:retards.slice(0,3).map(x=>x.l.rx.posologie.medicament+' prévue à '+x.c.at.slice(11,16).replace(':',' h ')).join(' ; ')+'. Plan d’administration dans l’onglet Prescriptions.',depuis:retards[0].c.at});
+  else if(p.aDonner)out.push({type:'doses',niveau:'info',titre:p.aDonner+' dose(s) à donner maintenant',detail:'Plan d’administration dans l’onglet Prescriptions.',depuis:p.lignes.flatMap(l=>l.creneaux.filter(c=>c.etat==='a-donner')).map(c=>c.at).sort()[0]});
+ }
  // Dénutrition (IMC de la consultation).
  const imc=imcDe(s),age=ageAns(s.identity?.birthDate,now);
  if(imc&&(imc<=18.5||age!=null&&age>=70&&imc<22))out.push({type:'denutrition',niveau:'warn',titre:'Dénutrition possible (IMC '+String(imc).replace('.',',')+')',detail:'Dépistage complet (perte de poids, apports) et avis diététique dans les 48 h.',depuis:'imc'+imc});

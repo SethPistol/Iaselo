@@ -11,6 +11,7 @@ coverage/
 *.zip
 /modeles/
 dist/assets/ccam.json
+dist/assets/medicaments-cip.json
 dist/assets/referentiels.json
 
 # Console des installations : liste et scripts avec secrets, jamais versionnés

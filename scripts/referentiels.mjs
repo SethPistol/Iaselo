@@ -4,7 +4,7 @@
 // Un échec n'empêche jamais le démarrage : la copie BDPM du dépôt reste en place, le codage indique « CCAM indisponible ».
 // L'état est écrit dans dist/assets/referentiels.json et affiché dans l'application.
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {gunzipSync} from 'node:zlib';
-import {construireBdpm,FICHIERS_BDPM,urlsBdpm} from '../server/referentiels/bdpm.mjs';
+import {construireBdpm,construirePresentations,FICHIERS_BDPM,urlsBdpm} from '../server/referentiels/bdpm.mjs';
 import {construireCcam,archivesSurPage,PAGE_CCAM} from '../server/referentiels/ccam.mjs';
 
 const racine=fileURLToPath(new URL('../dist/assets/',import.meta.url));
@@ -40,7 +40,11 @@ export async function majBdpm({dossier=racine,journal=console.log}={}){
  const base=construireBdpm(spe,compo);
  fs.writeFileSync(path.join(dossier,'medicaments-bdpm.json'),JSON.stringify(base)+'\n');
  journal('Base médicamenteuse BDPM : '+base.specialties.length+' spécialités ('+base.specialtiesDate+').');
- return {etat:'ok',specialites:base.specialties.length,date:base.specialtiesDate};
+ // Table CIP13 → CIS pour le scan des boîtes au lit du patient (facultative : sans elle, la boîte est vérifiée à l'œil).
+ let presentations=0;
+ try{const pr=construirePresentations(await premier(urlsBdpm(FICHIERS_BDPM.presentations)));fs.writeFileSync(path.join(dossier,'medicaments-cip.json'),JSON.stringify(pr)+'\n');presentations=Object.keys(pr.cip).length;journal('Présentations BDPM (CIP13) : '+presentations+' boîtes.')}
+ catch(e){journal('Présentations BDPM non mises à jour : '+String(e.message||e).slice(0,160))}
+ return {etat:'ok',specialites:base.specialties.length,date:base.specialtiesDate,presentations};
 }
 
 export async function majCcam({dossier=racine,journal=console.log,depot=CCAM_DEPOT,essais}={}){

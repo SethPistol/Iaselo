@@ -121,3 +121,11 @@ test('CCAM : le serveur reprend la version officielle dès qu’ameli répond à
   assert.equal((await rafraichirCcam({dossier,journal:()=>{}})).change,false);assert.equal(telechargements,0);
  }finally{globalThis.fetch=fetchOrig}
 });
+// Présentations BDPM (5e veille, lot 1) : table CIP13 → CIS pour le scan des boîtes au lit.
+import {construirePresentations} from '../server/referentiels/bdpm.mjs';
+test('présentations BDPM : CIP13 → CIS',()=>{
+ const lignes=Array.from({length:10001},(_,i)=>[String(60000000+i),'3000000','plaquette(s) de 8 comprimé(s)','Présentation active','Déclaration de commercialisation','01/01/2020',String(3400930000000+i),'oui','65%'].join('\t'));
+ const r=construirePresentations(Buffer.from(lignes.join('\n')),{date:'2026-11-28'});
+ assert.equal(r.cip['3400930000005'],'60000005');assert.equal(Object.keys(r.cip).length,10001);
+ assert.throws(()=>construirePresentations(Buffer.from(lignes.slice(0,5).join('\n'))),/incomplet/);
+});

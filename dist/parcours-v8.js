@@ -605,6 +605,8 @@ function prescriptions(){
   detail();
  };
  window.IaseloSecuriteUI?.decorer($('#content'),stay,{physician:physician(),valider:validerLignes});
+ // Circuit du médicament au lit (5e veille, lot 1) : prescription structurée, plan d'administration, 5 B.
+ window.IaseloAdministrationUI?.monter($('#content'),stay,{esc,toast,physician:physician(),nurse:nurseProfile(),role,auteur:()=>{try{return professionalWorkspace?.getAccess?.()?.profile?.display_name||role}catch{return role}},event,detail:()=>{if(p()===stay)detail()}});
  const draft=$('#rxform');
  if(draft)draft.onsubmit=e=>{
   e.preventDefault();

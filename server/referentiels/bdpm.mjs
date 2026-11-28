@@ -4,7 +4,7 @@
 import {lignesTabulees} from './archives.mjs';
 
 export const BASE_BDPM='https://base-donnees-publique.medicaments.gouv.fr';
-export const FICHIERS_BDPM={specialites:'CIS_bdpm.txt',compositions:'CIS_COMPO_bdpm.txt'};
+export const FICHIERS_BDPM={specialites:'CIS_bdpm.txt',compositions:'CIS_COMPO_bdpm.txt',presentations:'CIS_CIP_bdpm.txt'};
 export const urlsBdpm=fichier=>[BASE_BDPM+'/download/file/'+fichier,BASE_BDPM+'/telechargement.php?fichier='+fichier];
 
 export function construireBdpm(specialites,compositions,{date=new Date().toISOString().slice(0,10)}={}){
@@ -22,4 +22,13 @@ export function construireBdpm(specialites,compositions,{date=new Date().toISOSt
  }
  if(liste.length<10000)throw Error('Fichier des spécialités incomplet ('+liste.length+' lignes).');
  return {specialtiesDate:date,compositionDate:date,source:'Base de données publique des médicaments (ANSM, HAS, UNCAM), téléchargée le '+date,specialties:liste};
+}
+
+// Présentations (boîtes) : code CIP13 → code CIS. Sert au contrôle « bon médicament » quand l'infirmière scanne
+// le DataMatrix de la boîte (GTIN 0 + CIP13). Colonnes : CIS, CIP7, libellé, statut, commercialisation, date, CIP13…
+export function construirePresentations(presentations,{date=new Date().toISOString().slice(0,10)}={}){
+ const cip={};
+ for(const r of lignesTabulees(presentations)){const [cis,,,,,,cip13]=r;if(/^\d{8}$/.test(cis||'')&&/^\d{13}$/.test(cip13||''))cip[cip13]=cis}
+ const n=Object.keys(cip).length;if(n<10000)throw Error('Fichier des présentations incomplet ('+n+' lignes).');
+ return {date,source:'Base de données publique des médicaments (ANSM, HAS, UNCAM), présentations, téléchargée le '+date,cip};
 }
