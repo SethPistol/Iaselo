@@ -55,6 +55,8 @@ export async function makeApp({pool,bucket,cfg,messaging=brevoMessaging(),intero
   // Accueil le jour J : le patient flashe le QR code de l'entrée (nom + date de naissance), arrivée notée, proches prévenus s'il l'a accepté.
   if(pathname==='/api/arrivee')return workspaceApi(request,{DB,MESSAGING:messaging});
   // Préhabilitation (lien personnel) : programme de J-30 à J-1, saisies du patient, aucun envoi possible.
+  // Téléconsultation vidéo (lien personnel) : mise en relation WebRTC seulement, rien n'est enregistré.
+  if(pathname.startsWith('/api/visio/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||'',INTEROP_ENV:interopEnv});
   if(pathname.startsWith('/api/prehab/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   if(pathname.startsWith('/api/chambre/'))return workspaceApi(request,{DB,ESTABLISHMENT:messaging?.establishment||''});
   // Flux entrants des logiciels de la clinique (biologie, mouvements, moniteurs, courriers) : jeton propre à chaque émetteur.

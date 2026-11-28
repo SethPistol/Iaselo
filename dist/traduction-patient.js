@@ -412,7 +412,30 @@ const EN={
 "Ce jour ne peut plus être rempli.": "This day can no longer be filled in.",
 "Indiquez vos minutes de marche (0 à 600).": "Enter your walking minutes (0 to 600).",
 "Répondez à chaque question.": "Please answer every question.",
-"Jours remplis :": "Days filled in:"
+"Jours remplis :": "Days filled in:",
+"Rendez-vous vidéo": "Video appointment",
+"Votre rendez-vous vidéo": "Your video appointment",
+"Installez-vous au calme, avec une bonne connexion. Votre navigateur va vous demander l’accès à la caméra et au micro : acceptez.": "Settle somewhere quiet with a good connection. Your browser will ask for access to the camera and microphone: please accept.",
+"Entrer dans la salle": "Enter the room",
+"L’appel est chiffré et va directement de votre appareil à celui de votre soignant. Rien n’est enregistré.": "The call is encrypted and goes directly from your device to your clinician’s. Nothing is recorded.",
+"L’appel est terminé. Merci.": "The call has ended. Thank you.",
+"L’appel est terminé.": "The call has ended.",
+"Ce lien est incomplet. Utilisez le lien reçu par SMS ou par e-mail.": "This link is incomplete. Use the link received by text message or e-mail.",
+"La salle ouvre 15 minutes avant l’heure du rendez-vous.": "The room opens 15 minutes before the appointment time.",
+"Ce rendez-vous a été annulé.": "This appointment has been cancelled.",
+"Ce rendez-vous est terminé.": "This appointment has ended.",
+"Ce lien est bloqué. Appelez la clinique.": "This link is blocked. Please call the clinic.",
+"Chiffré de bout en bout · aucun enregistrement": "End-to-end encrypted · no recording",
+"Couper le micro": "Mute microphone",
+"Rétablir le micro": "Unmute microphone",
+"Couper la caméra": "Turn camera off",
+"Rétablir la caméra": "Turn camera on",
+"Raccrocher": "Hang up",
+"Connexion…": "Connecting…",
+"En attente de votre soignant…": "Waiting for your clinician…",
+"La connexion n’a pas pu s’établir. Vérifiez votre réseau ou réessayez.": "The connection could not be established. Check your network or try again.",
+"Connexion interrompue…": "Connection interrupted…",
+"Caméra et micro indisponibles : autorisez-les dans votre navigateur pour être vu et entendu.": "Camera and microphone unavailable: allow them in your browser so you can be seen and heard."
 };
 // Paquet de langue : phrases + éléments des phrases composées (dates, rendez-vous, montants, écran en chambre).
 const PAQ_EN={code:'en',nom:'English',dir:'ltr',phrases:EN,
@@ -483,7 +506,7 @@ function choix(){const s=document.querySelector('.lang-switch select');if(s&&s.v
 // Chargement à la demande d'un paquet (script local, même origine : aucun service extérieur).
 function charger(code){
  if(code==='fr'||PAQ[code])return Promise.resolve(true);
- return new Promise(res=>{const sc=document.createElement('script');sc.src=base+'langues/'+code+'.js?v=3';sc.onload=()=>res(!!PAQ[code]);sc.onerror=()=>res(false);document.head.append(sc)});
+ return new Promise(res=>{const sc=document.createElement('script');sc.src=base+'langues/'+code+'.js?v=4';sc.onload=()=>res(!!PAQ[code]);sc.onerror=()=>res(false);document.head.append(sc)});
 }
 async function changer(code){
  if(!connue(code))code='fr';
