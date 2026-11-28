@@ -316,6 +316,7 @@ function detail(){
  const navigate=key=>{if(tab==='consult')captureConsult();tab=nurseProfile()&&key==='science'?'consult':blocInterdit(key)?'perop':key;detail()};
  document.querySelectorAll('[data-dossier-stage]').forEach(button=>{button.onclick=()=>navigate((dossierStages.find(g=>g.id===button.dataset.dossierStage)||ADMIN_STAGE).defaultTab);button.onkeydown=e=>{if(adminJob())return;const index=dossierStages.findIndex(g=>g.id===button.dataset.dossierStage),count=dossierStages.length;let target;if(e.key==='ArrowRight')target=(index+1)%count;if(e.key==='ArrowLeft')target=(index+count-1)%count;if(e.key==='Home')target=0;if(e.key==='End')target=count-1;if(target===undefined)return;e.preventDefault();navigate(dossierStages[target].defaultTab);$('#dossier-tab-'+dossierStages[target].id).focus()}});
  if($('#dossier-section'))$('#dossier-section').onchange=e=>navigate(e.target.value);
+ if(!adminJob())window.IaseloDossierQuestionUI?.decorer(x,{esc,aller:navigate});
  (({surgeryAnnouncement,overview,preparation,instructions:patientInstructions,questionnaire:questionnaireReview,consult,science,perop,follow,rx:prescriptions,discharge,dischargeRx,dischargeLiaison,operativeReport,history,adminDossier})[tab]||(()=>veilleModule?.panel(tab)))();
  if(nurseProfile()&&!adminJob()){
   $('#content').insertAdjacentHTML('afterbegin',`<section class="notice nurse-tools no-print">

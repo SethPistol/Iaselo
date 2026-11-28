@@ -69,7 +69,8 @@ function creneaux(p,de,a){
 }
 // État d'une dose prévue : donnee | non-donnee | reportee | refusee | a-venir | a-donner | retard.
 function etatCreneau(rx,creneau,maintenant,tol=TOLERANCE_MIN){
- const ex=(rx.executions||[]).filter(e=>e.prevu===creneau).at(-1);
+ // Exécution rattachée au créneau, ou, à défaut, tracée sans créneau (saisie manuelle) dans la tolérance.
+ const ex=(rx.executions||[]).filter(e=>e.prevu===creneau).at(-1)||(rx.executions||[]).filter(e=>!e.prevu&&Math.abs(ms(e.at)-ms(creneau))<=tol*60000).at(-1);
  if(ex)return {etat:{'Réalisée':'donnee','Non réalisée':'non-donnee','Reportée':'reportee','Refusée':'refusee'}[ex.status]||'donnee',execution:ex};
  const d=(ms(maintenant)-ms(creneau))/60000;
  return {etat:d< -tol?'a-venir':d<=tol?'a-donner':'retard'};
