@@ -4,7 +4,7 @@
 (function(){
 'use strict';
 const Q=()=>window.IaseloDossierQuestion;
-let dlg=null,courant=null,ctxCourant=null;
+let dlg=null,courant=null,ctxCourant=null,bio={id:'',liste:[]};
 const style=document.createElement('style');style.textContent=`.dq-open{display:inline-flex;align-items:center;gap:6px}
 .dq{width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 32px);border:0;border-radius:18px;padding:0;background:var(--i-s1,#fff);color:var(--i-ink,#14232b);box-shadow:0 24px 60px rgba(10,30,40,.25)}
 .dq::backdrop{background:rgba(10,30,40,.45)}.dq-form{padding:18px 20px;display:grid;gap:12px}
@@ -37,7 +37,7 @@ function construire(){
  dlg.querySelector('[data-dq-form]').onsubmit=e=>{e.preventDefault();repondre(dlg.querySelector('#dq-q').value)};
 }
 function repondre(question){
- const r=Q().repondre(question,courant,{maintenant:new Date()}),zone=dlg.querySelector('.dq-rep');
+ const r=Q().repondre(question,courant,{maintenant:new Date(),biologie:bio.id===courant?.id?bio.liste:[]}),zone=dlg.querySelector('.dq-rep');
  zone.innerHTML=`<h3>${esc(r.titre)}</h3><p class="dq-texte">${esc(r.reponse)}</p>${r.elements.length?`<ul class="dq-el">${r.elements.map(f=>`<li><div><b>${esc(f.libelle)}</b><span>${esc(f.valeur)}</span></div><p class="dq-src">${esc(f.sourceLib)}${f.at?' · '+esc(Q().quand(f.at)):''}${f.onglet?` <button type="button" class="dq-lien" data-dq-ouvrir="${esc(f.onglet)}">Ouvrir</button>`:''}</p></li>`).join('')}</ul>`:''}<p class="dq-note">Réponse extraite du dossier, sans interprétation : vérifiez à la source avant toute décision.</p>`;
  zone.querySelectorAll('[data-dq-ouvrir]').forEach(b=>b.onclick=()=>{dlg.close();ctxCourant?.aller?.(b.dataset.dqOuvrir)});
 }
@@ -47,6 +47,8 @@ function ouvrir(stay,ctx){
  dlg.querySelectorAll('[data-dq-s]').forEach(b=>b.onclick=()=>{dlg.querySelector('#dq-q').value=b.dataset.dqS;repondre(b.dataset.dqS)});
  dlg.querySelector('.dq-rep').innerHTML='';dlg.querySelector('#dq-q').value='';
  dlg.showModal();dlg.querySelector('#dq-q').focus();
+ // Résultats de biologie reçus (serveur, selon les habilitations) : chargés à l'ouverture, jamais conservés.
+ if(bio.id!==stay.id){bio={id:stay.id,liste:[]};fetch('/api/workspace/marche/biologie?stay='+encodeURIComponent(stay.id),{cache:'no-store',credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&bio.id===stay.id)bio.liste=j.resultats||[]}).catch(()=>{})}
 }
 function decorer(stay,ctx){
  const actions=document.querySelector('#detail .detailhead .actions');if(!actions||!stay||actions.querySelector('[data-dq-open]'))return;

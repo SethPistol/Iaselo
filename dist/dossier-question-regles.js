@@ -14,7 +14,7 @@ const liste=v=>Array.isArray(v)?v.map(t).filter(Boolean):vide(v)?[]:[t(v)];
 const ts=at=>{const s=t(at);if(!s)return NaN;if(/^\d{2}\/\d{2}\/\d{4}/.test(s)){const [d,m,y]=s.slice(0,10).split('/');return Date.parse(y+'-'+m+'-'+d+'T'+(s.slice(11,16)||'00:00'))}return Date.parse(s.length===10?s+'T00:00':s)};
 const pad=n=>String(n).padStart(2,'0');
 function quand(at){const n=ts(at);if(!Number.isFinite(n))return t(at);const d=new Date(n);return pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+d.getHours()+' h '+pad(d.getMinutes())}
-const SOURCES={consult:'Consultation d’anesthésie',postopVitals:'Surveillance postopératoire',rx:'Prescriptions',perop:'Feuille d’anesthésie',nursingRecord:'Dossier infirmier',notes:'Transmissions',events:'Historique du dossier',sortiePlus:'Sortie',discharge:'Sortie',cro:'Compte rendu opératoire',core:'Séjour',soinsPlus:'Soins',questionnaire:'Questionnaire du patient'};
+const SOURCES={consult:'Consultation d’anesthésie',postopVitals:'Surveillance postopératoire',rx:'Prescriptions',perop:'Feuille d’anesthésie',nursingRecord:'Dossier infirmier',notes:'Transmissions',events:'Historique du dossier',sortiePlus:'Sortie',discharge:'Sortie',cro:'Compte rendu opératoire',biologie:'Biologie',core:'Séjour',soinsPlus:'Soins',questionnaire:'Questionnaire du patient'};
 // Onglet du dossier à ouvrir pour chaque source.
 const ONGLETS={consult:'consult',postopVitals:'follow',rx:'rx',perop:'perop',nursingRecord:'follow',notes:'follow',events:'history',sortiePlus:'discharge',discharge:'discharge',cro:'operativeReport',core:'consult',soinsPlus:'follow',questionnaire:'consult'};
 const PARAMS={sbp:'PA systolique',dbp:'PA diastolique',hr:'Fréquence cardiaque',rr:'Fréquence respiratoire',spo2:'SpO₂',temp:'Température',pain:'Douleur (EVA)',o2:'Oxygène',avpu:'Conscience',diurese:'Diurèse',glycemie:'Glycémie'};
@@ -27,7 +27,7 @@ function transmissions(stay){const out=[];
  for(const n of stay?.notes||[])out.push({at:n.at,auteur:n.role,texte:(n.context?n.context+' · ':'')+n.note,source:'notes'});
  return out.sort((a,b)=>ts(a.at)-ts(b.at))}
 
-function faits(stay,{maintenant=new Date()}={}){
+function faits(stay,{maintenant=new Date(),biologie=[]}={}){
  const F=[],add=(theme,libelle,valeur,source,at)=>{if(!vide(valeur))F.push({theme,libelle,valeur:t(valeur),source,sourceLib:SOURCES[source]||source,onglet:ONGLETS[source]||'',at:at||''})};
  const c=stay?.consult||{},cpa=c.cpa||{};
  add('intervention','Intervention',[cpa.libelle,cpa.cote].filter(x=>!vide(x)).join(' · ')||'', 'consult');
@@ -52,12 +52,14 @@ function faits(stay,{maintenant=new Date()}={}){
  for(const x of transmissions(stay))add('transmissions','Transmission'+(x.auteur?' · '+x.auteur:''),x.texte,x.source,x.at);
  const sp=stay?.sortiePlus||{};add('sortie','Sortie prévue',vide(sp.sortiePrevue)?'':quand(sp.sortiePrevue),'sortiePlus');add('sortie','Chambre',sp.chambre||stay?.preadmission?.chambre,'sortiePlus');add('sortie','Synthèse de sortie',stay?.discharge?.summary,'discharge');add('sortie','Consignes de sortie',stay?.discharge?.instructions,'discharge');
  add('cro','Compte rendu opératoire',typeof stay?.cro==='string'?stay.cro:stay?.cro?.texte||stay?.cro?.text,'cro');
+ for(const cr of biologie||[]){const d=cr?.data||cr||{};const quandCr=d.demandes?.[0]?.prelevement||cr?.day||'';for(const r of d.resultats||[]){if(vide(r.valeur))continue;const fl={haut:' ↑',bas:' ↓','critique-haut':' ↑↑ critique','critique-bas':' ↓↓ critique',critique:' critique',anormal:' anormal'}[r.interpretation]||'';add('biologie',t(r.libelle)||t(r.code),t(r.valeur)+(r.unite?' '+t(r.unite):'')+(r.intervalle?' (normes '+t(r.intervalle)+')':'')+fl,'biologie',r.date||r.prelevement||quandCr)}}
  for(const e of stay?.events||[])add('historique',t(e.kind)||'Historique',e.text,'events',e.at);
  return F;
 }
 
 const INTENTIONS=[
  ['allergies',/allerg|intoler|latex/,'Allergies'],
+ ['biologie',/biolog|bilan sanguin|\bnfs\b|hemoglobin|\bhb\b|plaquette|leucocyt|globules|kaliemi|potassium|natremi|sodium|ionogramme|creatin|\bdfg\b|clairance|uree|\binr\b|\btp\b|\btca\b|\bcrp\b|lactate|troponin|glycemie a jeun|hemoglobine glyquee|hba1c|ferritin|albumin/,'Biologie'],
  ['antibiotiques',/antibio|cefazol|cefuroxim|clindamy|vancomy|augmentin|amoxicil|reinjection/,'Antibiotiques'],
  ['derniereDose',/derniere dose|a quelle heure.*(recu|donne|pris)|quand.*(recu|donne|pris|administre)|a-t-(il|elle) (recu|eu|pris)|deja (recu|eu|pris)|administr/,'Administrations'],
  ['constantes',/constante|tension|pression|\bpa\b|frequence|pouls|\bfc\b|\bfr\b|spo2|saturation|temperature|fievre|febrile|douleur|\beva\b|diurese|glycemie|conscience|news/,'Constantes'],
@@ -73,15 +75,16 @@ const INTENTIONS=[
 ];
 const PARAM_Q=[['temp',/temperature|fievre|febrile|\bt\b/],['pain',/douleur|\beva\b|mal/],['spo2',/spo2|saturation|oxyg/],['hr',/pouls|\bfc\b|frequence cardiaque|cardiaque/],['rr',/\bfr\b|frequence respiratoire|respir/],['sbp',/tension|pression|\bpa\b/],['diurese',/diurese|urine/],['glycemie',/glycemie|sucre/],['avpu',/conscience|vigilance/]];
 
-const SUGGESTIONS=['Allergies ?','Dernières constantes','Douleur sur 24 h','Dernière dose de paracétamol','Traitements habituels','Prescriptions en cours','Antécédents','Antibioprophylaxie','Transmissions de la nuit','Sortie prévue'];
+const ANALYSES=[[/hemoglobin|\bhb\b/,/h[ée]moglobine(?! glyqu)|^hb\b|\bhgb\b/i],[/plaquette/,/plaquette/i],[/leucocyt|globules blancs/,/leucocyt|globules blancs|\bgb\b/i],[/kaliemi|potassium/,/potassium|kali[ée]mie|^k\b/i],[/natremi|sodium/,/sodium|natr[ée]mie|^na\b/i],[/creatin|\bdfg\b|clairance/,/cr[ée]atinin|dfg|clairance/i],[/uree/,/ur[ée]e/i],[/\binr\b/,/\binr\b/i],[/\btp\b/,/taux de prothrombine|^tp\b/i],[/\btca\b/,/\btca\b|c[ée]phaline/i],[/\bcrp\b/,/\bcrp\b|prot[ée]ine c/i],[/lactate/,/lactate/i],[/troponin/,/troponine/i],[/hba1c|glyquee/,/glyqu|hba1c/i],[/ferritin/,/ferritine/i],[/albumin/,/albumine/i]];
+const SUGGESTIONS=['Allergies ?','Dernière hémoglobine','Dernières constantes','Douleur sur 24 h','Dernière dose de paracétamol','Traitements habituels','Prescriptions en cours','Antécédents','Antibioprophylaxie','Transmissions de la nuit','Sortie prévue'];
 const MOTS_VIDES=new Set('le la les de des du un une et ou a au aux en est il elle t quel quelle quels quelles quoi qui que quand comment a-t-il a-t-elle son sa ses pour sur dans avec patient patiente dossier y on ce cette derniere dernier dernieres derniers il elle eu recu'.split(' '));
 function mots(q){return norm(q).split(/[^a-z0-9]+/).filter(w=>w.length>2&&!MOTS_VIDES.has(w))}
 
 function serieParam(stay,k,depuis){return vitals(stay).filter(r=>!vide(r.values[k])&&(!depuis||ts(r.at)>=depuis)).map(r=>({at:r.at,v:r.values[k],dbp:r.values.dbp}))}
 
 const resume=el=>el.slice(0,3).map(f=>f.libelle+' : '+f.valeur.replace(/[.\s]+$/,'')+(f.at?' ('+quand(f.at)+')':'')).join(' · ')+'.';
-function repondre(question,stay,{maintenant=new Date()}={}){
- const q=norm(question),now=maintenant instanceof Date?maintenant.getTime():Date.parse(maintenant),F=faits(stay,{maintenant});
+function repondre(question,stay,{maintenant=new Date(),biologie=[]}={}){
+ const q=norm(question),now=maintenant instanceof Date?maintenant.getTime():Date.parse(maintenant),F=faits(stay,{maintenant,biologie});
  const res=(intention,titre,reponse,elements)=>({intention,titre,reponse,elements:elements.slice(0,12),suggestions:SUGGESTIONS});
  if(!q)return res('vide','Posez une question','Exemples : « allergies ? », « dernière dose de paracétamol », « douleur sur 24 h ».',[]);
  const hit=INTENTIONS.find(([,re])=>re.test(q));const intention=hit?.[0]||'recherche';
@@ -94,6 +97,13 @@ function repondre(question,stay,{maintenant=new Date()}={}){
   if(!adm.length)return res(intention,'Administrations',m.length?'Aucune administration tracée pour « '+m.join(' ')+' » dans ce séjour.':'Aucune administration tracée dans ce séjour.',du('prescriptions'));
   const d=faites.at(-1);
   return res(intention,'Administrations',d?'Dernière dose donnée : '+t(d.rx.posologie?.medicament||d.rx.name)+(d.e.dose?' '+d.e.dose:'')+' le '+quand(d.e.at)+(d.e.author?' par '+d.e.author:'')+'. '+faites.length+' dose(s) donnée(s) au total.':'Aucune dose réalisée : '+adm.length+' administration(s) tracée(s) avec un autre statut.',el.reverse());
+ }
+ if(intention==='biologie'){
+  const bio=du('biologie').sort((a,b)=>(ts(b.at)||0)-(ts(a.at)||0)),cibles=ANALYSES.filter(([qre])=>qre.test(q)).map(([,re])=>re);
+  const el=cibles.length?bio.filter(f=>cibles.some(re=>re.test(f.libelle))):bio;
+  if(!el.length)return res(intention,'Biologie',cibles.length?'Aucun résultat de ce dosage reçu pour ce séjour.':'Aucun résultat de biologie reçu pour ce séjour.',[]);
+  const vus=new Set(),derniers=el.filter(f=>{const k=norm(f.libelle);if(vus.has(k))return false;vus.add(k);return true});
+  return res(intention,'Biologie',(cibles.length?'Dernier résultat : ':'Derniers résultats : ')+derniers.slice(0,4).map(f=>f.libelle+' '+f.valeur+(f.at?' ('+quand(f.at)+')':'')).join(' · ')+'.',el);
  }
  if(intention==='constantes'){
   const p=PARAM_Q.find(([,re])=>re.test(q))?.[0];const sur24=/24|journee|depuis|evolution|courbe|tendance|nuit/.test(q);

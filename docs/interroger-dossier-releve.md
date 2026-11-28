@@ -2,7 +2,7 @@
 
 ## Interroger le dossier
 Bouton « Interroger le dossier » (raccourci Alt + Q) dans l'en-tête de chaque séjour, pour les soignants et les médecins (pas pour les profils administratifs).
-- Question en langage courant ou question fréquente : allergies, dernières constantes, douleur ou température sur 24 h, dernière dose d'un médicament, traitements habituels, prescriptions, antécédents, antibioprophylaxie, transmissions de la nuit, sortie, poids et IMC. Sinon, recherche par mots dans tout le dossier.
+- Question en langage courant ou question fréquente : allergies, dernier résultat de biologie reçu (hémoglobine, kaliémie, créatinine, INR…), dernières constantes, douleur ou température sur 24 h, dernière dose d'un médicament, traitements habituels, prescriptions, antécédents, antibioprophylaxie, transmissions de la nuit, sortie, poids et IMC. Sinon, recherche par mots dans tout le dossier.
 - La réponse cite chaque élément avec sa rubrique et sa date, et un lien « Ouvrir » vers l'onglet concerné.
 - Moteur local (`dist/dossier-question-regles.js`) : la question n'est ni envoyée ni conservée, aucune interprétation médicale. Un modèle génératif hébergé HDS pourra s'y brancher plus tard avec les mêmes sources.
 

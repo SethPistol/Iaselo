@@ -43,3 +43,12 @@ test('relève : NEWS2 et éléments du journal infirmier',()=>{
  assert.match(r.A.join(' '),/NEWS2 6\./);assert.match(r.A.join(' '),/Saignement redon/);assert.match(r.A.join(' '),/Redon \(flanc droit\)/);
  assert.match(r.R.join(' '),/7 h 00 Pansement \(en retard\)/);assert.ok(r.alertes.includes('NEWS2 à 6'));
 });
+test('biologie reçue : dernier résultat par analyse',()=>{
+ const biologie=[{day:'2026-11-27',data:{demandes:[{prelevement:'2026-11-27T07:00'}],resultats:[{libelle:'Hémoglobine',valeur:'12.1',unite:'g/dL',intervalle:'12-16',interpretation:'normal'},{libelle:'Potassium',valeur:'5.9',unite:'mmol/L',interpretation:'haut'}]}},
+  {day:'2026-11-28',data:{demandes:[{prelevement:'2026-11-28T06:30'}],resultats:[{libelle:'Hémoglobine',valeur:'9.8',unite:'g/dL',intervalle:'12-16',interpretation:'bas'}]}}];
+ const r=Q.repondre('Dernière hémoglobine ?',stay(),{maintenant:now,biologie});
+ assert.equal(r.intention,'biologie');assert.match(r.reponse,/^Dernier résultat : Hémoglobine 9\.8 g\/dL \(normes 12-16\) ↓ \(28\/11 6 h 30\)/);assert.equal(r.elements.length,2);
+ assert.match(Q.repondre('kaliémie',stay(),{maintenant:now,biologie}).reponse,/Potassium 5\.9 mmol\/L ↑/);
+ assert.match(Q.repondre('INR',stay(),{maintenant:now,biologie}).reponse,/Aucun résultat de ce dosage/);
+ assert.match(Q.repondre('bilan sanguin',stay(),{maintenant:now}).reponse,/Aucun résultat de biologie/);
+});
