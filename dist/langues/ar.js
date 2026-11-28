@@ -378,6 +378,19 @@ window.IaseloLangue?.enregistrer({code:"ar",nom:"العربية",dir:"rtl",
 "Ambulance": "سيارة إسعاف",
 "Transport en commun": "وسائل النقل العام",
 "Langue": "اللغة",
-"Aller au contenu": "الانتقال إلى المحتوى"
+"Aller au contenu": "الانتقال إلى المحتوى",
+"Mon arrivée": "وصولي",
+"Signalez votre arrivée : l’équipe qui vous attend est prévenue.": "أبلغوا عن وصولكم: سيتم إخطار الفريق الذي ينتظركم.",
+"Votre nom de famille": "اسم العائلة",
+"Je suis arrivé(e)": "لقد وصلت",
+"Vos informations servent uniquement à prévenir l’équipe de votre arrivée.": "تُستخدم معلوماتكم فقط لإبلاغ الفريق بوصولكم.",
+"Merci": "شكرًا",
+"Merci, votre arrivée est enregistrée. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "شكرًا، تم تسجيل وصولكم. يُرجى التوجه إلى مكتب الاستقبال والقبول مع وثيقة هويتكم.",
+"Merci. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "شكرًا. يُرجى التوجه إلى مكتب الاستقبال والقبول مع وثيقة هويتكم.",
+"Si vous avez besoin d’aide, adressez-vous à l’accueil.": "إذا احتجتم إلى المساعدة، توجهوا إلى الاستقبال.",
+"Indiquez votre nom et votre date de naissance.": "يُرجى إدخال اسم العائلة وتاريخ الميلاد.",
+"Trop d’essais. Présentez-vous à l’accueil.": "محاولات كثيرة جدًا. يُرجى التوجه إلى الاستقبال.",
+"Origine refusée.": "تم رفض الطلب.",
+"Demande invalide.": "طلب غير صالح."
 }});
 })();

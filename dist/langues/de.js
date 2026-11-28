@@ -378,6 +378,19 @@ window.IaseloLangue?.enregistrer({code:"de",nom:"Deutsch",dir:"ltr",
 "Ambulance": "Krankenwagen",
 "Transport en commun": "Öffentliche Verkehrsmittel",
 "Langue": "Sprache",
-"Aller au contenu": "Zum Inhalt springen"
+"Aller au contenu": "Zum Inhalt springen",
+"Mon arrivée": "Meine Ankunft",
+"Signalez votre arrivée : l’équipe qui vous attend est prévenue.": "Melden Sie Ihre Ankunft: Das Team, das Sie erwartet, wird benachrichtigt.",
+"Votre nom de famille": "Ihr Nachname",
+"Je suis arrivé(e)": "Ich bin angekommen",
+"Vos informations servent uniquement à prévenir l’équipe de votre arrivée.": "Ihre Angaben dienen nur dazu, das Team über Ihre Ankunft zu informieren.",
+"Merci": "Danke",
+"Merci, votre arrivée est enregistrée. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "Danke, Ihre Ankunft wurde registriert. Bitte gehen Sie mit Ihrem Ausweis zur Patientenaufnahme.",
+"Merci. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "Danke. Bitte gehen Sie mit Ihrem Ausweis zur Patientenaufnahme.",
+"Si vous avez besoin d’aide, adressez-vous à l’accueil.": "Wenn Sie Hilfe brauchen, wenden Sie sich an den Empfang.",
+"Indiquez votre nom et votre date de naissance.": "Bitte geben Sie Ihren Nachnamen und Ihr Geburtsdatum an.",
+"Trop d’essais. Présentez-vous à l’accueil.": "Zu viele Versuche. Bitte gehen Sie zum Empfang.",
+"Origine refusée.": "Anfrage abgelehnt.",
+"Demande invalide.": "Ungültige Anfrage."
 }});
 })();

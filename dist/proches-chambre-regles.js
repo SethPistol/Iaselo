@@ -8,6 +8,7 @@
 'use strict';
 const t=v=>typeof v==='string'?v.replace(/[\u0000-\u001f]/g,' ').trim():'';
 const ETAPES=[
+ {id:'arrivee',libelle:'Arrivée à la clinique',auto:true},
  {id:'bloc',libelle:'Entrée au bloc opératoire',auto:true},
  {id:'reveil',libelle:'Arrivée en salle de réveil',auto:true},
  {id:'chambre',libelle:'Retour en chambre',auto:true},
@@ -20,7 +21,7 @@ const hm=h=>{const m=/^(\d{1,2})[:h ]?(\d{2})?/.exec(String(h||''));return m?Num
 // Texte du SMS : établissement, appellation choisie par le patient, étape, heure. Rien d'autre.
 function message(etab,appellation,etape,{heure=''}={}){
  const qui=t(appellation)||'votre proche',e=etab||'La clinique',h=hm(heure);
- const corps={bloc:'entrée au bloc opératoire'+(h?' à '+h:''),reveil:'arrivée en salle de réveil'+(h?' à '+h:''),chambre:'retour en chambre'+(h?' à '+h:'')+'. Les visites sont possibles aux horaires du service',
+ const corps={arrivee:'arrivée à la clinique'+(h?' à '+h:''),bloc:'entrée au bloc opératoire'+(h?' à '+h:''),reveil:'arrivée en salle de réveil'+(h?' à '+h:''),chambre:'retour en chambre'+(h?' à '+h:'')+'. Les visites sont possibles aux horaires du service',
   sortie:'la sortie est prévue aujourd’hui'+(h?' vers '+h:''),attente:'l’étape en cours prend plus de temps que prévu, un nouveau message suivra'}[etape];
  if(!corps)throw Error('Étape inconnue.');
  return e+' · Nouvelles de '+qui+' : '+corps+'. Message automatique, ne pas répondre.';

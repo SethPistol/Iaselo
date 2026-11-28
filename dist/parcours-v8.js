@@ -2369,6 +2369,8 @@ const surveillanceEcran=window.createSurveillanceCentrale?.({esc,toast,patients,
 if(surveillanceEcran){const renderBeforeSurv=render;render=function(){if(view==='surveillance'){closeCroDictation();surveillanceEcran.render();return}renderBeforeSurv()}}
 const sortiesEcran=window.createSorties?.({esc,toast,patients,role:()=>role,job:jobNow,view:()=>view,who:()=>{try{return professionalWorkspace?.getAccess?.()?.profile?.display_name||role}catch{return role}},open:(id,nextTab)=>{sejoursNav.dossier();if(view==='patients'&&tab==='consult'&&p())captureConsult();selected=id;tab=nextTab||(nurseProfile()?'follow':'consult');view='patients';filter='Tous';query='';render()},go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
 if(sortiesEcran){const renderBeforeSorties=render;render=function(){if(view==='sorties'){closeCroDictation();sortiesEcran.render();return}renderBeforeSorties()}}
+const arriveesEcran=window.createArrivees?.({toast,job:jobNow,isAdmin:()=>{try{return !!professionalWorkspace?.getAccess?.()?.profile?.isAdmin}catch{return false}},view:()=>view,go:v=>{if(view==='patients'&&tab==='consult'&&p())captureConsult();view=v;render()}});
+if(arriveesEcran){const renderBeforeArrivees=render;render=function(){if(view==='arrivees'){closeCroDictation();arriveesEcran.render();return}renderBeforeArrivees()}}
 window.createAppelJ1?.({esc,toast,patients,view:()=>view});
 window.createObjetsConnectes?.({esc,toast,patients,view:()=>view});
 window.createProchesChambre?.({esc,toast,patients,role:()=>role,peutEcrire:()=>!jobNow()||['anesthesiste','chirurgien','infirmier','secretariat'].includes(jobNow())});

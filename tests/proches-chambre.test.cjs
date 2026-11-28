@@ -11,7 +11,8 @@ test('SMS des proches : étape et heure seulement, aucune donnée médicale',()=
 test('accord du patient obligatoire, portables vérifiés, deux proches au plus',()=>{
  assert.match(P.valider({proches:[{prenom:'Marc',telephone:'0612345678'}]}).errors.join(),/accord du patient/);
  const v=P.valider({accord:true,proches:[{prenom:'Marc',telephone:'+33 6 12 34 56 78'}],appellation:'prenom'},{prenomPatient:'Lina'});
- assert.ok(v.ok);assert.equal(v.data.proches[0].telephone,'0612345678');assert.equal(v.data.appellation,'Lina');assert.deepEqual(v.data.etapes,['bloc','reveil','chambre','sortie']);
+ assert.ok(v.ok);assert.equal(v.data.proches[0].telephone,'0612345678');assert.equal(v.data.appellation,'Lina');assert.deepEqual(v.data.etapes,['arrivee','bloc','reveil','chambre','sortie']);
+ assert.match(P.message('Clinique','Lina','arrivee',{heure:'07:40'}),/arrivée à la clinique à 7 h 40/);
  assert.equal(P.valider({accord:true,proches:[{prenom:'Marc',telephone:'0612345678'}],appellation:'neutre'}).data.appellation,'votre proche');
  assert.ok(!P.valider({accord:true,proches:[{prenom:'A',telephone:'0145000000'}]}).ok);
  assert.ok(!P.valider({accord:true,proches:[1,2,3].map(i=>({prenom:'P'+i,telephone:'061234567'+i}))}).ok);

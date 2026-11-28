@@ -374,7 +374,20 @@ const EN={
 "Ambulance": "Ambulance",
 "Transport en commun": "Public transport",
 "Langue": "Language",
-"Aller au contenu": "Skip to content"
+"Aller au contenu": "Skip to content",
+"Mon arrivée": "My arrival",
+"Signalez votre arrivée : l’équipe qui vous attend est prévenue.": "Let us know you have arrived: the team expecting you will be notified.",
+"Votre nom de famille": "Your surname",
+"Je suis arrivé(e)": "I have arrived",
+"Vos informations servent uniquement à prévenir l’équipe de votre arrivée.": "Your details are only used to notify the team of your arrival.",
+"Merci": "Thank you",
+"Merci, votre arrivée est enregistrée. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "Thank you, your arrival has been recorded. Please go to the admissions desk with your ID.",
+"Merci. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "Thank you. Please go to the admissions desk with your ID.",
+"Si vous avez besoin d’aide, adressez-vous à l’accueil.": "If you need help, please ask at reception.",
+"Indiquez votre nom et votre date de naissance.": "Please enter your surname and date of birth.",
+"Trop d’essais. Présentez-vous à l’accueil.": "Too many attempts. Please go to reception.",
+"Origine refusée.": "Request refused.",
+"Demande invalide.": "Invalid request."
 };
 // Paquet de langue : phrases + éléments des phrases composées (dates, rendez-vous, montants, écran en chambre).
 const PAQ_EN={code:'en',nom:'English',dir:'ltr',phrases:EN,
@@ -445,7 +458,7 @@ function choix(){const s=document.querySelector('.lang-switch select');if(s&&s.v
 // Chargement à la demande d'un paquet (script local, même origine : aucun service extérieur).
 function charger(code){
  if(code==='fr'||PAQ[code])return Promise.resolve(true);
- return new Promise(res=>{const sc=document.createElement('script');sc.src=base+'langues/'+code+'.js?v=1';sc.onload=()=>res(!!PAQ[code]);sc.onerror=()=>res(false);document.head.append(sc)});
+ return new Promise(res=>{const sc=document.createElement('script');sc.src=base+'langues/'+code+'.js?v=2';sc.onload=()=>res(!!PAQ[code]);sc.onerror=()=>res(false);document.head.append(sc)});
 }
 async function changer(code){
  if(!connue(code))code='fr';

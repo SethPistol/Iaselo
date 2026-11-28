@@ -18,6 +18,7 @@ import {patientMessagerieApi,staffMessagerieApi} from './messagerie.mjs';
 import {staffContinuiteApi} from './continuite.mjs';
 import {staffTelephonieApi} from './telephonie.mjs';
 import {patientChambreApi,staffChambreApi,staffProchesApi} from './proches-chambre.mjs';
+import {patientArriveeApi,staffAccueilBlocApi} from './accueil-bloc.mjs';
 import {staffAppelJ1Api} from './appel-j1.mjs';
 import {staffCoutSejourApi} from './cout-sejour.mjs';
 import {staffObjetsApi} from './objets-connectes.mjs';
@@ -39,6 +40,7 @@ export async function workspaceApi(request,env){
  if(path.startsWith('/api/suivi-j1/'))return env.DB?patientSuiviJ1Api(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/parcours/'))return env.DB?patientParcoursApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/messagerie/'))return env.DB?patientMessagerieApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
+ if(path==='/api/arrivee')return env.DB?patientArriveeApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/chambre/'))return env.DB?patientChambreApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/preadmission/'))return env.DB?patientPreadmissionApi(request,env):json({error:'Stockage serveur indisponible.'},503);
  if(path.startsWith('/api/espace-patient/'))return env.DB?patientEspacePatientApi(request,env,env.ESTABLISHMENT):json({error:'Stockage serveur indisponible.'},503);
@@ -98,6 +100,7 @@ export async function workspaceApi(request,env){
   const prochesResponse=await staffProchesApi(request,env,acl);if(prochesResponse)return prochesResponse;
   const chambreResponse=await staffChambreApi(request,env,acl);if(chambreResponse)return chambreResponse;
   const appelJ1Response=await staffAppelJ1Api(request,env,acl);if(appelJ1Response)return appelJ1Response;
+  const accueilBlocResponse=await staffAccueilBlocApi(request,env,acl);if(accueilBlocResponse)return accueilBlocResponse;
   const coutResponse=await staffCoutSejourApi(request,env,acl);if(coutResponse)return coutResponse;
   const objetsResponse=await staffObjetsApi(request,env,acl);if(objetsResponse)return objetsResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;

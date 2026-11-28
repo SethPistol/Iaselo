@@ -14,7 +14,7 @@ const MENUS={
  infirmier:['priorities','controle','surveillance','patients','telesuivi','releve','identity','regulation','planningsInfirmiers','ouvertureSalles','pharmacy','tasks'],
  // Infirmier(ère) d'étage : sans l'ouverture des salles (ni la check-list HAS, masquée dans le dossier).
  infirmier_etage:['priorities','controle','surveillance','sorties','patients','telesuivi','releve','identity','regulation','planningsInfirmiers','pharmacy','tasks'],
- secretariat:['priorities','controle','sorties','patients','telephonie','preadmissions','identity','questionnaireSend','regulation','tasks'],
+ secretariat:['priorities','controle','sorties','arrivees','patients','telephonie','preadmissions','identity','questionnaireSend','regulation','tasks'],
  // Pharmacien et préparateur en pharmacie : même menu ; les droits (validation) diffèrent côté serveur.
  pharmacien:['controle','patients','pharmacy','commandesPharmacie','tasks'],
  dim:['patients','pmsi','activity','coutsSejour','tasks'],
@@ -26,7 +26,7 @@ const MENUS={
 // « Bloc & lits » : l'administrateur y gère les plages opératoires des chirurgiens (26/11/2026).
 // Plannings infirmiers : l'administrateur les consulte (lecture seule, la validation revient au cadre).
 // API FHIR & partenaires (27/11/2026) : logiciels autorisés à lire le dossier.
-const ADMIN=['indicateurs','coutsSejour','telephonie','professionalAccess','pilotage','droits','fhir','etablissement','repriseEmed','protocoles','commandesPharmacie','regulation','planningsInfirmiers','activity','billing'];
+const ADMIN=['arrivees','indicateurs','coutsSejour','telephonie','professionalAccess','pilotage','droits','fhir','etablissement','repriseEmed','protocoles','commandesPharmacie','regulation','planningsInfirmiers','activity','billing'];
 // Entrées retirées pour tous (doublons ou démonstration).
 const RETIREES=['search','service','open-nursing-record','portal','patientlink'];
 function menuPourProfil(profession,isAdmin,poste){

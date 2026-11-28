@@ -378,6 +378,19 @@ window.IaseloLangue?.enregistrer({code:"es",nom:"Español",dir:"ltr",
 "Ambulance": "Ambulancia",
 "Transport en commun": "Transporte público",
 "Langue": "Idioma",
-"Aller au contenu": "Ir al contenido"
+"Aller au contenu": "Ir al contenido",
+"Mon arrivée": "Mi llegada",
+"Signalez votre arrivée : l’équipe qui vous attend est prévenue.": "Indique su llegada: el equipo que le espera será avisado.",
+"Votre nom de famille": "Su apellido",
+"Je suis arrivé(e)": "He llegado",
+"Vos informations servent uniquement à prévenir l’équipe de votre arrivée.": "Sus datos solo sirven para avisar al equipo de su llegada.",
+"Merci": "Gracias",
+"Merci, votre arrivée est enregistrée. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "Gracias, su llegada ha quedado registrada. Preséntese en el mostrador de admisiones con su documento de identidad.",
+"Merci. Présentez-vous à l’accueil des admissions avec votre pièce d’identité.": "Gracias. Preséntese en el mostrador de admisiones con su documento de identidad.",
+"Si vous avez besoin d’aide, adressez-vous à l’accueil.": "Si necesita ayuda, diríjase a recepción.",
+"Indiquez votre nom et votre date de naissance.": "Indique su apellido y su fecha de nacimiento.",
+"Trop d’essais. Présentez-vous à l’accueil.": "Demasiados intentos. Diríjase a recepción.",
+"Origine refusée.": "Solicitud rechazada.",
+"Demande invalide.": "Solicitud no válida."
 }});
 })();
