@@ -842,6 +842,7 @@ function dischargeRx(){
   ${saved?.securite?window.IaseloSecuriteUI?.ligneSignee(saved.securite)||'':''}
   ${doc}
  </section>`;
+ window.IaseloOrdoNumUI?.monter($('#content'),stay,{physician:write,job:jobNow(),toast,event,print:printDischargeDocument,docHtml:()=>stay.discharge.ordinance?dischargeRxDoc(stay.id,stay.discharge.ordinance):''});
  if(!write)return;
  const form=$('#discharge-rx-form'),preview=$('.discharge-rx-preview');
  const readItems=()=>{

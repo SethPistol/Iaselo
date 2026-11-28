@@ -19,6 +19,7 @@ import {staffContinuiteApi} from './continuite.mjs';
 import {staffTelephonieApi} from './telephonie.mjs';
 import {patientChambreApi,staffChambreApi,staffProchesApi} from './proches-chambre.mjs';
 import {patientArriveeApi,staffAccueilBlocApi} from './accueil-bloc.mjs';
+import {staffOrdonnanceNumeriqueApi} from './ordonnance-numerique.mjs';
 import {staffAppelJ1Api} from './appel-j1.mjs';
 import {staffCoutSejourApi} from './cout-sejour.mjs';
 import {staffObjetsApi} from './objets-connectes.mjs';
@@ -101,6 +102,7 @@ export async function workspaceApi(request,env){
   const chambreResponse=await staffChambreApi(request,env,acl);if(chambreResponse)return chambreResponse;
   const appelJ1Response=await staffAppelJ1Api(request,env,acl);if(appelJ1Response)return appelJ1Response;
   const accueilBlocResponse=await staffAccueilBlocApi(request,env,acl);if(accueilBlocResponse)return accueilBlocResponse;
+  const ordoNumResponse=await staffOrdonnanceNumeriqueApi(request,env,acl);if(ordoNumResponse)return ordoNumResponse;
   const coutResponse=await staffCoutSejourApi(request,env,acl);if(coutResponse)return coutResponse;
   const objetsResponse=await staffObjetsApi(request,env,acl);if(objetsResponse)return objetsResponse;
   const planningsInfResponse=await staffPlanningsInfirmiersApi(request,env,acl);if(planningsInfResponse)return planningsInfResponse;

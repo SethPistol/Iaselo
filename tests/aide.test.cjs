@@ -5,7 +5,8 @@ test('recherche « Comment faire… » : la bonne fiche en tête, synonymes, mé
  assert.equal(A.chercher('comment donner une dose','infirmier')[0].id,'administrer');
  assert.equal(A.chercher('scanner la boîte','infirmier')[0].id,'administrer');
  assert.equal(A.chercher('faire la passation','infirmier')[0].id,'releve');
- assert.equal(A.chercher('ordonnance','anesthesiste')[0].id,'prescrire');
+ assert.equal(A.chercher('prescrire un médicament','anesthesiste')[0].id,'prescrire');
+ assert.equal(A.chercher('QR code de l’ordonnance pour la pharmacie','anesthesiste')[0].id,'ordonnance-numerique');
  assert.equal(A.chercher('accueil des patients QR','secretariat')[0].id,'arrivees');
  assert.equal(A.chercher('verrouiller mon écran','chirurgien')[0].id,'verrou');
  assert.equal(A.chercher('xyzzy','infirmier').length,0);
